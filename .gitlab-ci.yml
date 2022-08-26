@@ -1,0 +1,75 @@
+variables:
+  TF_VAR_app_env: Prod
+
+include:
+  - template: Security/SAST.gitlab-ci.yml
+
+before_script:
+  - touch .env
+  - make --version
+  - terraform --version
+  - aws --version
+
+stages:
+  - test
+  - plan
+  - apply
+
+sast:
+  stage: test
+
+tf:plan:
+  retry: 2
+  tags:
+    - linode
+  stage: plan
+  script:
+    - make plan
+  only:
+    refs:
+      - merge_request
+      - main
+  artifacts:
+    name: tfplan
+    paths:
+      - plans/.tfplan
+    reports:
+      terraform: plans/tfplan.json
+
+tf:apply:
+  retry: 2
+  tags:
+    - linode
+  stage: apply
+  script:
+    - make apply
+  only:
+    refs:
+      - main
+  environment:
+    name: aws
+    url: https://sso.jumpcloud.com/saml2/aws1
+    on_stop: tf:destroy
+  dependencies:
+    - tf:plan
+  when: manual
+
+tf:destroy:
+  retry: 2
+  stage: apply
+  variables:
+    GIT_STRATEGY: none
+  tags:
+    - linode
+  script:
+    - make destroy
+  when: manual
+  environment:
+    name: aws
+    action: stop
+  artifacts:
+    name: tfdestroy
+    paths:
+      - plans/.tfdestroy
+    reports:
+      terraform: plans/tfdestroy.json
