@@ -1,5 +1,7 @@
 import logging
-from os import getenv
+import json
+from os import getenv, path
+from copy import deepcopy
 
 import boto3
 from retry.api import retry
@@ -11,12 +13,13 @@ from botocore.exceptions import (
     ReadTimeoutError,
 )
 
-__trivialscan_version__ = "3.0.0rc4"
+__trivialscan_version__ = "3.0.0rc6"
 
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
-logger = logging.getLogger(__name__)
+DASHBOARD_API_URL = "https://dashboard.trivialsec.com"
+logger = logging.getLogger("uvicorn.default")
 ssm_client = boto3.client(service_name="ssm")
 s3_client = boto3.client(service_name="s3")
 
@@ -128,7 +131,7 @@ def get_s3(bucket_name: str, path_key: str, default=None, **kwargs) -> str:
     backoff=1,
 )
 def store_s3(bucket_name: str, path_key: str, value:str, **kwargs) -> bool:
-    logger.info(f"storing object key {path_key}")
+    logger.info(f"storing bucket {bucket_name} object key {path_key}")
     try:
         response = s3_client.put_object(Bucket=bucket_name, Key=path_key, Body=value, **kwargs)
         return (
@@ -148,3 +151,79 @@ def store_s3(bucket_name: str, path_key: str, value:str, **kwargs) -> bool:
             logger.warning(err, exc_info=True)
             raise RuntimeError("Platform is exhausted and unable to respond, please try again soon") from err
     return False
+
+def is_registered(account_name: str, trivialscan_client: str, provided_token: str) -> str:
+    object_key = f"{APP_ENV}/{account_name}/client-tokens/{trivialscan_client}"
+    register_token = get_s3(
+        bucket_name=STORE_BUCKET,
+        path_key=object_key,
+    )
+    return register_token == provided_token
+
+def store_public(report: dict) -> str:
+    for _query in report["results"]["queries"]:
+        query = deepcopy(_query)
+        if "error" in query:
+            continue
+        certificates = set()
+        del query["evaluations"]
+        for certdata in _query.get("tls", {}).get("certificates", []):
+            certificates.add(certdata["sha1_fingerprint"])
+            cert_key = path.join(APP_ENV, "certificates", f"{certdata['sha1_fingerprint']}.json")
+            certcopy = deepcopy(certdata)
+            del certcopy["pem"]
+            logger.info(f"Storing {cert_key}")
+            store_s3(
+                bucket_name=STORE_BUCKET,
+                path_key=cert_key,
+                value=json.dumps(certcopy, default=str),
+                StorageClass="STANDARD_IA"
+            )
+            pem_key = path.join(APP_ENV, "certificates", f"{certdata['sha1_fingerprint']}.pem")
+            logger.info(f"Storing {pem_key}")
+            store_s3(
+                bucket_name=STORE_BUCKET,
+                path_key=pem_key,
+                value=certdata["pem"],
+                StorageClass="STANDARD_IA"
+            )
+
+        query["tls"]["certificates"] = sorted(list(certificates))
+        host_key = path.join(APP_ENV, "hosts", query["transport"]["hostname"], str(query["transport"]["port"]), f"{query['last_updated']}.json")
+        store_s3(
+            bucket_name=STORE_BUCKET,
+            path_key=host_key,
+            value=json.dumps(query, default=str),
+            StorageClass="STANDARD_IA"
+        )
+    return
+
+def make_summary(report: dict) -> str:
+    data = deepcopy(report["results"])
+    data["config"] = report["config"]
+    data["flags"] = report["flags"]
+    data["score"] = 0
+    data["results"] = {
+        "pass": 0,
+        "info": 0,
+        "warn": 0,
+        "fail": 0,
+    }
+    del data["queries"]
+    certificates = set()
+    for _query in report["results"]["queries"]:
+        query = _query["transport"]
+        for evaluation in _query.get("evaluations", []):
+            for res in ["pass", "info", "warn", "fail"]:
+                if evaluation["result_level"] == res:
+                    data["results"][res] += 1
+            if "score" in evaluation:
+                data["score"] += evaluation["score"]
+        if "error" in _query:
+            query["error"] = _query["error"]
+
+        for certdata in _query.get("tls", {}).get("certificates", []):
+            certificates.add(certdata["sha1_fingerprint"])
+
+    data["certificates"] = sorted(list(certificates))
+    return json.dumps(data, default=str)

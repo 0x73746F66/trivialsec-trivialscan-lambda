@@ -1,4 +1,5 @@
 import logging
+from os import getenv
 
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
@@ -7,8 +8,8 @@ from mangum import Mangum
 import utils
 import router
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+DEFAULT_LOG_LEVEL = "WARNING"
+LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
 
 app = FastAPI(
     title="Trivial Scanner Dashboard API",
@@ -16,4 +17,10 @@ app = FastAPI(
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.include_router(router.router, prefix=f"/{utils.__trivialscan_version__}")
+
+@app.on_event("startup")
+async def startup_event():
+    logger = logging.getLogger("uvicorn.default")
+    logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
+
 handler = Mangum(app, lifespan="off")
