@@ -104,6 +104,53 @@ def store_ssm(parameter: str, value:str, **kwargs) -> bool:
     delay=1.5,
     backoff=1,
 )
+def list_s3(bucket_name: str, prefix_key: str, **kwargs) -> str:
+    """
+    params:
+    - bucket_name: s3 bucket with target contents
+    - prefix_key: pattern to match in s3
+    """
+    logger.info(f"requesting bucket {bucket_name} key prefix {prefix_key}")
+    keys = []
+    next_token = ''
+    base_kwargs = {
+        'Bucket': bucket_name,
+        'Prefix': prefix_key,
+    }
+    base_kwargs.update(kwargs)
+    while next_token is not None:
+        args = base_kwargs.copy()
+        if next_token != '':
+            args.update({'ContinuationToken': next_token})
+        try:
+            results = s3_client.list_objects_v2(**args)
+
+        except ClientError as err:
+            if err.response["Error"]["Code"] == "NoSuchBucket":
+                logger.warning(f"The requested bucket {bucket_name} was not found")
+            elif err.response["Error"]["Code"] == "InvalidObjectState":
+                logger.warning(f"The request was invalid due to: {err}")
+            elif err.response["Error"]["Code"] == "InvalidParameterException":
+                logger.warning(f"The request had invalid params: {err}")
+        for item in results.get('Contents', []):
+            k = item.get('Key')
+            if k[-1] != '/':
+                keys.append(k)
+        next_token = results.get('NextContinuationToken')
+
+    return keys
+
+@retry(
+    (
+        ConnectionClosedError,
+        ReadTimeoutError,
+        ConnectTimeoutError,
+        CapacityNotAvailableError,
+    ),
+    tries=3,
+    delay=1.5,
+    backoff=1,
+)
 def get_s3(bucket_name: str, path_key: str, default=None, **kwargs) -> str:
     logger.info(f"requesting bucket {bucket_name} object key {path_key}")
     try:
@@ -189,7 +236,7 @@ def store_public(report: dict) -> str:
             )
 
         query["tls"]["certificates"] = sorted(list(certificates))
-        host_key = path.join(APP_ENV, "hosts", query["transport"]["hostname"], str(query["transport"]["port"]), f"{query['last_updated']}.json")
+        host_key = path.join(APP_ENV, "hosts", query["transport"]["hostname"], str(query["transport"]["port"]), "latest.json")
         store_s3(
             bucket_name=STORE_BUCKET,
             path_key=host_key,

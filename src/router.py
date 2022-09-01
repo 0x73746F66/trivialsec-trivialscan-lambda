@@ -22,6 +22,9 @@ async def check_token_registration(
     x_forwarded_for: Union[str, None] = Header(
         default=None, include_in_schema=False),
 ):
+    """
+    Checks registration status of the provided account name, client name, and registration token
+    """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     return {
@@ -46,6 +49,10 @@ async def register_client(
     x_trivialscan_account: Union[str, None] = Header(default=None),
     x_forwarded_for: Union[str, None] = Header(default=None, include_in_schema=False),
 ):
+    """
+    Generates an account registration token for provided *NEW* client name.
+    Client names must be unique, if the coresponding registration token was lost a new client and token must be created.
+    """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     logger.info(
@@ -71,18 +78,22 @@ async def register_client(
             return {"token": register_token}
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        logger.exception(err)
         return err
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
-@router.get("/store/{report_hash}", status_code=status.HTTP_200_OK)
-async def retrieve(
+@router.get("/summary/{report_hash}", status_code=status.HTTP_200_OK)
+async def retrieve_summary(
     response: Response,
     report_hash: str,
     x_trivialscan_account: Union[str, None] = Header(default=None),
     x_trivialscan_client: Union[str, None] = Header(default=None),
     x_trivialscan_token: Union[str, None] = Header(default=None),
 ):
+    """
+
+    """
     if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
         response.status_code = status.HTTP_403_FORBIDDEN
         return
@@ -105,6 +116,125 @@ async def retrieve(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        logger.exception(err)
+        return err
+
+@router.get("/reports", status_code=status.HTTP_200_OK)
+async def retrieve_reports(
+    response: Response,
+    x_trivialscan_account: Union[str, None] = Header(default=None),
+    x_trivialscan_client: Union[str, None] = Header(default=None),
+    x_trivialscan_token: Union[str, None] = Header(default=None),
+):
+    """
+
+    """
+    if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+
+    summary_keys = []
+    data = []
+    prefix_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token)
+    try:
+        summary_keys = utils.list_s3(
+            bucket_name=utils.STORE_BUCKET,
+            prefix_key=prefix_key,
+        )
+        if not summary_keys:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return
+
+    except RuntimeError as err:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        logger.exception(err)
+        return err
+
+    for summary_key in summary_keys:
+        try:
+            ret = utils.get_s3(
+                bucket_name=utils.STORE_BUCKET,
+                path_key=summary_key,
+            )
+            if not ret:
+                response.status_code = status.HTTP_404_NOT_FOUND
+                return
+            item = json.loads(ret)
+            if item.get("config"):
+                del item["config"]
+            if item.get("flags"):
+                del item["flags"]
+            data.append(item)
+        except RuntimeError as err:
+            logger.exception(err)
+            continue
+
+    return data
+
+@router.get("/host/{hostname}", status_code=status.HTTP_200_OK)
+async def retrieve_host(
+    response: Response,
+    hostname: str,
+    port: int = 443,
+    x_trivialscan_account: Union[str, None] = Header(default=None),
+    x_trivialscan_client: Union[str, None] = Header(default=None),
+    x_trivialscan_token: Union[str, None] = Header(default=None),
+):
+    if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+
+    host_key = path.join(utils.APP_ENV, "hosts", hostname, str(port), "latest.json")
+    try:
+        ret = utils.get_s3(
+            bucket_name=utils.STORE_BUCKET,
+            path_key=host_key,
+        )
+        if not ret:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return
+
+        return json.loads(ret)
+
+    except RuntimeError as err:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        logger.exception(err)
+        return err
+
+@router.get("/certificate/{sha1_fingerprint}", status_code=status.HTTP_200_OK)
+async def retrieve_certificate(
+    response: Response,
+    sha1_fingerprint: str,
+    include_pem: bool = False,
+    x_trivialscan_account: Union[str, None] = Header(default=None),
+    x_trivialscan_client: Union[str, None] = Header(default=None),
+    x_trivialscan_token: Union[str, None] = Header(default=None),
+):
+    if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+
+    pem_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
+    cert_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.json")
+    try:
+        ret = utils.get_s3(
+            bucket_name=utils.STORE_BUCKET,
+            path_key=cert_key,
+        )
+        if not ret:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return
+        if include_pem:
+            ret["pem"] = utils.get_s3(
+                bucket_name=utils.STORE_BUCKET,
+                path_key=pem_key,
+            )
+
+        return json.loads(ret)
+
+    except RuntimeError as err:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        logger.exception(err)
         return err
 
 @router.post("/store", status_code=status.HTTP_200_OK)
@@ -144,6 +274,7 @@ async def save(
             return {"results_url": results_url}
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        logger.exception(err)
         return err
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
