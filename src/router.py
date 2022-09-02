@@ -123,6 +123,48 @@ async def retrieve_summary(
         utils.logger.exception(err)
         return err
 
+@router.get("/report/{report_hash}", status_code=status.HTTP_200_OK)
+async def retrieve_report(
+    response: Response,
+    report_hash: str,
+    x_trivialscan_account: Union[str, None] = Header(default=None),
+    x_trivialscan_client: Union[str, None] = Header(default=None),
+    x_trivialscan_token: Union[str, None] = Header(default=None),
+):
+    """
+
+    """
+    if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+
+    summary_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token, report_hash, "summary.json")
+    evaluations_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token, report_hash, "evaluations.json")
+    try:
+        ret = utils.get_s3(
+            bucket_name=utils.STORE_BUCKET,
+            path_key=summary_key,
+        )
+        if not ret:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return
+        data = json.loads(ret)
+        ret = utils.get_s3(
+            bucket_name=utils.STORE_BUCKET,
+            path_key=evaluations_key,
+        )
+        if not ret:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return
+
+        data["evaluations"] = json.loads(ret)
+        return data
+
+    except RuntimeError as err:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        utils.logger.exception(err)
+        return err
+
 @router.get("/reports", status_code=status.HTTP_200_OK)
 async def retrieve_reports(
     response: Response,
