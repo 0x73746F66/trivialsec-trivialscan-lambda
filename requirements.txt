@@ -8,3 +8,4 @@ starlette==0.19.1
 typing-extensions==4.3.0
 mangum==0.15.1
 retry==0.9.2
+python-multipart==0.0.5

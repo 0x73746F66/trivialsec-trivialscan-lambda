@@ -2,6 +2,7 @@ import logging
 import json
 from os import getenv, path
 from copy import deepcopy
+from datetime import datetime
 
 import boto3
 from retry.api import retry
@@ -19,7 +20,7 @@ APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
 DASHBOARD_API_URL = "https://dashboard.trivialsec.com"
-logger = logging.getLogger("uvicorn.default")
+logger = logging.getLogger()
 ssm_client = boto3.client(service_name="ssm")
 s3_client = boto3.client(service_name="s3")
 
@@ -58,6 +59,8 @@ def get_ssm(parameter: str, default=None, **kwargs) -> str:
             logger.warning(f"The request was invalid due to: {err}")
         elif err.response["Error"]["Code"] == "InvalidParameterException":
             logger.warning(f"The request had invalid params: {err}")
+        else:
+            logger.exception(err)
     return default
 
 @retry(
@@ -91,6 +94,8 @@ def store_ssm(parameter: str, value:str, **kwargs) -> bool:
         elif err.response["Error"]["Code"] == "ParameterLimitExceeded":
             logger.warning(err, exc_info=True)
             raise RuntimeError("Platform is exhausted and unable to respond, please try again soon") from err
+        else:
+            logger.exception(err)
     return False
 
 @retry(
@@ -127,11 +132,14 @@ def list_s3(bucket_name: str, prefix_key: str, **kwargs) -> str:
 
         except ClientError as err:
             if err.response["Error"]["Code"] == "NoSuchBucket":
-                logger.warning(f"The requested bucket {bucket_name} was not found")
+                logger.error(f"The requested bucket {bucket_name} was not found")
             elif err.response["Error"]["Code"] == "InvalidObjectState":
-                logger.warning(f"The request was invalid due to: {err}")
+                logger.error(f"The request was invalid due to: {err}")
             elif err.response["Error"]["Code"] == "InvalidParameterException":
-                logger.warning(f"The request had invalid params: {err}")
+                logger.error(f"The request had invalid params: {err}")
+            else:
+                logger.exception(err)
+            return
         for item in results.get('Contents', []):
             k = item.get('Key')
             if k[-1] != '/':
@@ -164,6 +172,8 @@ def get_s3(bucket_name: str, path_key: str, default=None, **kwargs) -> str:
             logger.warning(f"The request was invalid due to: {err}")
         elif err.response["Error"]["Code"] == "InvalidParameterException":
             logger.warning(f"The request had invalid params: {err}")
+        else:
+            logger.exception(err)
     return default
 
 @retry(
@@ -197,9 +207,13 @@ def store_s3(bucket_name: str, path_key: str, value:str, **kwargs) -> bool:
         elif err.response["Error"]["Code"] == "ParameterLimitExceeded":
             logger.warning(err, exc_info=True)
             raise RuntimeError("Platform is exhausted and unable to respond, please try again soon") from err
+        else:
+            logger.exception(err)
     return False
 
-def is_registered(account_name: str, trivialscan_client: str, provided_token: str) -> str:
+def is_registered(account_name: str, trivialscan_client: str, provided_token: str) -> bool:
+    if not provided_token:
+        return False
     object_key = f"{APP_ENV}/{account_name}/client-tokens/{trivialscan_client}"
     register_token = get_s3(
         bucket_name=STORE_BUCKET,
@@ -207,70 +221,69 @@ def is_registered(account_name: str, trivialscan_client: str, provided_token: st
     )
     return register_token == provided_token
 
-def store_public(report: dict) -> str:
-    for _query in report["results"]["queries"]:
-        query = deepcopy(_query)
-        if "error" in query:
-            continue
-        certificates = set()
-        del query["evaluations"]
-        for certdata in _query.get("tls", {}).get("certificates", []):
-            certificates.add(certdata["sha1_fingerprint"])
-            cert_key = path.join(APP_ENV, "certificates", f"{certdata['sha1_fingerprint']}.json")
-            certcopy = deepcopy(certdata)
-            del certcopy["pem"]
-            logger.info(f"Storing {cert_key}")
-            store_s3(
-                bucket_name=STORE_BUCKET,
-                path_key=cert_key,
-                value=json.dumps(certcopy, default=str),
-                StorageClass="STANDARD_IA"
-            )
-            pem_key = path.join(APP_ENV, "certificates", f"{certdata['sha1_fingerprint']}.pem")
-            logger.info(f"Storing {pem_key}")
-            store_s3(
-                bucket_name=STORE_BUCKET,
-                path_key=pem_key,
-                value=certdata["pem"],
-                StorageClass="STANDARD_IA"
-            )
-
-        query["tls"]["certificates"] = sorted(list(certificates))
-        host_key = path.join(APP_ENV, "hosts", query["transport"]["hostname"], str(query["transport"]["port"]), "latest.json")
-        store_s3(
+def store_summary(report: dict, path_prefix: str) -> bool:
+    account_name = report["config"].get("account_name")
+    try:
+        summary_key = path.join(APP_ENV, account_name, "results", path_prefix, "summary.json")
+        if store_s3(
             bucket_name=STORE_BUCKET,
-            path_key=host_key,
-            value=json.dumps(query, default=str),
-            StorageClass="STANDARD_IA"
-        )
-    return
+            path_key=summary_key,
+            value=json.dumps(report, default=str),
+            StorageClass='STANDARD_IA'
+        ):
+            return True
+    except RuntimeError as err:
+        logger.exception(err)
+        return False
 
-def make_summary(report: dict) -> str:
-    data = deepcopy(report["results"])
-    data["config"] = report["config"]
-    data["flags"] = report["flags"]
-    data["score"] = 0
-    data["results"] = {
-        "pass": 0,
-        "info": 0,
-        "warn": 0,
-        "fail": 0,
-    }
-    del data["queries"]
-    certificates = set()
-    for _query in report["results"]["queries"]:
-        query = _query["transport"]
-        for evaluation in _query.get("evaluations", []):
-            for res in ["pass", "info", "warn", "fail"]:
-                if evaluation["result_level"] == res:
-                    data["results"][res] += 1
-            if "score" in evaluation:
-                data["score"] += evaluation["score"]
-        if "error" in _query:
-            query["error"] = _query["error"]
+def store_evaluations(report: list, account_name: str, path_prefix: str) -> bool:
+    try:
+        evaluations_key = path.join(APP_ENV, account_name, "results", path_prefix, "evaluations.json")
+        if store_s3(
+            bucket_name=STORE_BUCKET,
+            path_key=evaluations_key,
+            value=json.dumps(report, default=str),
+            StorageClass='STANDARD_IA'
+        ):
+            return True
+    except RuntimeError as err:
+        logger.exception(err)
+        return False
 
-        for certdata in _query.get("tls", {}).get("certificates", []):
-            certificates.add(certdata["sha1_fingerprint"])
+def store_host(report: dict) -> bool:
+    host_key = path.join(APP_ENV, "hosts", report["transport"]["hostname"], str(report["transport"]["port"]), "latest.json")
+    if not store_s3(
+        bucket_name=STORE_BUCKET,
+        path_key=host_key,
+        value=json.dumps(report, default=str),
+        StorageClass="STANDARD_IA"
+    ):
+        return False
+    scan_date = datetime.fromisoformat(report["last_updated"]).strftime("%Y%m%d")
+    host_key2 = path.join(APP_ENV, "hosts", report["transport"]["hostname"], str(report["transport"]["port"]), report["transport"]["peer_address"], f"{scan_date}.json")
+    return store_s3(
+        bucket_name=STORE_BUCKET,
+        path_key=host_key2,
+        value=json.dumps(report, default=str),
+        StorageClass="STANDARD_IA"
+    )
 
-    data["certificates"] = sorted(list(certificates))
-    return json.dumps(data, default=str)
+def store_certificate(report: dict) -> bool:
+    cert_key = path.join(APP_ENV, "certificates", f"{report['sha1_fingerprint']}.json")
+    logger.info(f"Storing {cert_key}")
+    return store_s3(
+        bucket_name=STORE_BUCKET,
+        path_key=cert_key,
+        value=json.dumps(report, default=str),
+        StorageClass="STANDARD_IA"
+    )
+
+def store_certificate_pem(pem: str, sha1_fingerprint: str) -> bool:
+    pem_key = path.join(APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
+    logger.info(f"Storing {pem_key}")
+    return store_s3(
+        bucket_name=STORE_BUCKET,
+        path_key=pem_key,
+        value=pem,
+        StorageClass="STANDARD_IA"
+    )

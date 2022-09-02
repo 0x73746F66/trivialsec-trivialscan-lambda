@@ -1,19 +1,23 @@
-import logging
 import json
 from os import path
 from secrets import token_urlsafe
 from typing import Union
+from enum import Enum
 
-from fastapi import Header, APIRouter, Response, status
+from fastapi import Header, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
 
 import utils
 
-logger = logging.getLogger("uvicorn.default")
-logger.setLevel(logging.INFO)
+class ReportType(str, Enum):
+    HOST = "host"
+    CERTIFICATE = "certificate"
+    REPORT = "report"
+    EVALUATIONS = "evaluations"
+
 router = APIRouter()
 
-@router.get("/", status_code=status.HTTP_202_ACCEPTED)
+@router.get("/check-token", status_code=status.HTTP_202_ACCEPTED)
 async def check_token_registration(
     request: Request,
     x_trivialscan_account: Union[str, None] = Header(default=None),
@@ -55,7 +59,7 @@ async def register_client(
     """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    logger.info(
+    utils.logger.info(
         f'"{x_trivialscan_account}","{client_name}","{utils.__trivialscan_version__}","{x_forwarded_for}","{ip_addr}"'
     )
     object_key = f"{utils.APP_ENV}/{x_trivialscan_account}/client-tokens/{client_name}"
@@ -78,7 +82,7 @@ async def register_client(
             return {"token": register_token}
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        logger.exception(err)
+        utils.logger.exception(err)
         return err
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
@@ -116,7 +120,7 @@ async def retrieve_summary(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        logger.exception(err)
+        utils.logger.exception(err)
         return err
 
 @router.get("/reports", status_code=status.HTTP_200_OK)
@@ -147,7 +151,7 @@ async def retrieve_reports(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        logger.exception(err)
+        utils.logger.exception(err)
         return err
 
     for summary_key in summary_keys:
@@ -166,7 +170,7 @@ async def retrieve_reports(
                 del item["flags"]
             data.append(item)
         except RuntimeError as err:
-            logger.exception(err)
+            utils.logger.exception(err)
             continue
 
     return data
@@ -198,7 +202,7 @@ async def retrieve_host(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        logger.exception(err)
+        utils.logger.exception(err)
         return err
 
 @router.get("/certificate/{sha1_fingerprint}", status_code=status.HTTP_200_OK)
@@ -234,47 +238,56 @@ async def retrieve_certificate(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        logger.exception(err)
-        return err
+        utils.logger.exception(err)
 
-@router.post("/store", status_code=status.HTTP_200_OK)
-async def save(
-    request: Request,
+@router.post("/store/{report_type}", status_code=status.HTTP_200_OK)
+async def store(
     response: Response,
+    report_type: ReportType,
+    files: list[UploadFile] = File(...),
+    x_trivialscan_account: Union[str, None] = Header(default=None),
+    x_trivialscan_client: Union[str, None] = Header(default=None),
+    x_trivialscan_token: Union[str, None] = Header(default=None),
 ):
-    json_str = await request.body()
     try:
-        data = await request.json()
-    except json.decoder.JSONDecodeError:
-        _, json_bytes = json_str.split(b"\r\n\r\n")
-        json_str = "\n".join(json_bytes.decode().splitlines()[:-1])
-        data = json.loads(json_str)
-
-    try:
-        account_name = data["config"]["account_name"]
-        client_name = data["config"]["client_name"]
-        registration_token = data["config"]["token"]
-        if not utils.is_registered(account_name, client_name, registration_token):
+        if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
             response.status_code = status.HTTP_403_FORBIDDEN
             return
-        del data["config"]["token"]
-        if data.get("config").get("dashboard_api_url"):
-            del data["config"]["dashboard_api_url"]
-        utils.store_public(data)
-        result_id = token_urlsafe(56)
-        summary_key = path.join(utils.APP_ENV, account_name, "results", registration_token, result_id, "summary.json")
-        dashboard_api_url = utils.DASHBOARD_API_URL if not data.get("config").get("dashboard_api_url") else data["config"]["dashboard_api_url"]
-        results_url = f"{dashboard_api_url}/result/{result_id}"
-        if utils.store_s3(
-            bucket_name=utils.STORE_BUCKET,
-            path_key=summary_key,
-            value=utils.make_summary(data),
-            StorageClass='STANDARD_IA'
-        ):
-            return {"results_url": results_url}
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        logger.exception(err)
+        utils.logger.exception(err)
         return err
+
+    file = files[0]
+    contents = await file.read()
+    if file.filename.endswith(".json"):
+        contents = json.loads(contents.decode())
+    if isinstance(contents, dict):
+        if contents.get("config", {}).get("token"):
+            del contents["config"]["token"]
+        if contents.get("config", {}).get("dashboard_api_url"):
+            del contents["config"]["dashboard_api_url"]
+
+    if report_type is ReportType.REPORT:
+        result_token = token_urlsafe(56)
+        path_prefix = path.join(x_trivialscan_token, result_token)
+        if utils.store_summary(report=contents, path_prefix=path_prefix):
+            return {"results_uri": f"/result/{result_token}"}
+
+    if report_type is ReportType.EVALUATIONS:
+        result_token = file.filename.replace(".json", "")
+        path_prefix = path.join(x_trivialscan_token, result_token)
+        if utils.store_evaluations(report=contents, account_name=x_trivialscan_account, path_prefix=path_prefix):
+            return {"results_uri": f"/result/{result_token}"}
+
+    if report_type is ReportType.HOST:
+        return {"ok": utils.store_host(report=contents)}
+
+    if report_type is ReportType.CERTIFICATE and file.filename.endswith(".json"):
+        return {"ok": utils.store_certificate(report=contents)}
+
+    if report_type is ReportType.CERTIFICATE and file.filename.endswith(".pem"):
+        return {"ok": utils.store_certificate_pem(pem=contents, sha1_fingerprint=file.filename.replace(".pem", ""))}
+
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return

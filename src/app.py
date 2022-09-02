@@ -20,7 +20,8 @@ app.include_router(router.router, prefix=f"/{utils.__trivialscan_version__}")
 
 @app.on_event("startup")
 async def startup_event():
-    logger = logging.getLogger("uvicorn.default")
-    logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
+    if getenv("AWS_EXECUTION_ENV") is None:
+        utils.logger = logging.getLogger("uvicorn.default")
+    utils.logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
 
 handler = Mangum(app, lifespan="off")
