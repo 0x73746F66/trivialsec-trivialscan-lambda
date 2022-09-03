@@ -1,7 +1,6 @@
 import logging
 import json
 from os import getenv, path
-from copy import deepcopy
 from datetime import datetime
 
 import boto3
@@ -14,12 +13,11 @@ from botocore.exceptions import (
     ReadTimeoutError,
 )
 
-__trivialscan_version__ = "3.0.0rc6"
-
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
 DASHBOARD_API_URL = "https://dashboard.trivialsec.com"
+GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
 logger = logging.getLogger()
 ssm_client = boto3.client(service_name="ssm")
 s3_client = boto3.client(service_name="s3")
@@ -211,15 +209,40 @@ def store_s3(bucket_name: str, path_key: str, value:str, **kwargs) -> bool:
             logger.exception(err)
     return False
 
+def is_reserved(account_name: str, trivialscan_client: str) -> bool:
+    if not account_name or not trivialscan_client:
+        return False
+    object_key = f"{APP_ENV}/{account_name}/client-tokens/{trivialscan_client}"
+    register_str = get_s3(
+        STORE_BUCKET,
+        object_key,
+    )
+    if not register_str:
+        return False
+    try:
+        register_data = json.loads(register_str)
+    except json.decoder.JSONDecodeError:
+        return False
+    if register_data.get("register_token"):
+        return True
+    return False
+
 def is_registered(account_name: str, trivialscan_client: str, provided_token: str) -> bool:
     if not provided_token:
         return False
     object_key = f"{APP_ENV}/{account_name}/client-tokens/{trivialscan_client}"
-    register_token = get_s3(
+    register_str = get_s3(
         bucket_name=STORE_BUCKET,
         path_key=object_key,
     )
-    return register_token == provided_token
+    if not register_str:
+        return False
+    try:
+        register_data = json.loads(register_str)
+    except json.decoder.JSONDecodeError:
+        return False
+
+    return register_data.get("register_token") == provided_token
 
 def store_summary(report: dict, path_prefix: str) -> bool:
     account_name = report["config"].get("account_name")

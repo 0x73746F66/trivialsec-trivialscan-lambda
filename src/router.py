@@ -23,26 +23,29 @@ async def check_token_registration(
     x_trivialscan_account: Union[str, None] = Header(default=None),
     x_trivialscan_client: Union[str, None] = Header(default=None),
     x_trivialscan_token: Union[str, None] = Header(default=None),
-    x_forwarded_for: Union[str, None] = Header(
-        default=None, include_in_schema=False),
+    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Checks registration status of the provided account name, client name, and registration token
     """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    utils.logger.info(
+        f'"{x_trivialscan_account}","{x_trivialscan_client}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+    )
     return {
         "account": x_trivialscan_account,
         "client": x_trivialscan_client,
-        "token": x_trivialscan_token,
+        "provided_token": x_trivialscan_token,
         "registered": utils.is_registered(
             account_name=x_trivialscan_account,
             trivialscan_client=x_trivialscan_client,
             provided_token=x_trivialscan_token
         ),
         "ip_address": ip_addr,
-        "version": utils.__trivialscan_version__,
-        "x_forwarded_for": x_forwarded_for,
+        "version": x_trivialscan_version,
+        "user_agent": user_agent,
     }
 
 @router.post("/register/{client_name}", status_code=status.HTTP_200_OK)
@@ -50,8 +53,9 @@ async def register_client(
     request: Request,
     response: Response,
     client_name: str,
+    strict_identity: bool = True,
     x_trivialscan_account: Union[str, None] = Header(default=None),
-    x_forwarded_for: Union[str, None] = Header(default=None, include_in_schema=False),
+    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Generates an account registration token for provided *NEW* client name.
@@ -59,48 +63,81 @@ async def register_client(
     """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     utils.logger.info(
-        f'"{x_trivialscan_account}","{client_name}","{utils.__trivialscan_version__}","{x_forwarded_for}","{ip_addr}"'
+        f'"{x_trivialscan_account}","{client_name}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
     )
-    object_key = f"{utils.APP_ENV}/{x_trivialscan_account}/client-tokens/{client_name}"
-    register_token = utils.get_s3(
-        utils.STORE_BUCKET,
-        object_key,
-    )
-    if register_token is not None:
+    if not x_trivialscan_account or not client_name:
         response.status_code = status.HTTP_403_FORBIDDEN
-        return {"message": f"client {client_name} already registered"}
+        return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
-    register_token = token_urlsafe(nbytes=32)
+    try:
+        data = await request.json()
+        utils.logger.debug(data)
+        if isinstance(data, str):
+            data = json.loads(data)
+    except json.decoder.JSONDecodeError:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {"message": utils.GENERIC_SECURITY_MESSAGE}
+
+    try:
+        if utils.is_reserved(x_trivialscan_account, client_name):
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return {"message": f"client {client_name} already registered"}
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        utils.logger.exception(err)
+        return {"message": utils.GENERIC_SECURITY_MESSAGE}
+
+    object_key = f"{utils.APP_ENV}/{x_trivialscan_account}/client-tokens/{client_name}"
+    data["register_token"] = token_urlsafe(nbytes=32)
+    data["ip_addr"] = ip_addr
+    data["user_agent"] = user_agent
+    data["cli_version"] = x_trivialscan_version
+    data["strict_identity"] = strict_identity
     try:
         if utils.store_s3(
             utils.STORE_BUCKET,
             object_key,
-            register_token,
+            json.dumps(data, default=str),
             StorageClass='STANDARD_IA'
         ):
-            return {"token": register_token}
+            return {"token": data["register_token"]}
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         utils.logger.exception(err)
         return err
+
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
 @router.get("/summary/{report_hash}", status_code=status.HTTP_200_OK)
 async def retrieve_summary(
+    request: Request,
     response: Response,
     report_hash: str,
     x_trivialscan_account: Union[str, None] = Header(default=None),
     x_trivialscan_client: Union[str, None] = Header(default=None),
     x_trivialscan_token: Union[str, None] = Header(default=None),
+    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
 
     """
-    if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    utils.logger.info(
+        f'"{x_trivialscan_account}","{x_trivialscan_client}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+    )
+    try:
+        if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        utils.logger.exception(err)
+        return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
     summary_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token, report_hash, "summary.json")
     try:
@@ -125,18 +162,31 @@ async def retrieve_summary(
 
 @router.get("/report/{report_hash}", status_code=status.HTTP_200_OK)
 async def retrieve_report(
+    request: Request,
     response: Response,
     report_hash: str,
     x_trivialscan_account: Union[str, None] = Header(default=None),
     x_trivialscan_client: Union[str, None] = Header(default=None),
     x_trivialscan_token: Union[str, None] = Header(default=None),
+    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
 
     """
-    if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    utils.logger.info(
+        f'"{x_trivialscan_account}","{x_trivialscan_client}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+    )
+    try:
+        if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        utils.logger.exception(err)
+        return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
     summary_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token, report_hash, "summary.json")
     evaluations_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token, report_hash, "evaluations.json")
@@ -167,17 +217,30 @@ async def retrieve_report(
 
 @router.get("/reports", status_code=status.HTTP_200_OK)
 async def retrieve_reports(
+    request: Request,
     response: Response,
     x_trivialscan_account: Union[str, None] = Header(default=None),
     x_trivialscan_client: Union[str, None] = Header(default=None),
     x_trivialscan_token: Union[str, None] = Header(default=None),
+    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
 
     """
-    if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    utils.logger.info(
+        f'"{x_trivialscan_account}","{x_trivialscan_client}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+    )
+    try:
+        if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        utils.logger.exception(err)
+        return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
     summary_keys = []
     data = []
@@ -189,7 +252,7 @@ async def retrieve_reports(
         )
         if not summary_keys:
             response.status_code = status.HTTP_404_NOT_FOUND
-            return
+            return []
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -197,6 +260,8 @@ async def retrieve_reports(
         return err
 
     for summary_key in summary_keys:
+        if not summary_key.endswith("summary.json"):
+            continue
         try:
             ret = utils.get_s3(
                 bucket_name=utils.STORE_BUCKET,
@@ -204,7 +269,7 @@ async def retrieve_reports(
             )
             if not ret:
                 response.status_code = status.HTTP_404_NOT_FOUND
-                return
+                return []
             item = json.loads(ret)
             if item.get("config"):
                 del item["config"]
@@ -219,16 +284,29 @@ async def retrieve_reports(
 
 @router.get("/host/{hostname}", status_code=status.HTTP_200_OK)
 async def retrieve_host(
+    request: Request,
     response: Response,
     hostname: str,
     port: int = 443,
     x_trivialscan_account: Union[str, None] = Header(default=None),
     x_trivialscan_client: Union[str, None] = Header(default=None),
     x_trivialscan_token: Union[str, None] = Header(default=None),
+    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
-    if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    utils.logger.info(
+        f'"{x_trivialscan_account}","{x_trivialscan_client}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+    )
+    try:
+        if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        utils.logger.exception(err)
+        return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
     host_key = path.join(utils.APP_ENV, "hosts", hostname, str(port), "latest.json")
     try:
@@ -249,16 +327,29 @@ async def retrieve_host(
 
 @router.get("/certificate/{sha1_fingerprint}", status_code=status.HTTP_200_OK)
 async def retrieve_certificate(
+    request: Request,
     response: Response,
     sha1_fingerprint: str,
     include_pem: bool = False,
     x_trivialscan_account: Union[str, None] = Header(default=None),
     x_trivialscan_client: Union[str, None] = Header(default=None),
     x_trivialscan_token: Union[str, None] = Header(default=None),
+    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
-    if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    utils.logger.info(
+        f'"{x_trivialscan_account}","{x_trivialscan_client}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+    )
+    try:
+        if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        utils.logger.exception(err)
+        return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
     pem_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
     cert_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.json")
@@ -284,13 +375,21 @@ async def retrieve_certificate(
 
 @router.post("/store/{report_type}", status_code=status.HTTP_200_OK)
 async def store(
+    request: Request,
     response: Response,
     report_type: ReportType,
     files: list[UploadFile] = File(...),
     x_trivialscan_account: Union[str, None] = Header(default=None),
     x_trivialscan_client: Union[str, None] = Header(default=None),
     x_trivialscan_token: Union[str, None] = Header(default=None),
+    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    utils.logger.info(
+        f'"{x_trivialscan_account}","{x_trivialscan_client}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+    )
     try:
         if not utils.is_registered(x_trivialscan_account, x_trivialscan_client, x_trivialscan_token):
             response.status_code = status.HTTP_403_FORBIDDEN
