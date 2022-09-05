@@ -1,7 +1,7 @@
 resource "aws_lambda_function" "trivialscan" {
   filename      = "${abspath(path.module)}/${local.source_file}"
   source_code_hash = filebase64sha256("${abspath(path.module)}/${local.source_file}")
-  function_name = "trivialscan-dashboard"
+  function_name = "${var.app_env}-trivialscan-api"
   role          = aws_iam_role.trivialscan_role.arn
   handler       = "app.handler"
   runtime       = local.python_version
@@ -22,7 +22,11 @@ resource "aws_lambda_function" "trivialscan" {
     aws_iam_role_policy_attachment.policy_attach
   ]
   tags = {
-    CostCenter = "FOSS"
+    ProjectName = "trivialscan"
+    ProjectLeadEmail = "chris@trivialsec.com"
+    CostCenter = var.app_env != "Prod" ? "randd" : "opex"
+    SecurityTags = "credentials,customer-data,public-data"
+    AutomationTool = "Terraform"
   }
 }
 

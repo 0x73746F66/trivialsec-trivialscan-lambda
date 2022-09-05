@@ -26,8 +26,8 @@ def object_exists(bucket_name: str, file_path: str, **kwargs):
     try:
         content = s3_client.head_object(Bucket=bucket_name, Key=file_path, **kwargs)
         return content.get("ResponseMetadata", None) is not None
-    except ClientError:
-        pass
+    except ClientError as err:
+        logger.debug(err, exc_info=True)
     return False
 
 @retry(
@@ -186,7 +186,7 @@ def get_s3(bucket_name: str, path_key: str, default=None, **kwargs) -> str:
     backoff=1,
 )
 def store_s3(bucket_name: str, path_key: str, value:str, **kwargs) -> bool:
-    logger.info(f"storing bucket {bucket_name} object key {path_key}")
+    logger.debug(value)
     try:
         response = s3_client.put_object(Bucket=bucket_name, Key=path_key, Body=value, **kwargs)
         return (
@@ -221,7 +221,8 @@ def is_reserved(account_name: str, trivialscan_client: str) -> bool:
         return False
     try:
         register_data = json.loads(register_str)
-    except json.decoder.JSONDecodeError:
+    except json.decoder.JSONDecodeError as err:
+        logger.debug(err, exc_info=True)
         return False
     if register_data.get("register_token"):
         return True
@@ -239,42 +240,36 @@ def is_registered(account_name: str, trivialscan_client: str, provided_token: st
         return False
     try:
         register_data = json.loads(register_str)
-    except json.decoder.JSONDecodeError:
+    except json.decoder.JSONDecodeError as err:
+        logger.debug(err, exc_info=True)
         return False
 
     return register_data.get("register_token") == provided_token
 
 def store_summary(report: dict, path_prefix: str) -> bool:
     account_name = report["config"].get("account_name")
-    try:
-        summary_key = path.join(APP_ENV, account_name, "results", path_prefix, "summary.json")
-        if store_s3(
-            bucket_name=STORE_BUCKET,
-            path_key=summary_key,
-            value=json.dumps(report, default=str),
-            StorageClass='STANDARD_IA'
-        ):
-            return True
-    except RuntimeError as err:
-        logger.exception(err)
-        return False
+    summary_key = path.join(APP_ENV, account_name, "results", path_prefix, "summary.json")
+    logger.info(f"Storing {summary_key}")
+    return store_s3(
+        bucket_name=STORE_BUCKET,
+        path_key=summary_key,
+        value=json.dumps(report, default=str),
+        StorageClass='STANDARD_IA'
+    )
 
 def store_evaluations(report: list, account_name: str, path_prefix: str) -> bool:
-    try:
-        evaluations_key = path.join(APP_ENV, account_name, "results", path_prefix, "evaluations.json")
-        if store_s3(
-            bucket_name=STORE_BUCKET,
-            path_key=evaluations_key,
-            value=json.dumps(report, default=str),
-            StorageClass='STANDARD_IA'
-        ):
-            return True
-    except RuntimeError as err:
-        logger.exception(err)
-        return False
+    evaluations_key = path.join(APP_ENV, account_name, "results", path_prefix, "evaluations.json")
+    logger.info(f"Storing {evaluations_key}")
+    return store_s3(
+        bucket_name=STORE_BUCKET,
+        path_key=evaluations_key,
+        value=json.dumps(report, default=str),
+        StorageClass='STANDARD_IA'
+    )
 
 def store_host(report: dict) -> bool:
     host_key = path.join(APP_ENV, "hosts", report["transport"]["hostname"], str(report["transport"]["port"]), "latest.json")
+    logger.info(f"Storing {host_key}")
     if not store_s3(
         bucket_name=STORE_BUCKET,
         path_key=host_key,
@@ -284,6 +279,10 @@ def store_host(report: dict) -> bool:
         return False
     scan_date = datetime.fromisoformat(report["last_updated"]).strftime("%Y%m%d")
     host_key2 = path.join(APP_ENV, "hosts", report["transport"]["hostname"], str(report["transport"]["port"]), report["transport"]["peer_address"], f"{scan_date}.json")
+    if object_exists(STORE_BUCKET, host_key2):
+        logger.info(f"Exists {host_key2}")
+        return True
+    logger.info(f"Storing {host_key2}")
     return store_s3(
         bucket_name=STORE_BUCKET,
         path_key=host_key2,
@@ -293,6 +292,9 @@ def store_host(report: dict) -> bool:
 
 def store_certificate(report: dict) -> bool:
     cert_key = path.join(APP_ENV, "certificates", f"{report['sha1_fingerprint']}.json")
+    if object_exists(STORE_BUCKET, cert_key):
+        logger.info(f"Exists {cert_key}")
+        return True
     logger.info(f"Storing {cert_key}")
     return store_s3(
         bucket_name=STORE_BUCKET,
@@ -303,6 +305,9 @@ def store_certificate(report: dict) -> bool:
 
 def store_certificate_pem(pem: str, sha1_fingerprint: str) -> bool:
     pem_key = path.join(APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
+    if object_exists(STORE_BUCKET, pem_key):
+        logger.info(f"Exists {pem_key}")
+        return True
     logger.info(f"Storing {pem_key}")
     return store_s3(
         bucket_name=STORE_BUCKET,

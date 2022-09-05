@@ -268,8 +268,7 @@ async def retrieve_reports(
                 path_key=summary_key,
             )
             if not ret:
-                response.status_code = status.HTTP_404_NOT_FOUND
-                return []
+                continue
             item = json.loads(ret)
             if item.get("config"):
                 del item["config"]
