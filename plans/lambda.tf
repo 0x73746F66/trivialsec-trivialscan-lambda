@@ -21,13 +21,7 @@ resource "aws_lambda_function" "trivialscan" {
   depends_on = [
     aws_iam_role_policy_attachment.policy_attach
   ]
-  tags = {
-    ProjectName = "trivialscan"
-    ProjectLeadEmail = "chris@trivialsec.com"
-    CostCenter = var.app_env != "Prod" ? "randd" : "opex"
-    SecurityTags = "credentials,customer-data,public-data"
-    AutomationTool = "Terraform"
-  }
+  tags = local.tags
 }
 
 resource "aws_lambda_function_url" "trivialscan" {
