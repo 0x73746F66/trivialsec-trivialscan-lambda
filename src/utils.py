@@ -16,7 +16,6 @@ from botocore.exceptions import (
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
-DASHBOARD_API_URL = "https://dashboard.trivialsec.com"
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
 logger = logging.getLogger()
 ssm_client = boto3.client(service_name="ssm")
@@ -212,7 +211,7 @@ def store_s3(bucket_name: str, path_key: str, value:str, **kwargs) -> bool:
 def is_reserved(account_name: str, trivialscan_client: str) -> bool:
     if not account_name or not trivialscan_client:
         return False
-    object_key = f"{APP_ENV}/{account_name}/client-tokens/{trivialscan_client}"
+    object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{trivialscan_client}"
     register_str = get_s3(
         STORE_BUCKET,
         object_key,
@@ -231,7 +230,7 @@ def is_reserved(account_name: str, trivialscan_client: str) -> bool:
 def is_registered(account_name: str, trivialscan_client: str, provided_token: str) -> bool:
     if not provided_token:
         return False
-    object_key = f"{APP_ENV}/{account_name}/client-tokens/{trivialscan_client}"
+    object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{trivialscan_client}"
     register_str = get_s3(
         bucket_name=STORE_BUCKET,
         path_key=object_key,
@@ -248,7 +247,7 @@ def is_registered(account_name: str, trivialscan_client: str, provided_token: st
 
 def store_summary(report: dict, path_prefix: str) -> bool:
     account_name = report["config"].get("account_name")
-    summary_key = path.join(APP_ENV, account_name, "results", path_prefix, "summary.json")
+    summary_key = path.join(APP_ENV, "accounts", account_name, "results", path_prefix, "summary.json")
     logger.info(f"Storing {summary_key}")
     return store_s3(
         bucket_name=STORE_BUCKET,
@@ -258,7 +257,7 @@ def store_summary(report: dict, path_prefix: str) -> bool:
     )
 
 def store_evaluations(report: list, account_name: str, path_prefix: str) -> bool:
-    evaluations_key = path.join(APP_ENV, account_name, "results", path_prefix, "evaluations.json")
+    evaluations_key = path.join(APP_ENV, "accounts", account_name, "results", path_prefix, "evaluations.json")
     logger.info(f"Storing {evaluations_key}")
     return store_s3(
         bucket_name=STORE_BUCKET,

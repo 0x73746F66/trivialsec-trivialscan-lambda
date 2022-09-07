@@ -89,7 +89,7 @@ async def register_client(
         utils.logger.exception(err)
         return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
-    object_key = f"{utils.APP_ENV}/{x_trivialscan_account}/client-tokens/{client_name}"
+    object_key = f"{utils.APP_ENV}/accounts/{x_trivialscan_account}/client-tokens/{client_name}"
     data["register_token"] = token_urlsafe(nbytes=32)
     data["ip_addr"] = ip_addr
     data["user_agent"] = user_agent
@@ -139,7 +139,7 @@ async def retrieve_summary(
         utils.logger.exception(err)
         return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
-    summary_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token, report_hash, "summary.json")
+    summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", x_trivialscan_token, report_hash, "summary.json")
     try:
         ret = utils.get_s3(
             bucket_name=utils.STORE_BUCKET,
@@ -188,8 +188,8 @@ async def retrieve_report(
         utils.logger.exception(err)
         return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
-    summary_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token, report_hash, "summary.json")
-    evaluations_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token, report_hash, "evaluations.json")
+    summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", x_trivialscan_token, report_hash, "summary.json")
+    evaluations_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", x_trivialscan_token, report_hash, "evaluations.json")
     try:
         ret = utils.get_s3(
             bucket_name=utils.STORE_BUCKET,
@@ -244,7 +244,7 @@ async def retrieve_reports(
 
     summary_keys = []
     data = []
-    prefix_key = path.join(utils.APP_ENV, x_trivialscan_account, "results", x_trivialscan_token)
+    prefix_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", x_trivialscan_token)
     try:
         summary_keys = utils.list_s3(
             bucket_name=utils.STORE_BUCKET,
