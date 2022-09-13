@@ -18,6 +18,7 @@ APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
 logger = logging.getLogger()
+boto3.set_stream_logger('')
 ssm_client = boto3.client(service_name="ssm")
 s3_client = boto3.client(service_name="s3")
 

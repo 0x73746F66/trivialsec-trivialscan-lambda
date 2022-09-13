@@ -149,6 +149,7 @@ async def retrieve_summary(
             response.status_code = status.HTTP_404_NOT_FOUND
             return
         data = json.loads(ret)
+        data["report_url"] = f'/result/{report_hash}'
         if data.get("config").get("token"):
             del data["config"]["token"]
         if data.get("config").get("dashboard_api_url"):
@@ -199,6 +200,11 @@ async def retrieve_report(
             response.status_code = status.HTTP_404_NOT_FOUND
             return
         data = json.loads(ret)
+        if data.get("config").get("token"):
+            del data["config"]["token"]
+        if data.get("config").get("dashboard_api_url"):
+            del data["config"]["dashboard_api_url"]
+        data["report_url"] = f'/result/{report_hash}'
         ret = utils.get_s3(
             bucket_name=utils.STORE_BUCKET,
             path_key=evaluations_key,
@@ -250,14 +256,15 @@ async def retrieve_reports(
             bucket_name=utils.STORE_BUCKET,
             prefix_key=prefix_key,
         )
-        if not summary_keys:
-            response.status_code = status.HTTP_404_NOT_FOUND
-            return []
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         utils.logger.exception(err)
-        return err
+        return []
+
+    if not summary_keys:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return []
 
     for summary_key in summary_keys:
         if not summary_key.endswith("summary.json"):
@@ -274,6 +281,7 @@ async def retrieve_reports(
                 del item["config"]
             if item.get("flags"):
                 del item["flags"]
+            item["report_url"] = f'/result/{summary_key.split("/")[-2]}'
             data.append(item)
         except RuntimeError as err:
             utils.logger.exception(err)

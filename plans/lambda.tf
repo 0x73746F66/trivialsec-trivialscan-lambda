@@ -1,7 +1,7 @@
 resource "aws_lambda_function" "trivialscan" {
   filename      = "${abspath(path.module)}/${local.source_file}"
   source_code_hash = filebase64sha256("${abspath(path.module)}/${local.source_file}")
-  function_name = "${var.app_env}-trivialscan-api"
+  function_name = local.function_name
   role          = aws_iam_role.trivialscan_role.arn
   handler       = "app.handler"
   runtime       = local.python_version
@@ -27,11 +27,4 @@ resource "aws_lambda_function" "trivialscan" {
 resource "aws_lambda_function_url" "trivialscan" {
   function_name      = aws_lambda_function.trivialscan.arn
   authorization_type = "NONE"
-}
-
-output "trivialscan_arn" {
-    value = aws_lambda_function.trivialscan.arn
-}
-output "function_url" {
-    value = aws_lambda_function_url.trivialscan.function_url
 }
