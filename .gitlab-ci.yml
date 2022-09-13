@@ -186,7 +186,7 @@ tf:plan:
     - trivialscan
   stage: pre-deploy
   script:
-    - make plan
+    - make init plan
   only:
     refs:
       - merge_request
