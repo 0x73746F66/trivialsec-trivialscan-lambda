@@ -204,7 +204,7 @@ tf:apply:
     - trivialscan
   stage: deploy
   script:
-    - make apply
+    - make init apply
   only:
     refs:
       - main
