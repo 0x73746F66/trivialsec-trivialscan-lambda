@@ -38,6 +38,9 @@ output:
 build: ## makes the lambda zip archive
 	./.$(BUILD_ENV)/bin/build-archive
 
+build-prod: ## makes the lambda zip archive for prod
+	APP_ENV=Prod ./.$(BUILD_ENV)/bin/build-archive
+
 tfinstall:
 	curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
 	sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(shell lsb_release -cs) main"

@@ -1,0 +1,679 @@
+{
+    "openapi": "3.0.2",
+    "info": {
+        "title": "Trivial Scanner Dashboard API",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/check-token": {
+            "get": {
+                "summary": "Check Token Registration",
+                "description": "Checks registration status of the provided account name, client name, and registration token",
+                "operationId": "check_token_registration_check_token_get",
+                "parameters": [
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Client",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-client",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Token",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-token",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/register/{client_name}": {
+            "post": {
+                "summary": "Register Client",
+                "description": "Generates an account registration token for provided *NEW* client name.\nClient names must be unique, if the coresponding registration token was lost a new client and token must be created.",
+                "operationId": "register_client_register__client_name__post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Client Name",
+                            "type": "string"
+                        },
+                        "name": "client_name",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Strict Identity",
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "name": "strict_identity",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/summary/{report_hash}": {
+            "get": {
+                "summary": "Retrieve Summary",
+                "description": "    ",
+                "operationId": "retrieve_summary_summary__report_hash__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Report Hash",
+                            "type": "string"
+                        },
+                        "name": "report_hash",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Client",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-client",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Token",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-token",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/report/{report_hash}": {
+            "get": {
+                "summary": "Retrieve Report",
+                "description": "    ",
+                "operationId": "retrieve_report_report__report_hash__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Report Hash",
+                            "type": "string"
+                        },
+                        "name": "report_hash",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Client",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-client",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Token",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-token",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/reports": {
+            "get": {
+                "summary": "Retrieve Reports",
+                "description": "    ",
+                "operationId": "retrieve_reports_reports_get",
+                "parameters": [
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Client",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-client",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Token",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-token",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/host/{hostname}": {
+            "get": {
+                "summary": "Retrieve Host",
+                "operationId": "retrieve_host_host__hostname__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Hostname",
+                            "type": "string"
+                        },
+                        "name": "hostname",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Port",
+                            "type": "integer",
+                            "default": 443
+                        },
+                        "name": "port",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Client",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-client",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Token",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-token",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/certificate/{sha1_fingerprint}": {
+            "get": {
+                "summary": "Retrieve Certificate",
+                "operationId": "retrieve_certificate_certificate__sha1_fingerprint__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Sha1 Fingerprint",
+                            "type": "string"
+                        },
+                        "name": "sha1_fingerprint",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Include Pem",
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "name": "include_pem",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Client",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-client",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Token",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-token",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/store/{report_type}": {
+            "post": {
+                "summary": "Store",
+                "operationId": "store_store__report_type__post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/ReportType"
+                        },
+                        "name": "report_type",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Client",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-client",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Token",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-token",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Body_store_store__report_type__post"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Body_store_store__report_type__post": {
+                "title": "Body_store_store__report_type__post",
+                "required": [
+                    "files"
+                ],
+                "type": "object",
+                "properties": {
+                    "files": {
+                        "title": "Files",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "binary"
+                        }
+                    }
+                }
+            },
+            "HTTPValidationError": {
+                "title": "HTTPValidationError",
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "title": "Detail",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ValidationError"
+                        }
+                    }
+                }
+            },
+            "ReportType": {
+                "title": "ReportType",
+                "enum": [
+                    "host",
+                    "certificate",
+                    "report",
+                    "evaluations"
+                ],
+                "type": "string",
+                "description": "An enumeration."
+            },
+            "ValidationError": {
+                "title": "ValidationError",
+                "required": [
+                    "loc",
+                    "msg",
+                    "type"
+                ],
+                "type": "object",
+                "properties": {
+                    "loc": {
+                        "title": "Location",
+                        "type": "array",
+                        "items": {
+                            "anyOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "integer"
+                                }
+                            ]
+                        }
+                    },
+                    "msg": {
+                        "title": "Message",
+                        "type": "string"
+                    },
+                    "type": {
+                        "title": "Error Type",
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}
