@@ -7,6 +7,16 @@ primary := '\033[1;36m'
 bold := '\033[1m'
 clear := '\033[0m'
 
+ifndef APP_ENV
+APP_ENV=Dev
+endif
+ifndef CI_BUILD_REF
+CI_BUILD_REF=local
+endif
+ifndef RUNNER_NAME
+RUNNER_NAME=$(shell basename $(shell pwd))
+endif
+
 help: ## This help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
@@ -81,3 +91,22 @@ run-local: ## A local server interfacing with Lambda URL
 
 lambda-local: ## Invoke the regular Lambda, not as the LambdaURL context
 	curl -XPOST "http://localhost:8080/2015-03-31/functions/function/invocations" -d '{}'
+
+local-runner: ## local setup for a gitlab runner
+	@docker volume create --name=gitlab-cache 2>/dev/null || true
+	docker pull -q docker.io/gitlab/gitlab-runner:latest
+	docker build -t $(RUNNER_NAME)/runner:${CI_BUILD_REF} -f Dockerfile-runner .
+	@echo $(shell [ -z "${RUNNER_TOKEN}" ] && echo "RUNNER_TOKEN missing" )
+	@docker run -d --rm \
+		--name $(RUNNER_NAME) \
+		-v "gitlab-cache:/cache:rw" \
+		-e RUNNER_TOKEN=${RUNNER_TOKEN} \
+		$(RUNNER_NAME)/runner:${CI_BUILD_REF}
+	@docker exec -ti $(RUNNER_NAME) gitlab-runner register --non-interactive \
+		--tag-list 'trivialscan' \
+		--name $(RUNNER_NAME) \
+		--request-concurrency 10 \
+		--url https://gitlab.com/ \
+		--registration-token '$(RUNNER_TOKEN)' \
+		--cache-dir '/cache' \
+		--executor shell

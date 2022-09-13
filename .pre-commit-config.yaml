@@ -1,7 +1,4 @@
 ---
-default_language_version:
-  python: python3.10
-
 repos:
   - repo: https://github.com/asottile/pyupgrade
     rev: v2.32.0
