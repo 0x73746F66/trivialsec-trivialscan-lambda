@@ -205,7 +205,6 @@ tf:plan:
     paths:
       - $SOURCE_FILE
       - plans/.tfplan
-      - plans/tfplan.json
       - plans/.terraform.lock.hcl
       - plans/.terraform
     reports:

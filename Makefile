@@ -61,7 +61,7 @@ init: ## Runs tf init tf
 plan: ## Runs tf validate and tf plan
 	terraform -chdir=plans validate
 	terraform -chdir=plans plan -no-color -out=.tfplan
-	terraform -chdir=plans show --json .tfplan | jq -r '([.resource_changes[]?.change.actions?]|flatten)|{"create":(map(select(.=="create"))|length),"update":(map(select(.=="update"))|length),"delete":(map(select(.=="delete"))|length)}' > tfplan.json
+	terraform -chdir=plans show --json .tfplan | jq -r '([.resource_changes[]?.change.actions?]|flatten)|{"create":(map(select(.=="create"))|length),"update":(map(select(.=="update"))|length),"delete":(map(select(.=="delete"))|length)}' > plans/tfplan.json
 
 apply: ## tf apply -auto-approve -refresh=true
 	terraform -chdir=plans apply -auto-approve -refresh=true .tfplan
@@ -69,7 +69,7 @@ apply: ## tf apply -auto-approve -refresh=true
 destroy: init ## tf destroy -auto-approve
 	terraform -chdir=plans validate
 	terraform -chdir=plans plan -destroy -no-color -out=.tfdestroy
-	terraform -chdir=plans show --json .tfdestroy | jq -r '([.resource_changes[]?.change.actions?]|flatten)|{"create":(map(select(.=="create"))|length),"update":(map(select(.=="update"))|length),"delete":(map(select(.=="delete"))|length)}' > tfdestroy.json
+	terraform -chdir=plans show --json .tfdestroy | jq -r '([.resource_changes[]?.change.actions?]|flatten)|{"create":(map(select(.=="create"))|length),"update":(map(select(.=="update"))|length),"delete":(map(select(.=="delete"))|length)}' > plans/tfdestroy.json
 	terraform -chdir=plans apply -auto-approve -destroy .tfdestroy
 
 test-local: ## Prettier test outputs
