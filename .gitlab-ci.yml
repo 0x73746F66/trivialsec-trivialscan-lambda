@@ -2,7 +2,7 @@ variables:
   BUILD_ENV: ci
   APP_ENV: Prod
   SOURCE_FILE: plans/prod-trivialscan-lambda.zip
-  IMAGE_NAME: trivialscan-lambda
+  IMAGE_NAME: trivialscan-lambda-ci
   TF_VAR_app_env: Prod
   TF_VAR_log_level: WARNING
   TF_VAR_app_name: trivialscan-lambda
