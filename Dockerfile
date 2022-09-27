@@ -7,7 +7,7 @@ LABEL org.opencontainers.image.source="https://gitlab.com/trivialsec/trivialscan
 ENV PYTHONPATH ${PYTHONPATH}
 
 WORKDIR ${LAMBDA_TASK_ROOT}
-COPY src/*.py ./
+COPY src .
 COPY pyproject.toml .
 
 RUN echo "Installing from pyproyect.toml" \
