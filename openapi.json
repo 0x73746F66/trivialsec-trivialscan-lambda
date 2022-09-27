@@ -14,28 +14,19 @@
                     {
                         "required": false,
                         "schema": {
+                            "title": "Authorization",
+                            "type": "string"
+                        },
+                        "name": "authorization",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
                             "title": "X-Trivialscan-Account",
                             "type": "string"
                         },
                         "name": "x-trivialscan-account",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Client",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-client",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Token",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-token",
                         "in": "header"
                     },
                     {
@@ -50,6 +41,432 @@
                 ],
                 "responses": {
                     "202": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CheckToken"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/summary/{report_id}": {
+            "get": {
+                "summary": "Retrieve Summary",
+                "description": "Retrieves a summary of a Trivial Scanner report for the provided report identiffier",
+                "operationId": "retrieve_summary_summary__report_id__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Report Id",
+                            "type": "string"
+                        },
+                        "name": "report_id",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Authorization",
+                            "type": "string"
+                        },
+                        "name": "authorization",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ReportSummary"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/report/{report_id}": {
+            "get": {
+                "summary": "Retrieve Report",
+                "description": "Retrieves a full Trivial Scanner report for the provided report identiffier",
+                "operationId": "retrieve_report_report__report_id__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Report Id",
+                            "type": "string"
+                        },
+                        "name": "report_id",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Authorization",
+                            "type": "string"
+                        },
+                        "name": "authorization",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EvaluationReport"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/reports": {
+            "get": {
+                "summary": "Retrieve Reports",
+                "description": "Retrieves a collection of your own Trivial Scanner reports, providing a summary of each",
+                "operationId": "retrieve_reports_reports_get",
+                "parameters": [
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Authorization",
+                            "type": "string"
+                        },
+                        "name": "authorization",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "title": "Response Retrieve Reports Reports Get",
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ReportSummary"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/host/{hostname}": {
+            "get": {
+                "summary": "Retrieve Host",
+                "description": "Retrieves TLS data on any hostname, providing an optional port number",
+                "operationId": "retrieve_host_host__hostname__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Hostname",
+                            "type": "string"
+                        },
+                        "name": "hostname",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Port",
+                            "type": "integer",
+                            "default": 443
+                        },
+                        "name": "port",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Authorization",
+                            "type": "string"
+                        },
+                        "name": "authorization",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Host"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/certificate/{sha1_fingerprint}": {
+            "get": {
+                "summary": "Retrieve Certificate",
+                "description": "Retrieves TLS Certificate data by SHA1 fingerprint, optionally provides the PEM encoded certificate",
+                "operationId": "retrieve_certificate_certificate__sha1_fingerprint__get",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "title": "Sha1 Fingerprint",
+                            "type": "string"
+                        },
+                        "name": "sha1_fingerprint",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Include Pem",
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "name": "include_pem",
+                        "in": "query"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Authorization",
+                            "type": "string"
+                        },
+                        "name": "authorization",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful Response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Certificate"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HTTPValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/store/{report_type}": {
+            "post": {
+                "summary": "Store",
+                "description": "Stores various client report data generated by Trivial Scanner CLI",
+                "operationId": "store_store__report_type__post",
+                "parameters": [
+                    {
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/ReportType"
+                        },
+                        "name": "report_type",
+                        "in": "path"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "Authorization",
+                            "type": "string"
+                        },
+                        "name": "authorization",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Account",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-account",
+                        "in": "header"
+                    },
+                    {
+                        "required": false,
+                        "schema": {
+                            "title": "X-Trivialscan-Version",
+                            "type": "string"
+                        },
+                        "name": "x-trivialscan-version",
+                        "in": "header"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Body_store_store__report_type__post"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
                         "description": "Successful Response",
                         "content": {
                             "application/json": {
@@ -135,467 +552,6 @@
                     }
                 }
             }
-        },
-        "/summary/{report_hash}": {
-            "get": {
-                "summary": "Retrieve Summary",
-                "description": "    ",
-                "operationId": "retrieve_summary_summary__report_hash__get",
-                "parameters": [
-                    {
-                        "required": true,
-                        "schema": {
-                            "title": "Report Hash",
-                            "type": "string"
-                        },
-                        "name": "report_hash",
-                        "in": "path"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Account",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-account",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Client",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-client",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Token",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-token",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Version",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-version",
-                        "in": "header"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/report/{report_hash}": {
-            "get": {
-                "summary": "Retrieve Report",
-                "description": "    ",
-                "operationId": "retrieve_report_report__report_hash__get",
-                "parameters": [
-                    {
-                        "required": true,
-                        "schema": {
-                            "title": "Report Hash",
-                            "type": "string"
-                        },
-                        "name": "report_hash",
-                        "in": "path"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Account",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-account",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Client",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-client",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Token",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-token",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Version",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-version",
-                        "in": "header"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/reports": {
-            "get": {
-                "summary": "Retrieve Reports",
-                "description": "    ",
-                "operationId": "retrieve_reports_reports_get",
-                "parameters": [
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Account",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-account",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Client",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-client",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Token",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-token",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Version",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-version",
-                        "in": "header"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/host/{hostname}": {
-            "get": {
-                "summary": "Retrieve Host",
-                "operationId": "retrieve_host_host__hostname__get",
-                "parameters": [
-                    {
-                        "required": true,
-                        "schema": {
-                            "title": "Hostname",
-                            "type": "string"
-                        },
-                        "name": "hostname",
-                        "in": "path"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "Port",
-                            "type": "integer",
-                            "default": 443
-                        },
-                        "name": "port",
-                        "in": "query"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Account",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-account",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Client",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-client",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Token",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-token",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Version",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-version",
-                        "in": "header"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/certificate/{sha1_fingerprint}": {
-            "get": {
-                "summary": "Retrieve Certificate",
-                "operationId": "retrieve_certificate_certificate__sha1_fingerprint__get",
-                "parameters": [
-                    {
-                        "required": true,
-                        "schema": {
-                            "title": "Sha1 Fingerprint",
-                            "type": "string"
-                        },
-                        "name": "sha1_fingerprint",
-                        "in": "path"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "Include Pem",
-                            "type": "boolean",
-                            "default": false
-                        },
-                        "name": "include_pem",
-                        "in": "query"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Account",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-account",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Client",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-client",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Token",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-token",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Version",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-version",
-                        "in": "header"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/store/{report_type}": {
-            "post": {
-                "summary": "Store",
-                "operationId": "store_store__report_type__post",
-                "parameters": [
-                    {
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/components/schemas/ReportType"
-                        },
-                        "name": "report_type",
-                        "in": "path"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Account",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-account",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Client",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-client",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Token",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-token",
-                        "in": "header"
-                    },
-                    {
-                        "required": false,
-                        "schema": {
-                            "title": "X-Trivialscan-Version",
-                            "type": "string"
-                        },
-                        "name": "x-trivialscan-version",
-                        "in": "header"
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "multipart/form-data": {
-                            "schema": {
-                                "$ref": "#/components/schemas/Body_store_store__report_type__post"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful Response",
-                        "content": {
-                            "application/json": {
-                                "schema": {}
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/HTTPValidationError"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     },
     "components": {
@@ -617,6 +573,685 @@
                     }
                 }
             },
+            "Certificate": {
+                "title": "Certificate",
+                "required": [
+                    "authority_key_identifier",
+                    "expired",
+                    "expiry_status",
+                    "extensions",
+                    "external_refs",
+                    "is_self_signed",
+                    "issuer",
+                    "known_compromised",
+                    "md5_fingerprint",
+                    "not_after",
+                    "not_before",
+                    "public_key_curve",
+                    "public_key_size",
+                    "public_key_type",
+                    "revocation_crl_urls",
+                    "san",
+                    "serial_number",
+                    "serial_number_decimal",
+                    "serial_number_hex",
+                    "sha1_fingerprint",
+                    "sha256_fingerprint",
+                    "signature_algorithm",
+                    "spki_fingerprint",
+                    "subject",
+                    "subject_key_identifier",
+                    "validation_level",
+                    "version",
+                    "type"
+                ],
+                "type": "object",
+                "properties": {
+                    "authority_key_identifier": {
+                        "title": "Authority Key Identifier",
+                        "type": "string"
+                    },
+                    "expired": {
+                        "title": "Expired",
+                        "type": "boolean"
+                    },
+                    "expiry_status": {
+                        "title": "Expiry Status",
+                        "type": "string"
+                    },
+                    "extensions": {
+                        "title": "Extensions",
+                        "type": "array",
+                        "items": {}
+                    },
+                    "external_refs": {
+                        "title": "External Refs",
+                        "type": "object",
+                        "additionalProperties": {
+                            "maxLength": 65536,
+                            "minLength": 1,
+                            "type": "string",
+                            "format": "uri"
+                        }
+                    },
+                    "is_self_signed": {
+                        "title": "Is Self Signed",
+                        "type": "boolean"
+                    },
+                    "issuer": {
+                        "title": "Issuer",
+                        "type": "string"
+                    },
+                    "known_compromised": {
+                        "title": "Known Compromised",
+                        "type": "boolean"
+                    },
+                    "md5_fingerprint": {
+                        "title": "Md5 Fingerprint",
+                        "type": "string"
+                    },
+                    "not_after": {
+                        "title": "Not After",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "not_before": {
+                        "title": "Not Before",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "public_key_curve": {
+                        "title": "Public Key Curve",
+                        "type": "string"
+                    },
+                    "public_key_exponent": {
+                        "title": "Public Key Exponent",
+                        "exclusiveMinimum": 0.0,
+                        "type": "integer"
+                    },
+                    "public_key_modulus": {
+                        "title": "Public Key Modulus",
+                        "exclusiveMinimum": 0.0,
+                        "type": "integer"
+                    },
+                    "public_key_size": {
+                        "title": "Public Key Size",
+                        "exclusiveMinimum": 0.0,
+                        "type": "integer"
+                    },
+                    "public_key_type": {
+                        "$ref": "#/components/schemas/PublicKeyType"
+                    },
+                    "revocation_crl_urls": {
+                        "title": "Revocation Crl Urls",
+                        "type": "array",
+                        "items": {
+                            "maxLength": 65536,
+                            "minLength": 1,
+                            "type": "string",
+                            "format": "uri"
+                        }
+                    },
+                    "san": {
+                        "title": "San",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "serial_number": {
+                        "title": "Serial Number",
+                        "type": "string"
+                    },
+                    "serial_number_decimal": {
+                        "title": "Serial Number Decimal",
+                        "exclusiveMinimum": 0.0,
+                        "type": "integer"
+                    },
+                    "serial_number_hex": {
+                        "title": "Serial Number Hex",
+                        "type": "string"
+                    },
+                    "sha1_fingerprint": {
+                        "title": "Sha1 Fingerprint",
+                        "type": "string"
+                    },
+                    "sha256_fingerprint": {
+                        "title": "Sha256 Fingerprint",
+                        "type": "string"
+                    },
+                    "signature_algorithm": {
+                        "title": "Signature Algorithm",
+                        "type": "string"
+                    },
+                    "spki_fingerprint": {
+                        "title": "Spki Fingerprint",
+                        "type": "string"
+                    },
+                    "subject": {
+                        "title": "Subject",
+                        "type": "string"
+                    },
+                    "subject_key_identifier": {
+                        "title": "Subject Key Identifier",
+                        "type": "string"
+                    },
+                    "validation_level": {
+                        "$ref": "#/components/schemas/ValidationLevel"
+                    },
+                    "validation_oid": {
+                        "title": "Validation Oid",
+                        "type": "string"
+                    },
+                    "version": {
+                        "title": "Version",
+                        "exclusiveMinimum": 0.0,
+                        "type": "integer"
+                    },
+                    "type": {
+                        "$ref": "#/components/schemas/CertificateType"
+                    }
+                }
+            },
+            "CertificateType": {
+                "title": "CertificateType",
+                "enum": [
+                    "root",
+                    "intermediate",
+                    "leaf",
+                    "client"
+                ],
+                "type": "string",
+                "description": "An enumeration."
+            },
+            "CheckToken": {
+                "title": "CheckToken",
+                "type": "object",
+                "properties": {
+                    "generator": {
+                        "title": "Generator",
+                        "type": "string",
+                        "default": "trivialscan"
+                    },
+                    "version": {
+                        "title": "Version",
+                        "type": "string",
+                        "description": "trivialscan CLI version"
+                    },
+                    "account_name": {
+                        "title": "Account Name",
+                        "type": "string",
+                        "description": "Trivial Security account name"
+                    },
+                    "client_name": {
+                        "title": "Client Name",
+                        "type": "string",
+                        "description": "Machine name where trivialscan CLI execcutes"
+                    },
+                    "authorisation_valid": {
+                        "title": "HMAC Signature validation",
+                        "type": "boolean",
+                        "description": "Provides verifiable proof the client has possession of the Registration Token (without exposing/transmitting the token), using SHA256 hashing of the pertinent request information",
+                        "default": false
+                    },
+                    "registered": {
+                        "title": "Registered",
+                        "type": "boolean",
+                        "description": "Client is registered",
+                        "default": false
+                    },
+                    "ip_address": {
+                        "title": "Ip Address",
+                        "type": "string",
+                        "description": "Source IP Address"
+                    },
+                    "user_agent": {
+                        "title": "User Agent",
+                        "type": "string",
+                        "description": "Source HTTP Client"
+                    }
+                }
+            },
+            "ComplianceItem": {
+                "title": "ComplianceItem",
+                "required": [
+                    "compliance",
+                    "version"
+                ],
+                "type": "object",
+                "properties": {
+                    "compliance": {
+                        "title": "Compliance",
+                        "type": "string"
+                    },
+                    "version": {
+                        "title": "Version",
+                        "type": "string"
+                    },
+                    "requirement": {
+                        "title": "Requirement",
+                        "type": "string"
+                    },
+                    "description": {
+                        "title": "Description",
+                        "type": "string"
+                    }
+                }
+            },
+            "Config": {
+                "title": "Config",
+                "required": [
+                    "defaults",
+                    "outputs",
+                    "targets"
+                ],
+                "type": "object",
+                "properties": {
+                    "account_name": {
+                        "title": "Account Name",
+                        "type": "string",
+                        "description": "Trivial Security account name"
+                    },
+                    "client_name": {
+                        "title": "Client Name",
+                        "type": "string",
+                        "description": "Machine name where trivialscan CLI execcutes"
+                    },
+                    "project_name": {
+                        "title": "Project Name",
+                        "type": "string",
+                        "description": "Trivial Scanner project assignment for the report"
+                    },
+                    "defaults": {
+                        "$ref": "#/components/schemas/ConfigDefaults"
+                    },
+                    "outputs": {
+                        "title": "Outputs",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ConfigOutput"
+                        }
+                    },
+                    "targets": {
+                        "title": "Targets",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ConfigTarget"
+                        }
+                    }
+                }
+            },
+            "ConfigDefaults": {
+                "title": "ConfigDefaults",
+                "required": [
+                    "use_sni",
+                    "checkpoint"
+                ],
+                "type": "object",
+                "properties": {
+                    "use_sni": {
+                        "title": "Use Sni",
+                        "type": "boolean"
+                    },
+                    "cafiles": {
+                        "title": "Cafiles",
+                        "type": "string"
+                    },
+                    "tmp_path_prefix": {
+                        "title": "Tmp Path Prefix",
+                        "type": "string",
+                        "default": "/tmp"
+                    },
+                    "http_path": {
+                        "title": "Http Path",
+                        "type": "string",
+                        "default": "/"
+                    },
+                    "checkpoint": {
+                        "title": "Checkpoint",
+                        "type": "boolean"
+                    }
+                }
+            },
+            "ConfigOutput": {
+                "title": "ConfigOutput",
+                "required": [
+                    "type"
+                ],
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "$ref": "#/components/schemas/OutputType"
+                    },
+                    "use_icons": {
+                        "title": "Use Icons",
+                        "type": "boolean"
+                    },
+                    "when": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/OutputWhen"
+                            }
+                        ],
+                        "default": "final"
+                    },
+                    "path": {
+                        "title": "Path",
+                        "type": "string"
+                    }
+                }
+            },
+            "ConfigTarget": {
+                "title": "ConfigTarget",
+                "required": [
+                    "hostname"
+                ],
+                "type": "object",
+                "properties": {
+                    "hostname": {
+                        "title": "Hostname",
+                        "type": "string"
+                    },
+                    "port": {
+                        "title": "Port",
+                        "exclusiveMinimum": 0.0,
+                        "type": "integer",
+                        "default": 443
+                    },
+                    "client_certificate": {
+                        "title": "Client Certificate",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "http_request_paths": {
+                        "title": "Http Request Paths",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [
+                            "/"
+                        ]
+                    }
+                }
+            },
+            "EvaluationItem": {
+                "title": "EvaluationItem",
+                "required": [
+                    "rule_id",
+                    "group_id",
+                    "key",
+                    "name",
+                    "group",
+                    "result_label",
+                    "result_text",
+                    "description"
+                ],
+                "type": "object",
+                "properties": {
+                    "generator": {
+                        "title": "Generator",
+                        "type": "string",
+                        "default": "trivialscan"
+                    },
+                    "version": {
+                        "title": "Version",
+                        "type": "string",
+                        "description": "trivialscan CLI version"
+                    },
+                    "account_name": {
+                        "title": "Account Name",
+                        "type": "string",
+                        "description": "Trivial Security account name"
+                    },
+                    "client_name": {
+                        "title": "Client Name",
+                        "type": "string",
+                        "description": "Machine name where trivialscan CLI execcutes"
+                    },
+                    "rule_id": {
+                        "title": "Rule Id",
+                        "type": "string"
+                    },
+                    "group_id": {
+                        "title": "Group Id",
+                        "type": "string"
+                    },
+                    "key": {
+                        "title": "Key",
+                        "type": "string"
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "group": {
+                        "title": "Group",
+                        "type": "string"
+                    },
+                    "result_value": {
+                        "title": "Result Value",
+                        "anyOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "result_label": {
+                        "title": "Result Label",
+                        "type": "string"
+                    },
+                    "result_text": {
+                        "title": "Result Text",
+                        "type": "string"
+                    },
+                    "result_level": {
+                        "title": "Result Level",
+                        "type": "string"
+                    },
+                    "result_color": {
+                        "title": "Result Color",
+                        "type": "string"
+                    },
+                    "score": {
+                        "title": "Score",
+                        "type": "integer",
+                        "default": 0
+                    },
+                    "description": {
+                        "title": "Description",
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "title": "Metadata",
+                        "type": "object",
+                        "default": {}
+                    },
+                    "cve": {
+                        "title": "Cve",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    },
+                    "cvss2": {
+                        "title": "Cvss2",
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {}
+                        ]
+                    },
+                    "cvss3": {
+                        "title": "Cvss3",
+                        "anyOf": [
+                            {
+                                "type": "string"
+                            },
+                            {}
+                        ]
+                    },
+                    "references": {
+                        "title": "References",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ReferenceItem"
+                        },
+                        "default": []
+                    },
+                    "compliance": {
+                        "title": "Compliance",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ComplianceItem"
+                        },
+                        "default": []
+                    },
+                    "threats": {
+                        "title": "Threats",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ThreatItem"
+                        },
+                        "default": []
+                    }
+                }
+            },
+            "EvaluationReport": {
+                "title": "EvaluationReport",
+                "required": [
+                    "targets",
+                    "date",
+                    "results",
+                    "results_uri",
+                    "flags",
+                    "config",
+                    "evaluations"
+                ],
+                "type": "object",
+                "properties": {
+                    "generator": {
+                        "title": "Generator",
+                        "type": "string",
+                        "default": "trivialscan"
+                    },
+                    "version": {
+                        "title": "Version",
+                        "type": "string",
+                        "description": "trivialscan CLI version"
+                    },
+                    "account_name": {
+                        "title": "Account Name",
+                        "type": "string",
+                        "description": "Trivial Security account name"
+                    },
+                    "client_name": {
+                        "title": "Client Name",
+                        "type": "string",
+                        "description": "Machine name where trivialscan CLI execcutes"
+                    },
+                    "project_name": {
+                        "title": "Project Name",
+                        "type": "string"
+                    },
+                    "targets": {
+                        "title": "Targets",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "date": {
+                        "title": "Date",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "execution_duration_seconds": {
+                        "title": "Execution Duration Seconds",
+                        "exclusiveMinimum": 0.0,
+                        "type": "number"
+                    },
+                    "score": {
+                        "title": "Score",
+                        "type": "integer",
+                        "default": 0
+                    },
+                    "results": {
+                        "title": "Results",
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "certificates": {
+                        "title": "Certificates",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    },
+                    "results_uri": {
+                        "title": "Results Uri",
+                        "type": "string"
+                    },
+                    "flags": {
+                        "$ref": "#/components/schemas/Flags"
+                    },
+                    "config": {
+                        "$ref": "#/components/schemas/Config"
+                    },
+                    "evaluations": {
+                        "title": "Evaluations",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/EvaluationItem"
+                        }
+                    }
+                }
+            },
+            "Flags": {
+                "title": "Flags",
+                "required": [
+                    "hide_progress_bars",
+                    "synchronous_only",
+                    "hide_banner",
+                    "track_changes",
+                    "quiet"
+                ],
+                "type": "object",
+                "properties": {
+                    "hide_progress_bars": {
+                        "title": "Hide Progress Bars",
+                        "type": "boolean"
+                    },
+                    "synchronous_only": {
+                        "title": "Synchronous Only",
+                        "type": "boolean"
+                    },
+                    "hide_banner": {
+                        "title": "Hide Banner",
+                        "type": "boolean"
+                    },
+                    "track_changes": {
+                        "title": "Track Changes",
+                        "type": "boolean"
+                    },
+                    "previous_report": {
+                        "title": "Previous Report",
+                        "type": "string"
+                    },
+                    "quiet": {
+                        "title": "Quiet",
+                        "type": "boolean"
+                    }
+                }
+            },
             "HTTPValidationError": {
                 "title": "HTTPValidationError",
                 "type": "object",
@@ -630,6 +1265,400 @@
                     }
                 }
             },
+            "Host": {
+                "title": "Host",
+                "required": [
+                    "last_updated",
+                    "transport",
+                    "tls",
+                    "http"
+                ],
+                "type": "object",
+                "properties": {
+                    "last_updated": {
+                        "title": "Last Updated",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "transport": {
+                        "$ref": "#/components/schemas/HostTransport"
+                    },
+                    "tls": {
+                        "$ref": "#/components/schemas/HostTLS"
+                    },
+                    "http": {
+                        "title": "Http",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/HostHTTP"
+                        }
+                    }
+                }
+            },
+            "HostHTTP": {
+                "title": "HostHTTP",
+                "required": [
+                    "title",
+                    "status_code",
+                    "headers",
+                    "body_hash"
+                ],
+                "type": "object",
+                "properties": {
+                    "title": {
+                        "title": "Title",
+                        "type": "string"
+                    },
+                    "status_code": {
+                        "title": "Status Code",
+                        "maximum": 599.0,
+                        "minimum": 100.0,
+                        "type": "integer"
+                    },
+                    "headers": {
+                        "title": "Headers",
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        }
+                    },
+                    "body_hash": {
+                        "title": "Body Hash",
+                        "type": "string"
+                    }
+                }
+            },
+            "HostTLS": {
+                "title": "HostTLS",
+                "required": [
+                    "client",
+                    "cipher",
+                    "protocol",
+                    "session_resumption"
+                ],
+                "type": "object",
+                "properties": {
+                    "certificates": {
+                        "title": "Certificates",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    },
+                    "client": {
+                        "$ref": "#/components/schemas/HostTLSClient"
+                    },
+                    "cipher": {
+                        "$ref": "#/components/schemas/HostTLSCipher"
+                    },
+                    "protocol": {
+                        "$ref": "#/components/schemas/HostTLSProtocol"
+                    },
+                    "session_resumption": {
+                        "$ref": "#/components/schemas/HostTLSSessionResumption"
+                    }
+                }
+            },
+            "HostTLSCipher": {
+                "title": "HostTLSCipher",
+                "required": [
+                    "offered",
+                    "negotiated",
+                    "negotiated_bits"
+                ],
+                "type": "object",
+                "properties": {
+                    "forward_anonymity": {
+                        "title": "Forward Anonymity",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "offered": {
+                        "title": "Offered",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "negotiated": {
+                        "title": "Negotiated",
+                        "type": "string"
+                    },
+                    "negotiated_bits": {
+                        "title": "Negotiated Bits",
+                        "exclusiveMinimum": 0.0,
+                        "type": "integer"
+                    }
+                }
+            },
+            "HostTLSClient": {
+                "title": "HostTLSClient",
+                "type": "object",
+                "properties": {
+                    "certificate_mtls_expected": {
+                        "title": "Certificate Mtls Expected",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "certificate_trusted": {
+                        "title": "Certificate Trusted",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "certificate_match": {
+                        "title": "Certificate Match",
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "expected_client_subjects": {
+                        "title": "Expected Client Subjects",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    }
+                }
+            },
+            "HostTLSProtocol": {
+                "title": "HostTLSProtocol",
+                "required": [
+                    "negotiated",
+                    "negotiated_rfc",
+                    "preferred",
+                    "preferred_rfc",
+                    "offered",
+                    "offered_rfc"
+                ],
+                "type": "object",
+                "properties": {
+                    "negotiated": {
+                        "title": "Negotiated",
+                        "type": "string"
+                    },
+                    "negotiated_rfc": {
+                        "title": "Negotiated Rfc",
+                        "type": "string"
+                    },
+                    "preferred": {
+                        "title": "Preferred",
+                        "type": "string"
+                    },
+                    "preferred_rfc": {
+                        "title": "Preferred Rfc",
+                        "type": "string"
+                    },
+                    "offered": {
+                        "title": "Offered",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "offered_rfc": {
+                        "title": "Offered Rfc",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "HostTLSSessionResumption": {
+                "title": "HostTLSSessionResumption",
+                "required": [
+                    "cache_mode",
+                    "tickets",
+                    "ticket_hint"
+                ],
+                "type": "object",
+                "properties": {
+                    "cache_mode": {
+                        "title": "Cache Mode",
+                        "type": "string"
+                    },
+                    "tickets": {
+                        "title": "Tickets",
+                        "type": "boolean"
+                    },
+                    "ticket_hint": {
+                        "title": "Ticket Hint",
+                        "type": "boolean"
+                    }
+                }
+            },
+            "HostTransport": {
+                "title": "HostTransport",
+                "required": [
+                    "hostname",
+                    "sni_support",
+                    "peer_address"
+                ],
+                "type": "object",
+                "properties": {
+                    "hostname": {
+                        "title": "Domain Name",
+                        "type": "string"
+                    },
+                    "port": {
+                        "title": "Port",
+                        "exclusiveMinimum": 0.0,
+                        "type": "integer",
+                        "default": 443
+                    },
+                    "sni_support": {
+                        "title": "Sni Support",
+                        "type": "boolean"
+                    },
+                    "peer_address": {
+                        "title": "Peer Address",
+                        "type": "string",
+                        "format": "ipvanyaddress"
+                    },
+                    "certificate_mtls_expected": {
+                        "title": "Certificate Mtls Expected",
+                        "type": "boolean",
+                        "default": false
+                    }
+                }
+            },
+            "OutputType": {
+                "title": "OutputType",
+                "enum": [
+                    "json",
+                    "console"
+                ],
+                "type": "string",
+                "description": "An enumeration."
+            },
+            "OutputWhen": {
+                "title": "OutputWhen",
+                "enum": [
+                    "final",
+                    "per_host",
+                    "per_certificate"
+                ],
+                "type": "string",
+                "description": "An enumeration."
+            },
+            "PublicKeyType": {
+                "title": "PublicKeyType",
+                "enum": [
+                    "RSA",
+                    "DSA",
+                    "EC",
+                    "DH"
+                ],
+                "type": "string",
+                "description": "An enumeration."
+            },
+            "ReferenceItem": {
+                "title": "ReferenceItem",
+                "required": [
+                    "name",
+                    "url"
+                ],
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "title": "Name",
+                        "type": "string"
+                    },
+                    "url": {
+                        "title": "Url",
+                        "maxLength": 65536,
+                        "minLength": 1,
+                        "type": "string",
+                        "format": "uri"
+                    }
+                }
+            },
+            "ReportSummary": {
+                "title": "ReportSummary",
+                "required": [
+                    "targets",
+                    "date",
+                    "results",
+                    "results_uri",
+                    "flags",
+                    "config"
+                ],
+                "type": "object",
+                "properties": {
+                    "generator": {
+                        "title": "Generator",
+                        "type": "string",
+                        "default": "trivialscan"
+                    },
+                    "version": {
+                        "title": "Version",
+                        "type": "string",
+                        "description": "trivialscan CLI version"
+                    },
+                    "account_name": {
+                        "title": "Account Name",
+                        "type": "string",
+                        "description": "Trivial Security account name"
+                    },
+                    "client_name": {
+                        "title": "Client Name",
+                        "type": "string",
+                        "description": "Machine name where trivialscan CLI execcutes"
+                    },
+                    "project_name": {
+                        "title": "Project Name",
+                        "type": "string"
+                    },
+                    "targets": {
+                        "title": "Targets",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "date": {
+                        "title": "Date",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "execution_duration_seconds": {
+                        "title": "Execution Duration Seconds",
+                        "exclusiveMinimum": 0.0,
+                        "type": "number"
+                    },
+                    "score": {
+                        "title": "Score",
+                        "type": "integer",
+                        "default": 0
+                    },
+                    "results": {
+                        "title": "Results",
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "certificates": {
+                        "title": "Certificates",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": []
+                    },
+                    "results_uri": {
+                        "title": "Results Uri",
+                        "type": "string"
+                    },
+                    "flags": {
+                        "$ref": "#/components/schemas/Flags"
+                    },
+                    "config": {
+                        "$ref": "#/components/schemas/Config"
+                    }
+                }
+            },
             "ReportType": {
                 "title": "ReportType",
                 "enum": [
@@ -640,6 +1669,96 @@
                 ],
                 "type": "string",
                 "description": "An enumeration."
+            },
+            "ThreatItem": {
+                "title": "ThreatItem",
+                "required": [
+                    "standard",
+                    "version"
+                ],
+                "type": "object",
+                "properties": {
+                    "standard": {
+                        "title": "Standard",
+                        "type": "string"
+                    },
+                    "version": {
+                        "title": "Version",
+                        "type": "string"
+                    },
+                    "tactic_id": {
+                        "title": "Tactic Id",
+                        "type": "string"
+                    },
+                    "tactic_url": {
+                        "title": "Tactic Url",
+                        "maxLength": 65536,
+                        "minLength": 1,
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "tactic": {
+                        "title": "Tactic",
+                        "type": "string"
+                    },
+                    "description": {
+                        "title": "Description",
+                        "type": "string"
+                    },
+                    "technique_id": {
+                        "title": "Technique Id",
+                        "type": "string"
+                    },
+                    "technique_url": {
+                        "title": "Technique Url",
+                        "maxLength": 65536,
+                        "minLength": 1,
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "technique": {
+                        "title": "Technique",
+                        "type": "string"
+                    },
+                    "technique_description": {
+                        "title": "Technique Description",
+                        "type": "string"
+                    },
+                    "sub_technique_id": {
+                        "title": "Sub Technique Id",
+                        "type": "string"
+                    },
+                    "sub_technique_url": {
+                        "title": "Sub Technique Url",
+                        "maxLength": 65536,
+                        "minLength": 1,
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "sub_technique": {
+                        "title": "Sub Technique",
+                        "type": "string"
+                    },
+                    "sub_technique_description": {
+                        "title": "Sub Technique Description",
+                        "type": "string"
+                    },
+                    "data_source_id": {
+                        "title": "Data Source Id",
+                        "type": "string"
+                    },
+                    "data_source_url": {
+                        "title": "Data Source Url",
+                        "maxLength": 65536,
+                        "minLength": 1,
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "data_source": {
+                        "title": "Data Source",
+                        "type": "string"
+                    }
+                }
             },
             "ValidationError": {
                 "title": "ValidationError",
@@ -673,6 +1792,16 @@
                         "type": "string"
                     }
                 }
+            },
+            "ValidationLevel": {
+                "title": "ValidationLevel",
+                "enum": [
+                    "Domain Validation (DV)",
+                    "Organization Validation (OV)",
+                    "Extended Validation (EV)"
+                ],
+                "type": "string",
+                "description": "An enumeration."
             }
         }
     }
