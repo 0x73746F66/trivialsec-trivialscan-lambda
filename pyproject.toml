@@ -27,18 +27,6 @@ dependencies = [
     "python-multipart==0.0.5",
 ]
 
-[project.license]
-file = "LICENSE.md"
-
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-"*" = ["src/**/*.yaml"]
-
 [tool.coverage.run]
 source = ["src"]
 
