@@ -8,7 +8,7 @@ ENV PYTHONPATH ${PYTHONPATH}
 
 WORKDIR ${LAMBDA_TASK_ROOT}
 COPY src/*.py ./
-COPY pyproyect.toml .
+COPY pyproject.toml .
 
 RUN echo "Installing from pyproyect.toml" \
     && python -m pip install --progress-bar off -U --no-cache-dir .
