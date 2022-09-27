@@ -10,3 +10,6 @@ logging-format-style=new
 
 [FORMAT]
 max-line-length=200
+
+[MASTER]
+extension-pkg-whitelist=pydantic

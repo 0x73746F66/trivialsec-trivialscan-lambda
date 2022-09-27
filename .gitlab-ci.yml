@@ -1,4 +1,8 @@
 variables:
+  BUILD_ENV: ci
+  APP_ENV: Prod
+  SOURCE_FILE: plans/prod-trivialscan-lambda.zip
+  IMAGE_NAME: trivialscan-lambda-ci
   TF_VAR_app_env: Prod
   TF_VAR_log_level: WARNING
   TF_VAR_app_name: trivialscan-lambda
@@ -28,7 +32,12 @@ terraform validate:
     - trivialscan
   allow_failure: true
   script:
-    - pre-commit run terraform_validate --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
+    - |+
+      TOOLS="terraform_checkov terraform_validate"
+      for i in $TOOLS
+      do
+        pre-commit run $i --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
+      done
   only:
     refs:
       - merge_request
@@ -186,7 +195,7 @@ tf:plan:
     - trivialscan
   stage: pre-deploy
   script:
-    - make init plan
+    - make -B build init plan
   only:
     refs:
       - merge_request
@@ -194,7 +203,10 @@ tf:plan:
   artifacts:
     name: tfplan
     paths:
+      - $SOURCE_FILE
       - plans/.tfplan
+      - plans/.terraform.lock.hcl
+      - plans/.terraform
     reports:
       terraform: plans/tfplan.json
 
@@ -204,7 +216,7 @@ tf:apply:
     - trivialscan
   stage: deploy
   script:
-    - make init apply
+    - make apply
   only:
     refs:
       - main

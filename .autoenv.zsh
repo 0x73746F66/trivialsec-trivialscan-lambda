@@ -15,13 +15,16 @@ export TF_VAR_aws_access_key_id=${TF_VAR_aws_access_key_id:-$AWS_ACCESS_KEY_ID}
 export TF_VAR_aws_secret_access_key=${TF_VAR_aws_secret_access_key:-$AWS_SECRET_ACCESS_KEY}
 [ -z "${TF_VAR_aws_access_key_id}" ] && echo -e "${RED}AWS_ACCESS_KEY_ID (or TF_VAR_aws_access_key_id) not set${NC}"
 [ -z "${TF_VAR_aws_secret_access_key}" ] && echo -e "${RED}AWS_SECRET_ACCESS_KEY (or TF_VAR_aws_secret_access_key) not set${NC}"
+aws sts get-caller-identity
 readonly default_env=Dev
 readonly default_name=$(id -nu)-$(cat /etc/hostname)
+readonly prod_api_url=$(aws ssm get-parameter --name "/Prod/Deploy/trivialscan-lambda/trivialscan_lambda_url" --output text --with-decryption --query 'Parameter.Value' 2>/dev/null)
 export APP_ENV=${APP_ENV:-${default_env}}
 export APP_NAME=${APP_NAME:-${default_name}}
+export API_URL=${APP_URL:-${prod_api_url}}
 export TF_VAR_app_env=${APP_ENV}
 export TF_VAR_app_name=${APP_NAME}
-
 git fetch
 git status
 echo -e "${PRIMARY}$(make --version)${NC}\n$(make help)"
+[ -f .venv3.9/bin/activate ] && source .venv3.9/bin/activate

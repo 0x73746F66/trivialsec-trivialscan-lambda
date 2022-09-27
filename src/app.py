@@ -8,14 +8,11 @@ from mangum import Mangum
 import utils
 import router
 
-__version__ = "1.0.0"
-
 DEFAULT_LOG_LEVEL = "WARNING"
 LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
 
 app = FastAPI(
     title="Trivial Scanner Dashboard API",
-    version=__version__,
 )
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.include_router(router.router)
