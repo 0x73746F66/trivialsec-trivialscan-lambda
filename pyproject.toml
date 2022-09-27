@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "trivialscan-lambda"
+version = "1.0.0"
 description = "Just an API"
 authors = [
     {name = "Christopher Langton", email = "chris@trivialsec.com"},
@@ -26,10 +27,6 @@ dependencies = [
     "python-multipart==0.0.5",
 ]
 dynamic = ["version", "readme"]
-
-[tool.setuptools.dynamic]
-version = {attr = "app.__version__"}
-readme = {file = ["README.md"]}
 
 [project.license]
 file = "LICENSE.md"
