@@ -94,3 +94,4 @@ plans/dev-trivialscan-lambda.zip
 *.gz
 .development/python*/
 .development/sqlite3-builder/
+.development/*.log

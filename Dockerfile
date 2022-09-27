@@ -7,11 +7,9 @@ LABEL org.opencontainers.image.source="https://gitlab.com/trivialsec/trivialscan
 ENV PYTHONPATH ${PYTHONPATH}
 
 WORKDIR ${LAMBDA_TASK_ROOT}
-COPY src/app.py .
-COPY src/router.py .
-COPY src/utils.py .
-COPY requirements.txt .
-COPY setup.py .
+COPY src/*.py .
+COPY pyproyect.toml .
+
 RUN echo "Installing from setup.py" \
     && python -m pip install --progress-bar off -U --no-cache-dir .
 CMD [ "app.handler" ]

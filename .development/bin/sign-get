@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# sha256 sha512 sha3-256 sha3-384 sha3-512 blake2b512
+digest=sha512
+
+readonly path_uri=$1
+readonly unix_ts=$2
+readonly domain_name=$3
+readonly port=${4:-443}
+
+if [[ -f .env ]]; then
+  source .env
+fi
+if [ -z "${domain_name}" ]; then
+  echo -e "domain_name (arg 3) not provided"
+  exit 1
+fi
+if [ -z "${unix_ts}" ]; then
+  echo -e "unix_ts (arg 2) not provided"
+  exit 1
+fi
+if [ -z "${path_uri}" ]; then
+  echo -e "path_uri (arg 1) not provided"
+  exit 1
+fi
+if [ -z "${TRIVIALSCAN_TOKEN}" ]; then
+  echo -e "TRIVIALSCAN_TOKEN (environment variable) not defined"
+  exit 1
+fi
+
+readonly ciphertext=$(echo -ne "GET\n${domain_name}\n${port}\n${path_uri}\n${unix_ts}" | openssl dgst -${digest} -hmac "${TRIVIALSCAN_TOKEN}" | sed 's/^.*= //')
+if [ -z "${ciphertext}" ]; then
+  echo -e "Problem encountered while signing with openssl"
+  exit 7
+else
+  echo -n ${ciphertext}
+  exit 0
+fi

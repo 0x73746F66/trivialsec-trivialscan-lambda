@@ -4,9 +4,13 @@ export $(shell sed 's/=.*//' .env)
 .PHONY: help
 
 primary := '\033[1;36m'
+err := '\033[0;31m'
 bold := '\033[1m'
 clear := '\033[0m'
 
+ifndef BUILD_ENV
+BUILD_ENV=development
+endif
 ifndef APP_ENV
 APP_ENV=Dev
 endif
@@ -15,6 +19,17 @@ CI_BUILD_REF=local
 endif
 ifndef RUNNER_NAME
 RUNNER_NAME=$(shell basename $(shell pwd))
+endif
+ifndef API_URL
+API_HOSTNAME=localhost
+API_PORT=8080
+API_URL=http://${API_HOSTNAME}:${API_PORT}
+endif
+ifndef TEST_HOSTNAME
+TEST_HOSTNAME=jupiterbroadcasting.com
+endif
+ifndef TEST_SHA1SIG
+TEST_SHA1SIG=091e8ea1b256a312962af6c140c0fbf079a407b3
 endif
 
 help: ## This help.
@@ -80,14 +95,96 @@ unit-test: ## run unit tests with coverage
 	coverage run -m pytest --nf
 	coverage report -m
 
-docker-local: ## run the Lambda locally from the Docker container used to build the Terraform package
-	docker run --rm -p 8080:8080 --name trivialscan-dashboard pip-builder:latest
-
 run-local: ## A local server interfacing with Lambda URL
-	(cd src; uvicorn app:app --reload --host 0.0.0.0)
+	(cd src; uvicorn app:app --reload --port 8080 --host 0.0.0.0)
 
-lambda-local: ## Invoke the regular Lambda, not as the LambdaURL context
-	curl -XPOST "http://localhost:8080/2015-03-31/functions/function/invocations" -d '{}'
+curl-check-token: _validate _validate_token ## GET /check-token
+	$(eval UNIX_TS := $(shell date +'%s'))
+	$(eval SIG := $(shell .${BUILD_ENV}/bin/sign-get /check-token $(UNIX_TS) ${API_HOSTNAME} ${API_PORT}))
+	@curl -s --compressed \
+	 --trace-ascii .${BUILD_ENV}/latest-req-headers.log \
+     --dump-header .${BUILD_ENV}/latest-resp-headers.log \
+	 -H "X-Trivialscan-Account: ${TRIVIALSCAN_ACCOUNT_NAME}" \
+	 -H "X-Trivialscan-Version: ${TRIVIALSCAN_CLI_VERSION}" \
+	 -H "Authorization: HMAC id=\"${TRIVIALSCAN_CLIENT_NAME}\", mac=\"$(SIG)\", ts=\"$(UNIX_TS)\"" \
+	"${API_URL}/check-token" | jq
+
+curl-reports: _validate _validate_token ## GET /reports
+	$(eval UNIX_TS := $(shell date +'%s'))
+	$(eval SIG := $(shell .${BUILD_ENV}/bin/sign-get /reports $(UNIX_TS) ${API_HOSTNAME} ${API_PORT}))
+	@curl -s --compressed \
+	 --trace-ascii .${BUILD_ENV}/latest-req-headers.log \
+     --dump-header .${BUILD_ENV}/latest-resp-headers.log \
+	 -H "X-Trivialscan-Account: ${TRIVIALSCAN_ACCOUNT_NAME}" \
+	 -H "X-Trivialscan-Version: ${TRIVIALSCAN_CLI_VERSION}" \
+	 -H "Authorization: HMAC id=\"${TRIVIALSCAN_CLIENT_NAME}\", mac=\"$(SIG)\", ts=\"$(UNIX_TS)\"" \
+	"${API_URL}/reports" | jq
+
+curl-summary: _validate _validate_token ## GET /summary/{report_hash}
+	@echo $(shell [ -z "${TRIVIALSCAN_REPORT_HASH}" ] && echo -e $(err)TRIVIALSCAN_REPORT_HASH missing$(clear) )
+	$(eval UNIX_TS := $(shell date +'%s'))
+	$(eval SIG := $(shell .${BUILD_ENV}/bin/sign-get /summary/${TRIVIALSCAN_REPORT_HASH} $(UNIX_TS) ${API_HOSTNAME} ${API_PORT}))
+	@curl -s --compressed \
+	 --trace-ascii .${BUILD_ENV}/latest-req-headers.log \
+     --dump-header .${BUILD_ENV}/latest-resp-headers.log \
+	 -H "X-Trivialscan-Account: ${TRIVIALSCAN_ACCOUNT_NAME}" \
+	 -H "X-Trivialscan-Version: ${TRIVIALSCAN_CLI_VERSION}" \
+	 -H "Authorization: HMAC id=\"${TRIVIALSCAN_CLIENT_NAME}\", mac=\"$(SIG)\", ts=\"$(UNIX_TS)\"" \
+	"${API_URL}/summary/${TRIVIALSCAN_REPORT_HASH}" | jq
+
+curl-report: _validate _validate_token ## GET /report/{report_hash}
+	@echo $(shell [ -z "${TRIVIALSCAN_REPORT_HASH}" ] && echo -e $(err)TRIVIALSCAN_REPORT_HASH missing$(clear) )
+	$(eval UNIX_TS := $(shell date +'%s'))
+	$(eval SIG := $(shell .${BUILD_ENV}/bin/sign-get /report/${TRIVIALSCAN_REPORT_HASH} $(UNIX_TS) ${API_HOSTNAME} ${API_PORT}))
+	@curl -s --compressed \
+	 --trace-ascii .${BUILD_ENV}/latest-req-headers.log \
+     --dump-header .${BUILD_ENV}/latest-resp-headers.log \
+	 -H "X-Trivialscan-Account: ${TRIVIALSCAN_ACCOUNT_NAME}" \
+	 -H "X-Trivialscan-Version: ${TRIVIALSCAN_CLI_VERSION}" \
+	 -H "Authorization: HMAC id=\"${TRIVIALSCAN_CLIENT_NAME}\", mac=\"$(SIG)\", ts=\"$(UNIX_TS)\"" \
+	"${API_URL}/report/${TRIVIALSCAN_REPORT_HASH}" | jq
+
+curl-host: _validate _validate_token ## GET /host/{hostname}
+	@echo $(shell [ -z "${TEST_HOSTNAME}" ] && echo -e $(err)TEST_HOSTNAME missing$(clear) )
+	$(eval UNIX_TS := $(shell date +'%s'))
+	$(eval SIG := $(shell .${BUILD_ENV}/bin/sign-get /host/${TEST_HOSTNAME} $(UNIX_TS) ${API_HOSTNAME} ${API_PORT}))
+	@curl -s --compressed \
+	 --trace-ascii .${BUILD_ENV}/latest-req-headers.log \
+     --dump-header .${BUILD_ENV}/latest-resp-headers.log \
+	 -H "X-Trivialscan-Account: ${TRIVIALSCAN_ACCOUNT_NAME}" \
+	 -H "X-Trivialscan-Version: ${TRIVIALSCAN_CLI_VERSION}" \
+	 -H "Authorization: HMAC id=\"${TRIVIALSCAN_CLIENT_NAME}\", mac=\"$(SIG)\", ts=\"$(UNIX_TS)\"" \
+	"${API_URL}/host/${TEST_HOSTNAME}" | jq
+
+curl-certificate: _validate _validate_token ## GET /certificate/{sha1_fingerprint}
+	@echo $(shell [ -z "${TEST_SHA1SIG}" ] && echo -e $(err)TEST_SHA1SIG missing$(clear) )
+	$(eval UNIX_TS := $(shell date +'%s'))
+	$(eval SIG := $(shell .${BUILD_ENV}/bin/sign-get /certificate/${TEST_SHA1SIG} $(UNIX_TS) ${API_HOSTNAME} ${API_PORT}))
+	@curl -s --compressed \
+	 --trace-ascii .${BUILD_ENV}/latest-req-headers.log \
+     --dump-header .${BUILD_ENV}/latest-resp-headers.log \
+	 -H "X-Trivialscan-Account: ${TRIVIALSCAN_ACCOUNT_NAME}" \
+	 -H "X-Trivialscan-Version: ${TRIVIALSCAN_CLI_VERSION}" \
+	 -H "Authorization: HMAC id=\"${TRIVIALSCAN_CLIENT_NAME}\", mac=\"$(SIG)\", ts=\"$(UNIX_TS)\"" \
+	"${API_URL}/certificate/${TEST_SHA1SIG}" | jq
+
+local-register: _validate ## POST /register/{client_name}
+	@cat .${BUILD_ENV}/client-identifiers.json | curl -XPOST -s --compressed \
+	 --trace-ascii .${BUILD_ENV}/latest-req-headers.log \
+     --dump-header .${BUILD_ENV}/latest-resp-headers.log \
+	 -H "X-Trivialscan-Account: ${TRIVIALSCAN_ACCOUNT_NAME}" \
+	 -H "X-Trivialscan-Version: ${TRIVIALSCAN_CLI_VERSION}" \
+	 -H "Content-Type: application/json" \
+	 -d @- -- \
+	"${API_URL}/register/${TRIVIALSCAN_CLIENT_NAME}" | jq
+
+_validate_token:
+	@echo $(shell [ -z "${TRIVIALSCAN_TOKEN}" ] && echo -e $(err)TRIVIALSCAN_TOKEN missing$(clear) )
+_validate:
+	@echo $(shell [ -z "${BUILD_ENV}" ] && echo -e $(err)BUILD_ENV missing$(clear) )
+	@echo $(shell [ -z "${TRIVIALSCAN_CLIENT_NAME}" ] && echo -e $(err)TRIVIALSCAN_CLIENT_NAME missing$(clear) )
+	@echo $(shell [ -z "${TRIVIALSCAN_ACCOUNT_NAME}" ] && echo -e $(err)TRIVIALSCAN_ACCOUNT_NAME missing$(clear) )
+	@echo $(shell [ -z "${TRIVIALSCAN_CLI_VERSION}" ] && echo -e $(err)TRIVIALSCAN_CLI_VERSION missing$(clear) )
 
 local-runner: ## local setup for a gitlab runner
 	@docker volume create --name=gitlab-cache 2>/dev/null || true
