@@ -205,3 +205,6 @@ local-runner: ## local setup for a gitlab runner
 		--registration-token '$(RUNNER_TOKEN)' \
 		--cache-dir '/cache' \
 		--executor shell
+
+tail-aws-logs: ## Install using pipx install awscliv2
+	awsv2 logs tail "/aws/lambda/$(shell sed -e 's/\(.*\)/\L\1/' <<< "${APP_ENV}")-trivialscan-api" --follow

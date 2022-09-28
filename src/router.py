@@ -102,7 +102,7 @@ async def retrieve_summary(
         utils.logger.exception(err)
         return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
-    summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", registration_token, report_id, "summary.json")
+    summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
     try:
         ret = utils.get_s3(
             bucket_name=utils.STORE_BUCKET,
@@ -168,8 +168,8 @@ async def retrieve_report(
         utils.logger.exception(err)
         return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
-    summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", registration_token, report_id, "summary.json")
-    evaluations_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", registration_token, report_id, "evaluations.json")
+    summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
+    evaluations_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "evaluations.json")
     try:
         ret = utils.get_s3(
             bucket_name=utils.STORE_BUCKET,
@@ -245,7 +245,7 @@ async def retrieve_reports(
 
     summary_keys = []
     data = []
-    prefix_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", registration_token)
+    prefix_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results")
     try:
         summary_keys = utils.list_s3(
             bucket_name=utils.STORE_BUCKET,
@@ -433,9 +433,11 @@ async def store(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    raw = await request.body()
+
+    file = files[0]
+    contents = await file.read()
     authz = utils.HMAC(
-        raw_body=raw.decode("utf8"),
+        raw_body=contents.decode("utf8"),
         authorization_header=authorization,
         request_url=str(request.url),
     )
@@ -456,10 +458,8 @@ async def store(
         utils.logger.exception(err)
         return {"message": utils.GENERIC_SECURITY_MESSAGE}
 
-    file = files[0]
-    contents = await file.read()
     if file.filename.endswith(".json"):
-        contents = json.loads(contents.decode())
+        contents = json.loads(contents.decode("utf8"))
     if isinstance(contents, dict):
         if contents.get("config", {}).get("token"):
             del contents["config"]["token"]
@@ -469,14 +469,12 @@ async def store(
     if report_type is models.ReportType.REPORT:
         contents["version"] = x_trivialscan_version
         result_token = token_urlsafe(56)
-        path_prefix = path.join(registration_token, result_token)
-        if utils.store_summary(report=contents, path_prefix=path_prefix):
+        if utils.store_summary(report=contents, path_prefix=result_token):
             return {"results_uri": f"/result/{result_token}/summary"}
 
     if report_type is models.ReportType.EVALUATIONS:
         result_token = file.filename.replace(".json", "")
-        path_prefix = path.join(registration_token, result_token)
-        if utils.store_evaluations(report=contents, account_name=x_trivialscan_account, path_prefix=path_prefix):
+        if utils.store_evaluations(report=contents, account_name=x_trivialscan_account, path_prefix=result_token):
             return {"results_uri": f"/result/{result_token}"}
 
     if report_type is models.ReportType.HOST:
