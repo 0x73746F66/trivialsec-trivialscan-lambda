@@ -170,7 +170,7 @@ class HMAC:
             return False
 
         digestmod = self.supported_algorithms.get(self.algorithm)
-        # Sign HMAC using server-side secret
+        # Sign HMAC using server-side secret (not provided by client)
         digest = hmac.new(secret_key.encode(
             'utf8'), self.canonical_string.encode('utf8'), digestmod).hexdigest()
         self.server_mac = digest
