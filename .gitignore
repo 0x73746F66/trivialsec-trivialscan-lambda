@@ -90,7 +90,7 @@ cert_dot_sh/*.csv.part
 **/*.pid
 **/.monit*
 **/*.whl
-plans/dev-trivialscan-lambda.zip
+plans/*.zip
 *.gz
 .development/python*/
 .development/sqlite3-builder/

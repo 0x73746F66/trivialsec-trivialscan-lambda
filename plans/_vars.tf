@@ -22,3 +22,8 @@ variable "build_env" {
   type        = string
   default     = "development"
 }
+variable "jitter_seconds" {
+  description = "JITTER_SECONDS"
+  type        = string
+  default     = "10"
+}

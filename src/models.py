@@ -94,8 +94,8 @@ class ReportSummary(DefaultInfo):
     results: dict[str, int]
     certificates: list[str] = Field(default=[])
     results_uri: str
-    flags: Flags
-    config: Config
+    flags: Union[Flags, None] = Field(default=None)
+    config: Union[Config, None] = Field(default=None)
 
 class HostTLSProtocol(BaseModel):
     negotiated: str

@@ -9,6 +9,7 @@ resource "aws_lambda_function" "trivialscan" {
 
   environment {
     variables = {
+      JITTER_SECONDS = var.jitter_seconds
       APP_ENV = var.app_env
       APP_NAME = var.app_name
       LOG_LEVEL = var.log_level

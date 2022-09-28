@@ -19,6 +19,7 @@ from botocore.exceptions import (
     ReadTimeoutError,
 )
 
+JITTER_SECONDS = int(getenv("JITTER_SECONDS", "30"))
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
@@ -44,8 +45,8 @@ class HMAC:
     }
     server_mac: str
     parsed_header: dict = dict()
-    _not_before_seconds: int = 30
-    _expire_after_seconds: int = 5
+    _not_before_seconds: int = JITTER_SECONDS
+    _expire_after_seconds: int = JITTER_SECONDS
 
     @property
     def scheme(self):
@@ -83,8 +84,8 @@ class HMAC:
             method: str = "GET",
             raw_body: str = None,
             algorithm: str = None,
-            not_before_seconds: int = 30,
-            expire_after_seconds: int = 5,
+            not_before_seconds: int = JITTER_SECONDS,
+            expire_after_seconds: int = JITTER_SECONDS,
         ):
         self.authorization_header = authorization_header
         self.raw = raw_body
@@ -170,7 +171,7 @@ class HMAC:
             return False
 
         digestmod = self.supported_algorithms.get(self.algorithm)
-        # Sign HMAC using server-side secret
+        # Sign HMAC using server-side secret (not provided by client)
         digest = hmac.new(secret_key.encode(
             'utf8'), self.canonical_string.encode('utf8'), digestmod).hexdigest()
         self.server_mac = digest
