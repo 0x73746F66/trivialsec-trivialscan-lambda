@@ -39,7 +39,7 @@ async def check_token_registration(
         request_url=str(request.url),
     )
     utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}","{x_trivialscan_version}"'
     )
     registration_token = utils.retrieve_token(
         account_name=x_trivialscan_account,
@@ -69,7 +69,6 @@ async def retrieve_summary(
     report_id: str,
     authorization: Union[str, None] = Header(default=None),
     x_trivialscan_account: Union[str, None] = Header(default=None),
-    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves a summary of a Trivial Scanner report for the provided report identiffier
@@ -86,7 +85,7 @@ async def retrieve_summary(
         request_url=str(request.url),
     )
     utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}",'
     )
     registration_token = utils.retrieve_token(
         account_name=x_trivialscan_account,
@@ -135,7 +134,6 @@ async def retrieve_report(
     report_id: str,
     authorization: Union[str, None] = Header(default=None),
     x_trivialscan_account: Union[str, None] = Header(default=None),
-    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves a full Trivial Scanner report for the provided report identiffier
@@ -152,7 +150,7 @@ async def retrieve_report(
         request_url=str(request.url),
     )
     utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}",'
     )
     registration_token = utils.retrieve_token(
         account_name=x_trivialscan_account,
@@ -210,7 +208,6 @@ async def retrieve_reports(
     response: Response,
     authorization: Union[str, None] = Header(default=None),
     x_trivialscan_account: Union[str, None] = Header(default=None),
-    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
@@ -219,7 +216,7 @@ async def retrieve_reports(
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = utils.HMAC(
@@ -227,7 +224,7 @@ async def retrieve_reports(
         request_url=str(request.url),
     )
     utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+        f'"{x_trivialscan_account}","{authz.id}","","{ip_addr}","{user_agent}"'
     )
     registration_token = utils.retrieve_token(
         account_name=x_trivialscan_account,
@@ -296,7 +293,6 @@ async def retrieve_host(
     port: int = 443,
     authorization: Union[str, None] = Header(default=None),
     x_trivialscan_account: Union[str, None] = Header(default=None),
-    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves TLS data on any hostname, providing an optional port number
@@ -313,7 +309,7 @@ async def retrieve_host(
         request_url=str(request.url),
     )
     utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}",'
     )
     registration_token = utils.retrieve_token(
         account_name=x_trivialscan_account,
@@ -358,7 +354,6 @@ async def retrieve_certificate(
     include_pem: bool = False,
     authorization: Union[str, None] = Header(default=None),
     x_trivialscan_account: Union[str, None] = Header(default=None),
-    x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves TLS Certificate data by SHA1 fingerprint, optionally provides the PEM encoded certificate
@@ -375,7 +370,7 @@ async def retrieve_certificate(
         request_url=str(request.url),
     )
     utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}",'
     )
     registration_token = utils.retrieve_token(
         account_name=x_trivialscan_account,
@@ -442,7 +437,7 @@ async def store(
         request_url=str(request.url),
     )
     utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}","{x_trivialscan_version}"'
     )
     registration_token = utils.retrieve_token(
         account_name=x_trivialscan_account,
@@ -506,7 +501,7 @@ async def register_client(
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     utils.logger.info(
-        f'"{x_trivialscan_account}","{client_name}","{x_trivialscan_version}","{ip_addr}","{user_agent}"'
+        f'"{x_trivialscan_account}","{client_name}","{ip_addr}","{user_agent}","{x_trivialscan_version}"'
     )
     if not x_trivialscan_account or not client_name:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'

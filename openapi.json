@@ -2,7 +2,7 @@
     "openapi": "3.0.2",
     "info": {
         "title": "Trivial Scanner Dashboard API",
-        "version": "1.0.0"
+        "version": "0.1.0"
     },
     "paths": {
         "/check-token": {
@@ -1129,8 +1129,6 @@
                     "date",
                     "results",
                     "results_uri",
-                    "flags",
-                    "config",
                     "evaluations"
                 ],
                 "type": "object",
@@ -1580,9 +1578,7 @@
                     "targets",
                     "date",
                     "results",
-                    "results_uri",
-                    "flags",
-                    "config"
+                    "results_uri"
                 ],
                 "type": "object",
                 "properties": {
