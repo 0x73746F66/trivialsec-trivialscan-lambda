@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Union, Any
 from datetime import datetime
 
-from pydantic import BaseModel, Field, AnyHttpUrl, validator, conint, PositiveInt, PositiveFloat, IPvAnyAddress
+from pydantic import BaseModel, Field, AnyHttpUrl, validator, conint, PositiveInt, PositiveFloat, IPvAnyAddress, EmailStr
 
 class OutputType(str, Enum):
     JSON = "json"
@@ -149,7 +149,7 @@ class Host(BaseModel):
     http: list[HostHTTP]
 
 class Certificate(BaseModel):
-    authority_key_identifier: str
+    authority_key_identifier: Union[str, None] = Field(default=None)
     expired: bool
     expiry_status: str
     extensions: list
@@ -160,9 +160,9 @@ class Certificate(BaseModel):
     md5_fingerprint: str
     not_after: datetime
     not_before: datetime
-    public_key_curve: str
-    public_key_exponent: Union[PositiveInt, None]
-    public_key_modulus: Union[PositiveInt, None]
+    public_key_curve: Union[str, None] = Field(default=None)
+    public_key_exponent: Union[PositiveInt, None] = Field(default=None)
+    public_key_modulus: Union[PositiveInt, None] = Field(default=None)
     public_key_size: PositiveInt
     public_key_type: PublicKeyType
     revocation_crl_urls: list[AnyHttpUrl]
@@ -176,8 +176,8 @@ class Certificate(BaseModel):
     spki_fingerprint: str
     subject: str
     subject_key_identifier: str
-    validation_level: ValidationLevel
-    validation_oid: Union[str, None]
+    validation_level: Union[ValidationLevel, None] = Field(default=None)
+    validation_oid: Union[str, None] = Field(default=None)
     version: PositiveInt
     type: CertificateType
 
@@ -241,3 +241,53 @@ class EvaluationItem(DefaultInfo):
 
 class EvaluationReport(ReportSummary):
     evaluations: list[EvaluationItem]
+
+class AccountRegistration(BaseModel):
+    name: str
+    display: str
+    primary_email: EmailStr
+
+class MemberAccount(AccountRegistration):
+    billing_email: EmailStr
+    api_key: str
+    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
+    timestamp: int
+
+class MemberProfile(BaseModel):
+    account: MemberAccount
+    email: EmailStr
+    ip_addr: Union[str, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
+    timestamp: int
+
+class ClientInfo(BaseModel):
+    operating_system: str
+    operating_system_release: str
+    operating_system_version: str
+    architecture: str
+
+class Client(ClientInfo):
+    name: str
+    cli_version: str
+    access_token: str
+    ip_addr: Union[str, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
+    timestamp: int
+
+class ClientOut(ClientInfo):
+    name: str
+    cli_version: str
+    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
+    timestamp: int
+
+class MagicLinkRequest(BaseModel):
+    email: EmailStr
+
+class MagicLink(BaseModel):
+    magic_token: str
+    ip_addr: Union[str, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
+    timestamp: Union[int, None] = Field(default=None)
+    sendgrid: Union[dict, None] = Field(default={})

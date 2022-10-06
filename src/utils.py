@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from os import getenv, path
 from typing import Union
+from enum import Enum
 
 import boto3
 from retry.api import retry
@@ -18,16 +19,32 @@ from botocore.exceptions import (
     ConnectTimeoutError,
     ReadTimeoutError,
 )
+import requests
+from sendgrid import SendGridAPIClient
+
+import models
 
 JITTER_SECONDS = int(getenv("JITTER_SECONDS", "30"))
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
+RESERVED_CLIENTS = ["dashboard", "cli"]
 logger = logging.getLogger()
 boto3.set_stream_logger('')
 ssm_client = boto3.client(service_name="ssm")
 s3_client = boto3.client(service_name="s3")
+
+class StorageClass(str, Enum):
+    STANDARD = "STANDARD"
+    REDUCED_REDUNDANCY = "REDUCED_REDUNDANCY"
+    STANDARD_IA = "STANDARD_IA"
+    ONEZONE_IA = "ONEZONE_IA"
+    INTELLIGENT_TIERING = "INTELLIGENT_TIERING"
+    GLACIER = "GLACIER"
+    DEEP_ARCHIVE = "DEEP_ARCHIVE"
+    OUTPOSTS = "OUTPOSTS"
+    GLACIER_IR = "GLACIER_IR"
 
 class HMAC:
     auth_param_re = r'([a-zA-Z0-9_\-]+)=(([a-zA-Z0-9_\-]+)|("")|(".*[^\\]"))'
@@ -265,7 +282,7 @@ def store_ssm(parameter: str, value:str, **kwargs) -> bool:
     delay=1.5,
     backoff=1,
 )
-def list_s3(bucket_name: str, prefix_key: str, **kwargs) -> str:
+def list_s3(bucket_name: str, prefix_key: str, **kwargs) -> list[str]:
     """
     params:
     - bucket_name: s3 bucket with target contents
@@ -343,10 +360,16 @@ def get_s3(bucket_name: str, path_key: str, default=None, **kwargs) -> str:
     delay=1.5,
     backoff=1,
 )
-def store_s3(bucket_name: str, path_key: str, value:str, **kwargs) -> bool:
+def store_s3(bucket_name: str, path_key: str, value: str, storage_class: StorageClass = StorageClass.STANDARD_IA, **kwargs) -> bool:
     logger.debug(value)
     try:
-        response = s3_client.put_object(Bucket=bucket_name, Key=path_key, Body=value, **kwargs)
+        response = s3_client.put_object(
+            Bucket=bucket_name,
+            Key=path_key,
+            Body=value,
+            StorageClass=storage_class.name,
+            **kwargs
+        )
         return (
             False
             if not isinstance(response, dict)
@@ -368,11 +391,15 @@ def store_s3(bucket_name: str, path_key: str, value:str, **kwargs) -> bool:
     return False
 
 def retrieve_token(account_name: str, client_name: str) -> Union[str, None]:
-    object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{client_name}"
+    if client_name in RESERVED_CLIENTS:
+        object_key = f"{APP_ENV}/accounts/{account_name}/registration.json"
+    else:
+        object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{client_name}.json"
     register_str = get_s3(
         bucket_name=STORE_BUCKET,
         path_key=object_key,
     )
+    logger.warning(register_str)
     if not register_str:
         return None
     try:
@@ -381,10 +408,29 @@ def retrieve_token(account_name: str, client_name: str) -> Union[str, None]:
         logger.debug(err, exc_info=True)
         return None
 
-    return register_data.get("register_token")
+    return register_data.get("api_key") if client_name in RESERVED_CLIENTS else register_data.get("access_token")
 
-def is_registered(account_name: str, trivialscan_client: str) -> bool:
-    object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{trivialscan_client}"
+def member_exists(member_email: str, account_name: Union[str, None] = None) -> bool:
+    suffix = f"/members/{member_email}/profile.json"
+    if account_name:
+        return object_exists(STORE_BUCKET, f"{APP_ENV}/accounts/{account_name}{suffix}")
+    prefix_matches = list_s3(bucket_name=STORE_BUCKET, prefix_key=f"{APP_ENV}/accounts")
+    return len([k for k in prefix_matches if k.endswith(suffix)]) == 1
+
+def load_member(member_email: str) -> Union[models.MemberProfile, None]:
+    suffix = f"/members/{member_email}/profile.json"
+    prefix_matches = list_s3(bucket_name=STORE_BUCKET, prefix_key=f"{APP_ENV}/accounts")
+    matches = [k for k in prefix_matches if k.endswith(suffix)]
+    if len(matches) != 1:
+        return
+    return models.MemberProfile(**json.loads(get_s3(STORE_BUCKET, matches[0])))
+
+def is_registered(account_name: str, trivialscan_client: Union[str, None] = None) -> bool:
+    if trivialscan_client and trivialscan_client not in RESERVED_CLIENTS:
+        object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{trivialscan_client}.json"
+    else:
+        object_key = f"{APP_ENV}/accounts/{account_name}/registration.json"
+
     register_str = get_s3(
         bucket_name=STORE_BUCKET,
         path_key=object_key,
@@ -397,7 +443,7 @@ def is_registered(account_name: str, trivialscan_client: str) -> bool:
         logger.debug(err, exc_info=True)
         return False
 
-    return register_data.get("register_token") is not None
+    return isinstance(register_data, dict)
 
 def store_summary(report: dict, path_prefix: str) -> bool:
     account_name = report["config"].get("account_name")
@@ -406,8 +452,7 @@ def store_summary(report: dict, path_prefix: str) -> bool:
     return store_s3(
         bucket_name=STORE_BUCKET,
         path_key=summary_key,
-        value=json.dumps(report, default=str),
-        StorageClass='STANDARD_IA'
+        value=json.dumps(report, default=str)
     )
 
 def store_evaluations(report: list, account_name: str, path_prefix: str) -> bool:
@@ -416,8 +461,7 @@ def store_evaluations(report: list, account_name: str, path_prefix: str) -> bool
     return store_s3(
         bucket_name=STORE_BUCKET,
         path_key=evaluations_key,
-        value=json.dumps(report, default=str),
-        StorageClass='STANDARD_IA'
+        value=json.dumps(report, default=str)
     )
 
 def store_host(report: dict) -> bool:
@@ -427,7 +471,7 @@ def store_host(report: dict) -> bool:
         bucket_name=STORE_BUCKET,
         path_key=host_key,
         value=json.dumps(report, default=str),
-        StorageClass="STANDARD_IA"
+        storage_class=StorageClass.ONEZONE_IA,
     ):
         return False
     scan_date = datetime.fromisoformat(report["last_updated"]).strftime("%Y%m%d")
@@ -440,7 +484,6 @@ def store_host(report: dict) -> bool:
         bucket_name=STORE_BUCKET,
         path_key=host_key2,
         value=json.dumps(report, default=str),
-        StorageClass="STANDARD_IA"
     )
 
 def store_certificate(report: dict) -> bool:
@@ -453,7 +496,6 @@ def store_certificate(report: dict) -> bool:
         bucket_name=STORE_BUCKET,
         path_key=cert_key,
         value=json.dumps(report, default=str),
-        StorageClass="STANDARD_IA"
     )
 
 def store_certificate_pem(pem: str, sha1_fingerprint: str) -> bool:
@@ -466,10 +508,75 @@ def store_certificate_pem(pem: str, sha1_fingerprint: str) -> bool:
         bucket_name=STORE_BUCKET,
         path_key=pem_key,
         value=pem,
-        StorageClass="STANDARD_IA"
     )
 
-def parse_auth(authorization: str) -> dict:
-    reg = re.compile(r'(\w+)[:=] ?"?([-\w]+)"?')
-    matches = reg.findall(authorization)
-    return dict(matches)
+
+SENDGRID_TEMPLATES = {
+    'invitations': "d-ddd501dd76634f12bdba7dfcee416270",
+    'registrations': "d-1259c22153484803bdc4d6cb490571a6",
+    'subscriptions': "d-14c95c71ba5f40deac27eb8e0bcd0373",
+    'updated_email': 'd-30f820fc0f8a4f4d9f0fd5592a7419b5',
+    'account_recovery': "d-a791985ca56f4339acd9a77cc5d66cbd",
+    'magic_link': "d-c356f835c3b541d2ba76f5f50bb5a27b",
+    'recovery_request': "d-11d132b6513749a48005d21cb56df2dc",
+}
+SENDGRID_GROUPS = {
+    'notifications': 14193,
+    'focus_group': 14107,
+    'subscriptions': 14106,
+    'marketing': 14105,
+}
+SENDGRID_LISTS = {
+    'subscribers': "a656c506-1a36-45ad-ad29-bb54db25ccd9",
+    'members': "7c88b8a4-9b7a-4a25-9b09-be3d3a0cdcf3",
+    'trials': "6d72d4a5-5e15-455f-9cd4-0f28a9f06e24",
+}
+def send_email(subject: str, template: str, data: dict, recipient: str, group: str = 'notifications', sender: str = 'support@trivialsec.com'):
+    sendgrid_api_key = get_ssm(f'/{APP_ENV}/Deploy/trivialsec/sendgrid_api_key', WithDecryption=True)
+    sendgrid = SendGridAPIClient(sendgrid_api_key)
+    tmp_url = sendgrid.client.mail.send._build_url(query_params={})  # pylint: disable=protected-access
+    req_body = {
+        'subject': subject,
+        'from': {'email': sender},
+        'template_id': SENDGRID_TEMPLATES.get(template),
+        'asm': {
+            'group_id': SENDGRID_GROUPS.get(group)
+        },
+        'personalizations': [
+            {
+                'dynamic_template_data': {**data, **{'email': recipient}},
+                'to': [
+                    {
+                        'email': recipient
+                    }
+                ]
+            }
+        ]
+    }
+    res = requests.post(
+        url=tmp_url,
+        json=req_body,
+        headers=sendgrid.client.request_headers,
+        timeout=10
+    )
+    logger.debug(res.__dict__)
+    return res
+
+def upsert_contact(recipient_email: str, list_name: str = 'subscribers'):
+    sendgrid_api_key = get_ssm(f'/{APP_ENV}/Deploy/trivialsec/sendgrid_api_key', WithDecryption=True)
+    sendgrid = SendGridAPIClient(sendgrid_api_key)
+    res = requests.put(
+        url='https://api.sendgrid.com/v3/marketing/contacts',
+        json={
+            "list_ids": [
+                SENDGRID_LISTS.get(list_name)
+            ],
+            "contacts": [{
+                "email": recipient_email
+            }]
+        },
+        headers=sendgrid.client.request_headers,
+        timeout=10
+    )
+    logger.debug(res.__dict__)
+    return res
