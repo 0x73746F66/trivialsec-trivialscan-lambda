@@ -30,5 +30,6 @@ deploy/
 *.zip
 trivialsec-common/
 .lh/
+.ci/
 .development/
 src_old/
