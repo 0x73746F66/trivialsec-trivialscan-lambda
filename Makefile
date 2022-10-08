@@ -1,21 +1,30 @@
 SHELL := /bin/bash
--include .env
-export $(shell sed 's/=.*//' .env)
 .PHONY: help
-
 primary := '\033[1;36m'
 err := '\033[0;31m'
 bold := '\033[1m'
 clear := '\033[0m'
+
+-include .env
+export $(shell sed 's/=.*//' .env)
+ifndef CI_BUILD_REF
+CI_BUILD_REF=local
+endif
+ifeq ($(CI_BUILD_REF), local)
+-include .env.local
+export $(shell sed 's/=.*//' .env.local)
+endif
+
+help: ## This help.
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+.DEFAULT_GOAL := help
 
 ifndef BUILD_ENV
 BUILD_ENV=development
 endif
 ifndef APP_ENV
 APP_ENV=Dev
-endif
-ifndef CI_BUILD_REF
-CI_BUILD_REF=local
 endif
 ifndef RUNNER_NAME
 RUNNER_NAME=$(shell basename $(shell pwd))
@@ -31,11 +40,6 @@ endif
 ifndef TEST_SHA1SIG
 TEST_SHA1SIG=091e8ea1b256a312962af6c140c0fbf079a407b3
 endif
-
-help: ## This help.
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-
-.DEFAULT_GOAL := help
 
 deps: ## install dependancies for development of this project
 	pip install -U pip
@@ -53,6 +57,12 @@ clean: ## Cleanup tmp files
 	@find . -type f -name '*.DS_Store' -delete 2>/dev/null
 	@rm -f **/*.zip **/*.tar **/*.tgz **/*.gz
 
+env:
+	@echo -e $(bold)$(primary)BUILD_ENV$(clear) = $(BUILD_ENV)
+	@echo -e $(bold)$(primary)APP_ENV$(clear) = $(APP_ENV)
+	@echo -e $(bold)$(primary)CI_BUILD_REF$(clear) = $(CI_BUILD_REF)
+	@echo -e $(bold)$(primary)API_URL$(clear) = $(API_URL)
+
 output:
 	@echo -e $(bold)$(primary)trivialscan_arn$(clear) = $(shell terraform -chdir=plans output trivialscan_arn)
 	@echo -e $(bold)$(primary)function_url$(clear) = $(shell terraform -chdir=plans output function_url)
@@ -60,7 +70,7 @@ output:
 	@echo -e $(bold)$(primary)trivialscan_role_arn$(clear) = $(shell terraform -chdir=plans output trivialscan_role_arn)
 	@echo -e $(bold)$(primary)trivialscan_policy_arn$(clear) = $(shell terraform -chdir=plans output trivialscan_policy_arn)
 
-build: ## makes the lambda zip archive
+build: env ## makes the lambda zip archive
 	./.$(BUILD_ENV)/bin/build-archive
 
 tfinstall:
@@ -68,10 +78,10 @@ tfinstall:
 	sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(shell lsb_release -cs) main"
 	sudo apt-get update
 	sudo apt-get install -y terraform
-	terraform -chdir=plans -install-autocomplete || true
+	terraform -install-autocomplete || true
 
-init: ## Runs tf init tf
-	terraform -chdir=plans init -reconfigure -upgrade=true
+init: env ## Runs tf init tf
+	terraform -chdir=plans init -backend-config=${APP_ENV}-backend.conf -reconfigure -upgrade=true
 
 plan: ## Runs tf validate and tf plan
 	terraform -chdir=plans validate
@@ -95,7 +105,7 @@ unit-test: ## run unit tests with coverage
 	coverage run -m pytest --nf
 	coverage report -m
 
-run-local: ## A local server interfacing with Lambda URL
+run-local: env ## A local server interfacing with Lambda URL
 	(cd src; uvicorn app:app --reload --port 8080 --host 0.0.0.0)
 
 curl-check-token: _validate _validate_token ## GET /check-token

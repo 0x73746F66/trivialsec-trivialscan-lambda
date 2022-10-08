@@ -11,6 +11,9 @@ echo -e "${PRIMARY}
 if [[ -f .env ]]; then
   source .env
 fi
+if [[ -f .env.local ]]; then
+  source .env.local
+fi
 export TF_VAR_aws_access_key_id=${TF_VAR_aws_access_key_id:-$AWS_ACCESS_KEY_ID}
 export TF_VAR_aws_secret_access_key=${TF_VAR_aws_secret_access_key:-$AWS_SECRET_ACCESS_KEY}
 [ -z "${TF_VAR_aws_access_key_id}" ] && echo -e "${RED}AWS_ACCESS_KEY_ID (or TF_VAR_aws_access_key_id) not set${NC}"

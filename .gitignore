@@ -61,8 +61,8 @@ instance/
 
 # Environments
 .venv*/
-**/.env
-**/.env-prod
+**/.env.local
+**/.env.*.local
 env/
 venv/
 ENV/
@@ -78,6 +78,7 @@ venv.bak/
 **/.hcl*
 **/terraform.*
 tf*.json
+.ci/python*/
 .lh/
 
 # sensitive
@@ -90,7 +91,7 @@ cert_dot_sh/*.csv.part
 **/*.pid
 **/.monit*
 **/*.whl
-plans/*.zip
+*.zip
 *.gz
 .development/python*/
 .development/sqlite3-builder/

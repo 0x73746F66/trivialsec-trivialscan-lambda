@@ -18,9 +18,5 @@ terraform {
             version = ">= 4.9.0"
         }
     }
-    backend "s3" {
-        bucket      = "stateful-trivialsec"
-        key         = "terraform/trivialscan-lambda"
-        region      = "ap-southeast-2"
-    }
+    backend "s3" {}
 }

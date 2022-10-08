@@ -53,7 +53,7 @@ async def validate_authorization(
         "version": x_trivialscan_version,
         "account_name": x_trivialscan_account,
         "client_name": authz.id,
-        "authorisation_valid": authz.validate(access_token),
+        "authorisation_valid": False if not access_token else authz.validate(access_token),
         "registered": utils.is_registered(
             account_name=x_trivialscan_account,
             trivialscan_client=authz.id if authz.id not in utils.RESERVED_CLIENTS else None,
@@ -701,12 +701,16 @@ async def account_register(
     if not account.name:
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    utils.logger.warning(f"ip_addr {ip_addr}")
+    utils.logger.warning(f"user_agent {user_agent}")
     member = models.MemberProfile(
         account=account,
         email=account.primary_email,
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-        user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        timestamp = account.timestamp
+        ip_addr=ip_addr,
+        user_agent=user_agent,
+        timestamp=account.timestamp
     )
     try:
         if utils.is_registered(account.name):
@@ -721,6 +725,7 @@ async def account_register(
         ):
             response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
             return
+        member.confirmation_token = hashlib.sha224(bytes(f'{random()}{user_agent}{ip_addr}', 'ascii')).hexdigest()
         object_key = f"{utils.APP_ENV}/accounts/{account.name}/registration.json"
         if utils.store_s3(
             utils.STORE_BUCKET,
@@ -729,6 +734,15 @@ async def account_register(
             storage_class=utils.StorageClass.STANDARD
         ):
             utils.upsert_contact(recipient_email=member.email, list_name="members")
+            activation_url = f"{utils.DASHBOARD_URL}/register/{member.confirmation_token}"
+            utils.send_email(
+                subject="Trivial Security - Confirmation",
+                recipient=member.email,
+                template='registrations',
+                data={
+                    "activation_url": activation_url
+                }
+            )
             return member
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -741,7 +755,7 @@ async def account_register(
 @router.post("/magic-link",
     status_code=status.HTTP_202_ACCEPTED
 )
-async def magic_link (
+async def magic_link(
     request: Request,
     response: Response,
     data: models.MagicLinkRequest,
@@ -753,7 +767,6 @@ async def magic_link (
         422 The prodided values are not acceptable or not sent
         424 The email address is not registered
         503 An exception was encountered and logged
-        500 An unexpected and unhandled request path occurred
     """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
@@ -762,42 +775,82 @@ async def magic_link (
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return
     magic_token = hashlib.sha224(bytes(f'{random()}{user_agent}{ip_addr}', 'ascii')).hexdigest()
-    login_url = f"https://scanner.trivialsec.com/login/{magic_token}"
+    login_url = f"{utils.DASHBOARD_URL}/login/{magic_token}"
     try:
         if member := utils.load_member(data.email):
             sendgrid = utils.send_email(
                 recipient=data.email,
-                subject="Trivial Security login",
+                subject="Trivial Security Magic Link",
                 template='magic_link',
                 data={
                     "magic_link": login_url
                 }
             )
-            object_key = f"{utils.APP_ENV}/accounts/{member.account.name}/members/{member.email}/magic-link.json"
+            object_key = f"{utils.APP_ENV}/magic-links/{magic_token}.json"
             link = models.MagicLink(
+                email=data.email,
                 magic_token=magic_token,
                 ip_addr=ip_addr,
                 user_agent=user_agent,
                 timestamp=round(time() * 1000),
-                sendgrid=sendgrid.__dict__
+                sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
             )
-            if not utils.store_s3(
+            if utils.store_s3(
                 utils.STORE_BUCKET,
                 object_key,
                 json.dumps(link.dict(), default=str),
                 storage_class=utils.StorageClass.STANDARD_IA
             ):
-                response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+                utils.logger.info(f"Magic Link for {member.account.name}")
                 return
 
-        else:
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-            return
+        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+        return
 
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         utils.logger.exception(err)
         return
 
-    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
+@router.get("/magic-link/{magic_token}",
+    response_model=models.MemberProfile,
+    response_model_exclude_unset=True,
+    status_code=status.HTTP_200_OK
+)
+async def login(
+    request: Request,
+    response: Response,
+    magic_token: str,
+):
+    """
+    Login for members with magic link emailed to them
+
+    Return codes:
+        406 The prodided values are not acceptable or not sent
+        424 The email address is not registered
+        500 An unexpected and unhandled request path occurred
+    """
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    utils.logger.info(
+        f'"","","{ip_addr}","{user_agent}",""'
+    )
+
+    try:
+        object_key = f"{utils.APP_ENV}/magic-links/{magic_token}.json"
+        ret = utils.get_s3(utils.STORE_BUCKET, object_key)
+        if not ret:
+            response.status_code = status.HTTP_406_NOT_ACCEPTABLE
+            return
+        link = models.MagicLink(**json.loads(ret))
+        member = utils.load_member(link.email)
+        if not member:
+            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            return
+        return member
+
+    except RuntimeError as err:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        utils.logger.exception(err)
+        return

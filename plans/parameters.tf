@@ -5,3 +5,10 @@ resource "aws_ssm_parameter" "trivialscan_lambda_url" {
   tags        = local.tags
   overwrite   = true
 }
+resource "aws_ssm_parameter" "sendgrid_api_key" {
+  name        = "/${var.app_env}/Deploy/${var.app_name}/sendgrid_api_key"
+  type        = "SecureString"
+  value       = var.sendgrid_api_key
+  tags        = local.tags
+  overwrite   = true
+}

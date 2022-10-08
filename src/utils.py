@@ -30,8 +30,14 @@ APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
 RESERVED_CLIENTS = ["dashboard", "cli"]
+ALLOWED_ORIGINS = [
+    "https://www.trivialsec.com",
+    "https://scanner.trivialsec.com",
+    "http://jager:5173",
+    "http://localhost:5173",
+]
+DASHBOARD_URL = "https://scanner.trivialsec.com"
 logger = logging.getLogger()
-boto3.set_stream_logger('')
 ssm_client = boto3.client(service_name="ssm")
 s3_client = boto3.client(service_name="s3")
 
@@ -399,7 +405,6 @@ def retrieve_token(account_name: str, client_name: str) -> Union[str, None]:
         bucket_name=STORE_BUCKET,
         path_key=object_key,
     )
-    logger.warning(register_str)
     if not register_str:
         return None
     try:
@@ -415,13 +420,16 @@ def member_exists(member_email: str, account_name: Union[str, None] = None) -> b
     if account_name:
         return object_exists(STORE_BUCKET, f"{APP_ENV}/accounts/{account_name}{suffix}")
     prefix_matches = list_s3(bucket_name=STORE_BUCKET, prefix_key=f"{APP_ENV}/accounts")
-    return len([k for k in prefix_matches if k.endswith(suffix)]) == 1
+    return len([k for k in prefix_matches if k.endswith(suffix)]) >= 1
 
 def load_member(member_email: str) -> Union[models.MemberProfile, None]:
     suffix = f"/members/{member_email}/profile.json"
     prefix_matches = list_s3(bucket_name=STORE_BUCKET, prefix_key=f"{APP_ENV}/accounts")
     matches = [k for k in prefix_matches if k.endswith(suffix)]
-    if len(matches) != 1:
+    if len(matches) > 1:
+        logger.critical("load_member found too many matches, this is a data taint, likely manual data edits")
+        logger.info(matches)
+    if len(matches) == 0:
         return
     return models.MemberProfile(**json.loads(get_s3(STORE_BUCKET, matches[0])))
 
@@ -510,44 +518,70 @@ def store_certificate_pem(pem: str, sha1_fingerprint: str) -> bool:
         value=pem,
     )
 
-
 SENDGRID_TEMPLATES = {
-    'invitations': "d-ddd501dd76634f12bdba7dfcee416270",
-    'registrations': "d-1259c22153484803bdc4d6cb490571a6",
-    'subscriptions': "d-14c95c71ba5f40deac27eb8e0bcd0373",
-    'updated_email': 'd-30f820fc0f8a4f4d9f0fd5592a7419b5',
-    'account_recovery': "d-a791985ca56f4339acd9a77cc5d66cbd",
-    'magic_link': "d-c356f835c3b541d2ba76f5f50bb5a27b",
-    'recovery_request': "d-11d132b6513749a48005d21cb56df2dc",
+    "account_recovery": "d-da9d3ba3389643289b8d3596e902068d",
+    "magic_link": "d-48aa0ed2e9ff442ea6ee9b73ac984b96",
+    "recovery_request": "d-1958843496444e7bb8e29f4277e74182",
+    "registrations": "d-a0a115275e404b32bf96b540ecdffeda",
+    "subscriptions": "d-1d20f029d4eb46b5957c253c3ccd3262",
+    "updated_email": "d-fef742bc0a754165a8778f4929df3dbb",
+    "invitations": "d-c4a471191062414ea3cefd67c98deed4",
 }
 SENDGRID_GROUPS = {
-    'notifications': 14193,
-    'focus_group': 14107,
-    'subscriptions': 14106,
-    'marketing': 14105,
+    'notifications': 18318,
+    'focus_group': 18317,
+    'subscriptions': 18319,
+    'marketing': 18316,
 }
 SENDGRID_LISTS = {
-    'subscribers': "a656c506-1a36-45ad-ad29-bb54db25ccd9",
-    'members': "7c88b8a4-9b7a-4a25-9b09-be3d3a0cdcf3",
-    'trials': "6d72d4a5-5e15-455f-9cd4-0f28a9f06e24",
+    'subscribers': "09998a12-998c-4ca8-990d-2c5e66f0c0ef",
+    'members': "ce2b465e-60cd-426c-9ac1-78cdb8e9a4c4",
+    'trials': "f0c56ac3-7317-4b39-9a26-b4e37bc33efd",
 }
-def send_email(subject: str, template: str, data: dict, recipient: str, group: str = 'notifications', sender: str = 'support@trivialsec.com'):
-    sendgrid_api_key = get_ssm(f'/{APP_ENV}/Deploy/trivialsec/sendgrid_api_key', WithDecryption=True)
+
+def send_email(
+    subject: str,
+    template: str,
+    data: dict,
+    recipient: str,
+    group: str = 'notifications',
+    sender: str = 'support@trivialsec.com',
+    sender_name: str = 'Chris @ Trivial Security',
+    bcc: Union[str, None] = "support@trivialsec.com"
+):
+    sendgrid_api_key = get_ssm(f'/{APP_ENV}/Deploy/{APP_NAME}/sendgrid_api_key', WithDecryption=True)
     sendgrid = SendGridAPIClient(sendgrid_api_key)
     tmp_url = sendgrid.client.mail.send._build_url(query_params={})  # pylint: disable=protected-access
     req_body = {
         'subject': subject,
-        'from': {'email': sender},
+        'from': {'email': "donotreply@trivialsec.com", 'name': sender_name},
+        'reply_to': {'email': sender},
+        'mail_settings': {
+            'bcc': {'email': bcc, 'enable': bcc is not None and bcc != recipient},
+            "footer": {
+                "enable": False,
+            },
+            "sandbox_mode": {
+                "enable": APP_ENV != "Prod"
+            }
+        },
         'template_id': SENDGRID_TEMPLATES.get(template),
         'asm': {
             'group_id': SENDGRID_GROUPS.get(group)
         },
         'personalizations': [
             {
+                'subject': subject,
                 'dynamic_template_data': {**data, **{'email': recipient}},
                 'to': [
                     {
                         'email': recipient
+                    }
+                ],
+                'bcc': [
+                    {
+                        'email': bcc,
+                        'enable': bcc is not None and bcc != recipient
                     }
                 ]
             }
@@ -559,11 +593,11 @@ def send_email(subject: str, template: str, data: dict, recipient: str, group: s
         headers=sendgrid.client.request_headers,
         timeout=10
     )
-    logger.debug(res.__dict__)
+    logger.info(res.__dict__)
     return res
 
 def upsert_contact(recipient_email: str, list_name: str = 'subscribers'):
-    sendgrid_api_key = get_ssm(f'/{APP_ENV}/Deploy/trivialsec/sendgrid_api_key', WithDecryption=True)
+    sendgrid_api_key = get_ssm(f'/{APP_ENV}/Deploy/{APP_NAME}/sendgrid_api_key', WithDecryption=True)
     sendgrid = SendGridAPIClient(sendgrid_api_key)
     res = requests.put(
         url='https://api.sendgrid.com/v3/marketing/contacts',

@@ -13,7 +13,7 @@ variable "app_env" {
   default     = "Dev"
 }
 variable "app_name" {
-  description = "default trivialsec"
+  description = "default trivialscan-lambda"
   type        = string
   default     = "trivialscan-lambda"
 }

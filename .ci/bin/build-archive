@@ -2,11 +2,12 @@
 set -x
 readonly CWD=$(pwd)
 readonly PYTHON_VERSION=${PYTHON_VERSION:-python3.9}
-
 if [ -z "${APP_ENV}" ]; then
     echo "APP_ENV not set"
     exit 1
 fi
+readonly SOURCE_FILE=plans/${SOURCE_FILE:-$(echo "$APP_ENV" | awk '{print tolower($0)}')-$(basename $CWD).zip}
+readonly IMAGE_NAME=${IMAGE_NAME:-trivialscan-lambda-ci}
 if [ -z "${SOURCE_FILE}" ]; then
     echo "SOURCE_FILE not set"
     exit 1
