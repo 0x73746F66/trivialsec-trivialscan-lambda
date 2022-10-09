@@ -11,6 +11,7 @@ from typing import Union
 from enum import Enum
 
 import boto3
+import validators
 from retry.api import retry
 from botocore.exceptions import (
     CapacityNotAvailableError,
@@ -29,7 +30,6 @@ APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
-RESERVED_CLIENTS = ["dashboard", "cli"]
 ALLOWED_ORIGINS = [
     "https://www.trivialsec.com",
     "https://scanner.trivialsec.com",
@@ -397,8 +397,8 @@ def store_s3(bucket_name: str, path_key: str, value: str, storage_class: Storage
     return False
 
 def retrieve_token(account_name: str, client_name: str) -> Union[str, None]:
-    if client_name in RESERVED_CLIENTS:
-        object_key = f"{APP_ENV}/accounts/{account_name}/registration.json"
+    if validators.email(client_name) is True:
+        object_key = f"{APP_ENV}/accounts/{account_name}/members/{client_name}/profile.json"
     else:
         object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{client_name}.json"
     register_str = get_s3(
@@ -413,7 +413,7 @@ def retrieve_token(account_name: str, client_name: str) -> Union[str, None]:
         logger.debug(err, exc_info=True)
         return None
 
-    return register_data.get("api_key") if client_name in RESERVED_CLIENTS else register_data.get("access_token")
+    return register_data.get("access_token")
 
 def member_exists(member_email: str, account_name: Union[str, None] = None) -> bool:
     suffix = f"/members/{member_email}/profile.json"
@@ -433,9 +433,18 @@ def load_member(member_email: str) -> Union[models.MemberProfile, None]:
         return
     return models.MemberProfile(**json.loads(get_s3(STORE_BUCKET, matches[0])))
 
+def save_member(member: models.MemberProfile) -> bool:
+    object_key = f"{APP_ENV}/accounts/{member.account.name}/members/{member.email}/profile.json"
+    return store_s3(
+        STORE_BUCKET,
+        object_key,
+        json.dumps(member.dict(), default=str),
+        storage_class=StorageClass.STANDARD
+    )
+
 def is_registered(account_name: str, trivialscan_client: Union[str, None] = None) -> bool:
-    if trivialscan_client and trivialscan_client not in RESERVED_CLIENTS:
-        object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{trivialscan_client}.json"
+    if trivialscan_client and validators.email(trivialscan_client) is True:
+        object_key = f"{APP_ENV}/accounts/{account_name}/members/{trivialscan_client}/profile.json"
     else:
         object_key = f"{APP_ENV}/accounts/{account_name}/registration.json"
 

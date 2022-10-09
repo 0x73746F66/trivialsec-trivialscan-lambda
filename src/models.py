@@ -257,6 +257,7 @@ class MemberAccount(AccountRegistration):
 class MemberProfile(BaseModel):
     account: MemberAccount
     email: EmailStr
+    access_token: Union[str, None] = Field(default=None)
     confirmation_token: Union[str, None] = Field(default=None)
     ip_addr: Optional[Union[IPvAnyAddress, None]] = Field(default=None)
     user_agent: Optional[Union[str, None]] = Field(default=None)

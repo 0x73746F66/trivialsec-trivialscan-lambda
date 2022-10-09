@@ -8,7 +8,7 @@ from mangum import Mangum
 import boto3
 
 import utils
-import router
+from routers import account, member, report
 
 DEFAULT_LOG_LEVEL = "WARNING"
 LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
@@ -29,7 +29,9 @@ app.add_middleware(
     ],
     max_age=3600,
 )
-app.include_router(router.router)
+app.include_router(account.router)
+app.include_router(member.router)
+app.include_router(report.router)
 
 @app.on_event("startup")
 async def startup_event():
