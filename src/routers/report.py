@@ -30,29 +30,20 @@ async def retrieve_summary(
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
-        return {"results_uri": "missing authorization"}
-    authz = utils.HMAC(
+        return
+    authz = utils.Authorization(
         authorization_header=authorization,
-        request_url=str(request.url),
-    )
-    utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}",'
-    )
-    access_token = utils.retrieve_token(
+        request_url=request.url,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
         account_name=x_trivialscan_account,
-        client_name=authz.id,
     )
-    try:
-        if not access_token or not authz.validate(access_token):
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-            response.status_code = status.HTTP_403_FORBIDDEN
-            return {"results_uri": "invalid authorization"}
-    except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
-        return {"message": utils.GENERIC_SECURITY_MESSAGE}
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
 
     summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
     try:
@@ -95,29 +86,20 @@ async def retrieve_report(
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.HMAC(
+    authz = utils.Authorization(
         authorization_header=authorization,
-        request_url=str(request.url),
-    )
-    utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}",'
-    )
-    access_token = utils.retrieve_token(
+        request_url=request.url,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
         account_name=x_trivialscan_account,
-        client_name=authz.id,
     )
-    try:
-        if not access_token or not authz.validate(access_token):
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-            response.status_code = status.HTTP_403_FORBIDDEN
-            return
-    except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
-        return {"message": utils.GENERIC_SECURITY_MESSAGE}
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
 
     summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
     evaluations_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "evaluations.json")
@@ -167,32 +149,22 @@ async def retrieve_reports(
     """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get(
-        "http", {}).get("userAgent")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.HMAC(
+    authz = utils.Authorization(
         authorization_header=authorization,
-        request_url=str(request.url),
-    )
-    utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","","{ip_addr}","{user_agent}"'
-    )
-    access_token = utils.retrieve_token(
+        request_url=request.url,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
         account_name=x_trivialscan_account,
-        client_name=authz.id,
     )
-    try:
-        if not access_token or not authz.validate(access_token):
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-            response.status_code = status.HTTP_403_FORBIDDEN
-            return
-    except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
-        return {"message": utils.GENERIC_SECURITY_MESSAGE}
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
 
     summary_keys = []
     data = []
@@ -256,29 +228,20 @@ async def retrieve_host(
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.HMAC(
+    authz = utils.Authorization(
         authorization_header=authorization,
-        request_url=str(request.url),
-    )
-    utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}",'
-    )
-    access_token = utils.retrieve_token(
+        request_url=request.url,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
         account_name=x_trivialscan_account,
-        client_name=authz.id,
     )
-    try:
-        if not access_token or not authz.validate(access_token):
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-            response.status_code = status.HTTP_403_FORBIDDEN
-            return
-    except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
-        return {"message": utils.GENERIC_SECURITY_MESSAGE}
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
 
     host_key = path.join(utils.APP_ENV, "hosts", hostname, str(port), "latest.json")
     try:
@@ -315,31 +278,23 @@ async def retrieve_certificate(
     """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    user_agent = event.get("requestContext", {}).get(
+        "http", {}).get("userAgent")
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.HMAC(
+    authz = utils.Authorization(
         authorization_header=authorization,
-        request_url=str(request.url),
-    )
-    utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}",'
-    )
-    access_token = utils.retrieve_token(
+        request_url=request.url,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
         account_name=x_trivialscan_account,
-        client_name=authz.id,
     )
-    try:
-        if not access_token or not authz.validate(access_token):
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-            response.status_code = status.HTTP_403_FORBIDDEN
-            return
-    except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
-        return {"message": utils.GENERIC_SECURITY_MESSAGE}
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
 
     pem_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
     cert_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.json")
@@ -379,35 +334,25 @@ async def store(
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
-    if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-
     file = files[0]
     contents = await file.read()
-    authz = utils.HMAC(
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    authz = utils.Authorization(
         raw_body=contents.decode("utf8"),
         authorization_header=authorization,
-        request_url=str(request.url),
+        request_url=request.url,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
+        account_name=x_trivialscan_account,
         method="POST",
     )
-    utils.logger.info(
-        f'"{x_trivialscan_account}","{authz.id}","{ip_addr}","{user_agent}","{x_trivialscan_version}"'
-    )
-    access_token = utils.retrieve_token(
-        account_name=x_trivialscan_account,
-        client_name=authz.id,
-    )
-    try:
-        if not access_token or not authz.validate(access_token):
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-            response.status_code = status.HTTP_403_FORBIDDEN
-            return
-    except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
-        return {"message": utils.GENERIC_SECURITY_MESSAGE}
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
 
     if file.filename.endswith(".json"):
         contents = json.loads(contents.decode("utf8"))

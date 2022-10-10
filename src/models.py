@@ -1,6 +1,6 @@
 # pylint: disable=no-self-argument
 from enum import Enum
-from typing import Union, Any, Optional
+from typing import Union, Any
 from datetime import datetime
 
 from pydantic import BaseModel, Field, AnyHttpUrl, validator, conint, PositiveInt, PositiveFloat, IPvAnyAddress, EmailStr
@@ -42,12 +42,6 @@ class DefaultInfo(BaseModel):
     version: Union[str, None] = Field(default=None, description="trivialscan CLI version")
     account_name: Union[str, None] = Field(default=None, description="Trivial Security account name")
     client_name: Union[str, None] = Field(default=None, description="Machine name where trivialscan CLI execcutes")
-
-class CheckToken(DefaultInfo):
-    authorisation_valid: bool = Field(default=False, title="HMAC Signature validation", description="Provides verifiable proof the client has possession of the Registration Token (without exposing/transmitting the token), using SHA256 hashing of the pertinent request information")
-    registered: bool = Field(default=False, description="Client is registered")
-    ip_address: Union[str, None] = Field(default=None, description="Source IP Address")
-    user_agent: Optional[Union[str, None]] = Field(default=None, description="Source HTTP Client")
 
 class ConfigDefaults(BaseModel):
     use_sni: bool
@@ -250,17 +244,17 @@ class AccountRegistration(BaseModel):
 class MemberAccount(AccountRegistration):
     billing_email: EmailStr
     api_key: str
-    ip_addr: Optional[Union[IPvAnyAddress, None]] = Field(default=None)
-    user_agent: Optional[Union[str, None]] = Field(default=None)
+    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
     timestamp: int
 
 class MemberProfile(BaseModel):
     account: MemberAccount
     email: EmailStr
-    access_token: Union[str, None] = Field(default=None)
+    confirmed: bool = Field(default=False)
     confirmation_token: Union[str, None] = Field(default=None)
-    ip_addr: Optional[Union[IPvAnyAddress, None]] = Field(default=None)
-    user_agent: Optional[Union[str, None]] = Field(default=None)
+    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
     timestamp: int
 
 class ClientInfo(BaseModel):
@@ -269,19 +263,14 @@ class ClientInfo(BaseModel):
     operating_system_version: str
     architecture: str
 
-class Client(ClientInfo):
+class Client(BaseModel):
+    account: MemberAccount
+    client_info: ClientInfo
     name: str
     cli_version: str
     access_token: str
-    ip_addr: Optional[Union[IPvAnyAddress, None]] = Field(default=None)
-    user_agent: Optional[Union[str, None]] = Field(default=None)
-    timestamp: int
-
-class ClientOut(ClientInfo):
-    name: str
-    cli_version: str
-    ip_addr: Optional[Union[IPvAnyAddress, None]] = Field(default=None)
-    user_agent: Optional[Union[str, None]] = Field(default=None)
+    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
     timestamp: int
 
 class MagicLinkRequest(BaseModel):
@@ -289,7 +278,38 @@ class MagicLinkRequest(BaseModel):
 
 class MagicLink(MagicLinkRequest):
     magic_token: str
-    ip_addr: Optional[Union[IPvAnyAddress, None]] = Field(default=None)
-    user_agent: Optional[Union[str, None]] = Field(default=None)
+    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
+    timestamp: Union[int, None] = Field(default=None)
+    sendgrid_message_id: Union[str, None] = Field(default=None)
+
+class MemberSession(BaseModel):
+    member: Union[MemberProfile, str]
+    session_token: str
+    access_token: str
+    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
+    timestamp: int
+
+class CheckToken(BaseModel):
+    version: Union[str, None] = Field(default=None)
+    account_name: Union[str, None] = Field(default=None)
+    session: Union[MemberSession, None] = Field(default=None)
+    client: Union[Client, None] = Field(default=None)
+    account: Union[MemberAccount, None] = Field(default=None)
+    member: Union[MemberProfile, None] = Field(default=None)
+    authorisation_valid: bool = Field(default=False, title="HMAC Signature validation", description="Provides verifiable proof the client has possession of the Registration Token (without exposing/transmitting the token), using SHA256 hashing of the pertinent request information")
+    registered: bool = Field(default=False, description="Client is registered")
+    ip_addr: Union[str, None] = Field(default=None, description="Source IP Address")
+    user_agent: Union[str, None] = Field(default=None, description="Source HTTP Client")
+
+class SupportRequest(BaseModel):
+    subject: str
+    message: str
+
+class Support(SupportRequest):
+    member: MemberProfile
+    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
     timestamp: Union[int, None] = Field(default=None)
     sendgrid_message_id: Union[str, None] = Field(default=None)

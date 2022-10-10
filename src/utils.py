@@ -12,6 +12,7 @@ from enum import Enum
 
 import boto3
 import validators
+from pydantic import EmailStr, IPvAnyAddress
 from retry.api import retry
 from botocore.exceptions import (
     CapacityNotAvailableError,
@@ -78,6 +79,10 @@ class HMAC:
     @property
     def id(self):
         return self.parsed_header.get('id')
+
+    @property
+    def sesh(self):
+        return self.parsed_header.get('sesh')
 
     @property
     def ts(self):
@@ -202,6 +207,56 @@ class HMAC:
         if invalid := not hmac.compare_digest(digest, self.mac):
             logger.error(f'server_mac {self.server_mac} canonical_string {self.canonical_string}')
         return not invalid
+
+class Authorization:
+    def __init__(self,
+        authorization_header: str,
+        request_url: str,
+        user_agent: Union[str, None] = None,
+        ip_addr: Union[IPvAnyAddress, None] = None,
+        account_name: Union[str, None] = None,
+        method: str = "GET",
+        raw_body: str = None,
+        algorithm: str = None,
+        not_before_seconds: int = JITTER_SECONDS,
+        expire_after_seconds: int = JITTER_SECONDS
+    ):
+        self._hmac = HMAC(
+            authorization_header,
+            str(request_url),
+            method,
+            raw_body,
+            algorithm,
+            not_before_seconds,
+            expire_after_seconds
+        )
+        self.ip_addr = ip_addr
+        self.user_agent = user_agent
+        self.is_valid: bool = False
+        self.account: Union[models.MemberAccount, None] = None
+        self.session: Union[models.MemberSession, None] = None
+        self.client: Union[models.Client, None] = None
+        self.member: Union[models.MemberProfile, None] = None
+        logger.info(f"Authorization validation id {self._hmac.id}")
+        if validators.email(self._hmac.id) is True:
+            self.member = load_member(self._hmac.id)
+            session_token = hashlib.sha224(bytes(f'{self.member.email}{ip_addr}{user_agent}', 'ascii')).hexdigest()
+            logger.info(f"Session HMAC-based Authorization: session_token {session_token}")
+            self.session = load_session(self.member.account.name, self.member.email, session_token)
+            self.is_valid = self._hmac.validate(self.session.access_token)
+        elif account_name is None or self._hmac.id == account_name:
+            logger.info(f"Secret Key HMAC-based Authorization: account_name {account_name}")
+            self.account = load_member_account(self._hmac.id)
+            self.is_valid = self._hmac.validate(self.account.api_key)
+        elif account_name:
+            logger.info(f"Client Token HMAC-based Authorization: client_name {self._hmac.id}")
+            self.account = load_member_account(account_name)
+            self.client = load_client(self.account.name, self._hmac.id)
+            if self.client:
+                self.is_valid = self._hmac.validate(self.client.access_token)
+        else:
+            logger.error("Unhandled validation")
+
 
 def object_exists(bucket_name: str, file_path: str, **kwargs):
     try:
@@ -396,31 +451,16 @@ def store_s3(bucket_name: str, path_key: str, value: str, storage_class: Storage
             logger.exception(err)
     return False
 
-def retrieve_token(account_name: str, client_name: str) -> Union[str, None]:
-    if validators.email(client_name) is True:
-        object_key = f"{APP_ENV}/accounts/{account_name}/members/{client_name}/profile.json"
-    else:
-        object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{client_name}.json"
-    register_str = get_s3(
-        bucket_name=STORE_BUCKET,
-        path_key=object_key,
-    )
-    if not register_str:
-        return None
-    try:
-        register_data = json.loads(register_str)
-    except json.decoder.JSONDecodeError as err:
-        logger.debug(err, exc_info=True)
-        return None
-
-    return register_data.get("access_token")
-
 def member_exists(member_email: str, account_name: Union[str, None] = None) -> bool:
     suffix = f"/members/{member_email}/profile.json"
     if account_name:
         return object_exists(STORE_BUCKET, f"{APP_ENV}/accounts/{account_name}{suffix}")
     prefix_matches = list_s3(bucket_name=STORE_BUCKET, prefix_key=f"{APP_ENV}/accounts")
     return len([k for k in prefix_matches if k.endswith(suffix)]) >= 1
+
+def load_member_account(account_name: str) -> Union[models.MemberAccount, None]:
+    object_key = f"{APP_ENV}/accounts/{account_name}/registration.json"
+    return models.MemberAccount(**json.loads(get_s3(STORE_BUCKET, object_key)))
 
 def load_member(member_email: str) -> Union[models.MemberProfile, None]:
     suffix = f"/members/{member_email}/profile.json"
@@ -433,6 +473,24 @@ def load_member(member_email: str) -> Union[models.MemberProfile, None]:
         return
     return models.MemberProfile(**json.loads(get_s3(STORE_BUCKET, matches[0])))
 
+def save_account(account: models.MemberAccount) -> bool:
+    object_key = f"{APP_ENV}/accounts/{account.name}/registration.json"
+    return store_s3(
+        STORE_BUCKET,
+        object_key,
+        json.dumps(account.dict(), default=str),
+        storage_class=StorageClass.STANDARD
+    )
+
+def save_magic_link(link: models.MagicLink) -> bool:
+    object_key = f"{APP_ENV}/magic-links/{link.magic_token}.json"
+    return store_s3(
+        STORE_BUCKET,
+        object_key,
+        json.dumps(link.dict(), default=str),
+        storage_class=StorageClass.STANDARD_IA
+    )
+
 def save_member(member: models.MemberProfile) -> bool:
     object_key = f"{APP_ENV}/accounts/{member.account.name}/members/{member.email}/profile.json"
     return store_s3(
@@ -442,25 +500,110 @@ def save_member(member: models.MemberProfile) -> bool:
         storage_class=StorageClass.STANDARD
     )
 
-def is_registered(account_name: str, trivialscan_client: Union[str, None] = None) -> bool:
-    if trivialscan_client and validators.email(trivialscan_client) is True:
-        object_key = f"{APP_ENV}/accounts/{account_name}/members/{trivialscan_client}/profile.json"
-    else:
-        object_key = f"{APP_ENV}/accounts/{account_name}/registration.json"
+def save_member_session(session: models.MemberSession) -> bool:
+    object_key = f"{APP_ENV}/accounts/{session.member.account.name}/members/{session.member.email}/sessions/{session.session_token}.json"
+    return store_s3(
+        STORE_BUCKET,
+        object_key,
+        json.dumps(session.dict(), default=str),
+        storage_class=StorageClass.ONEZONE_IA
+    )
 
-    register_str = get_s3(
+def load_session(account_name: str, client_email: EmailStr, session_token: str) -> Union[models.MemberSession, None]:
+    if validators.email(client_email) is False:
+        return
+    object_key = f"{APP_ENV}/accounts/{account_name}/members/{client_email}/sessions/{session_token}.json"
+    raw = get_s3(
         bucket_name=STORE_BUCKET,
         path_key=object_key,
     )
-    if not register_str:
+    if not raw:
+        logger.warning(f"Missing session object: {object_key}")
+        return
+    try:
+        data = json.loads(raw)
+    except json.decoder.JSONDecodeError as err:
+        logger.debug(err, exc_info=True)
+        return
+    if not isinstance(data, dict):
+        logger.warning(f"Missing session data for object: {object_key}")
+        return
+    return models.MemberSession(**data)
+
+def load_sessions(account_name: str, client_email: EmailStr) -> list[models.MemberSession]:
+    prefix_key = f"{APP_ENV}/accounts/{account_name}/members/{client_email}/sessions/"
+    ret = []
+    prefix_matches = list_s3(bucket_name=STORE_BUCKET, prefix_key=prefix_key)
+    if len(prefix_matches) == 0:
+        return []
+    for object_path in prefix_matches:
+        raw = get_s3(STORE_BUCKET, object_path)
+        if raw:
+            ret.append(models.MemberSession(**json.loads(raw)))
+    return ret
+
+def load_client(account_name: str, client_name: str) -> Union[models.Client, None]:
+    if validators.email(client_name) is True:
+        return
+    object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{client_name}.json"
+    raw = get_s3(
+        bucket_name=STORE_BUCKET,
+        path_key=object_key,
+    )
+    if not raw:
+        logger.warning(f"Missing client object: {object_key}")
+        return
+    try:
+        data = json.loads(raw)
+    except json.decoder.JSONDecodeError as err:
+        logger.debug(err, exc_info=True)
+        return
+    if not isinstance(data, dict):
+        logger.warning(f"Missing client data for object: {object_key}")
+        return
+    return models.Client(**data)
+
+def save_client(client: models.Client) -> bool:
+    object_key = f"{APP_ENV}/accounts/{client.account.name}/client-tokens/{client.name}.json"
+    return store_s3(
+        STORE_BUCKET,
+        object_key,
+        json.dumps(client.dict(), default=str),
+        storage_class=StorageClass.STANDARD
+    )
+
+def save_support(support: models.Support) -> bool:
+    clean_subject = ''.join(e for e in '-'.join(support.subject.split()).replace('/', '-').lower() if e.isalnum() or e == '-')
+    object_key = f"{APP_ENV}/accounts/{support.member.account.name}/members/{support.member.email}/support/{clean_subject}.json"
+    return store_s3(
+        STORE_BUCKET,
+        object_key,
+        json.dumps(support.dict(), default=str),
+        storage_class=StorageClass.STANDARD
+    )
+
+def is_registered(account_name: str, trivialscan_client: Union[str, None] = None) -> bool:
+    if trivialscan_client:
+        if validators.email(trivialscan_client) is True:
+            object_key = f"{APP_ENV}/accounts/{account_name}/members/{trivialscan_client}/profile.json"
+        else:
+            object_key = f"{APP_ENV}/accounts/{account_name}/client-tokens/{trivialscan_client}.json"
+    else:
+        object_key = f"{APP_ENV}/accounts/{account_name}/registration.json"
+
+    raw = get_s3(
+        bucket_name=STORE_BUCKET,
+        path_key=object_key,
+    )
+    if not raw:
         return False
     try:
-        register_data = json.loads(register_str)
+        data = json.loads(raw)
     except json.decoder.JSONDecodeError as err:
         logger.debug(err, exc_info=True)
         return False
 
-    return isinstance(register_data, dict)
+    return isinstance(data, dict)
 
 def store_summary(report: dict, path_prefix: str) -> bool:
     account_name = report["config"].get("account_name")
@@ -535,6 +678,7 @@ SENDGRID_TEMPLATES = {
     "subscriptions": "d-1d20f029d4eb46b5957c253c3ccd3262",
     "updated_email": "d-fef742bc0a754165a8778f4929df3dbb",
     "invitations": "d-c4a471191062414ea3cefd67c98deed4",
+    "support": "",
 }
 SENDGRID_GROUPS = {
     'notifications': 18318,
