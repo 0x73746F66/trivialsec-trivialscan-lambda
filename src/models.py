@@ -272,6 +272,7 @@ class Client(BaseModel):
     ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
     user_agent: Union[str, None] = Field(default=None)
     timestamp: int
+    active: bool = Field(default=False)
 
 class MagicLinkRequest(BaseModel):
     email: EmailStr
