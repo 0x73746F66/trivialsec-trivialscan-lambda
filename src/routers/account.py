@@ -296,6 +296,13 @@ async def support_request(
                 "json": json.dumps(authz.member.dict(), indent=2, default=str, sort_keys=True),
             }
         )
+        if sendgrid._content:
+            res = json.loads(sendgrid._content.decode())
+            if isinstance(res, dict) and res.get('errors'):
+                utils.logger.error(res.get('errors'))
+                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+                return
+
         support = models.Support(
             member=authz.member,
             subject=data.subject,

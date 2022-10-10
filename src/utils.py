@@ -678,7 +678,7 @@ SENDGRID_TEMPLATES = {
     "subscriptions": "d-1d20f029d4eb46b5957c253c3ccd3262",
     "updated_email": "d-fef742bc0a754165a8778f4929df3dbb",
     "invitations": "d-c4a471191062414ea3cefd67c98deed4",
-    "support": "",
+    "support": "d-821ef38856bb4d0581f26c4745ce00e7",
 }
 SENDGRID_GROUPS = {
     'notifications': 18318,
@@ -705,6 +705,22 @@ def send_email(
     sendgrid_api_key = get_ssm(f'/{APP_ENV}/Deploy/{APP_NAME}/sendgrid_api_key', WithDecryption=True)
     sendgrid = SendGridAPIClient(sendgrid_api_key)
     tmp_url = sendgrid.client.mail.send._build_url(query_params={})  # pylint: disable=protected-access
+    personalization = {
+        'subject': subject,
+        'dynamic_template_data': {**data, **{'email': recipient}},
+        'to': [
+            {
+                'email': recipient
+            }
+        ],
+    }
+    if bcc is not None and bcc != recipient:
+        personalization['bcc'] = [
+            {
+                'email': bcc,
+                'enable': bcc is not None and bcc != recipient
+            }
+        ]
     req_body = {
         'subject': subject,
         'from': {'email': "donotreply@trivialsec.com", 'name': sender_name},
@@ -722,23 +738,7 @@ def send_email(
         'asm': {
             'group_id': SENDGRID_GROUPS.get(group)
         },
-        'personalizations': [
-            {
-                'subject': subject,
-                'dynamic_template_data': {**data, **{'email': recipient}},
-                'to': [
-                    {
-                        'email': recipient
-                    }
-                ],
-                'bcc': [
-                    {
-                        'email': bcc,
-                        'enable': bcc is not None and bcc != recipient
-                    }
-                ]
-            }
-        ]
+        'personalizations': [personalization],
     }
     res = requests.post(
         url=tmp_url,
