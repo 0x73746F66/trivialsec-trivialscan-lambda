@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 import boto3
 
-import utils
+import internals
 from routers import account, member, report
 
 DEFAULT_LOG_LEVEL = "WARNING"
@@ -19,7 +19,7 @@ app = FastAPI(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=utils.ALLOWED_ORIGINS,
+    allow_origins=internals.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["POST", "GET", "DELETE"],
     allow_headers=[
@@ -36,10 +36,10 @@ app.include_router(report.router)
 @app.on_event("startup")
 async def startup_event():
     if getenv("AWS_EXECUTION_ENV") is None:
-        utils.logger = logging.getLogger("uvicorn.default")
+        internals.logger = logging.getLogger("uvicorn.default")
         boto3.set_stream_logger('')
     else:
         boto3.set_stream_logger('boto3', getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
-    utils.logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
+    internals.logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
 
 handler = Mangum(app, lifespan="off")

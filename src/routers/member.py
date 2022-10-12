@@ -9,7 +9,7 @@ from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
 import validators
 
-import utils
+import internals
 import models
 import services.aws
 import services.sendgrid
@@ -40,7 +40,7 @@ async def validate_authorization(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -81,7 +81,7 @@ async def member_profile(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -117,7 +117,7 @@ async def member_sessions(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -128,7 +128,7 @@ async def member_sessions(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    prefix_key = f"{utils.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"
+    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"
     sessions = []
     prefix_matches = services.aws.list_s3(prefix_key)
     if len(prefix_matches) == 0:
@@ -163,7 +163,7 @@ async def list_members(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -174,19 +174,22 @@ async def list_members(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    prefix_key = f"{utils.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"
-    sessions = []
+    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/"
+    members = []
     prefix_matches = services.aws.list_s3(prefix_key)
     if len(prefix_matches) == 0:
         return []
     for object_path in prefix_matches:
+        if not object_path.endswith("profile.json"):
+            continue
         raw = services.aws.get_s3(object_path)
         if raw:
-            sessions.append(models.MemberSession(**json.loads(raw)))
-    if not sessions:
+            internals.logger.info(raw)
+            members.append(models.MemberProfile(**json.loads(raw)))
+    if not members:
         response.status_code = status.HTTP_404_NOT_FOUND
         return []
-    return sessions
+    return members
 
 @router.get("/revoke/{session_token}",
             response_model=list[models.MemberSession],
@@ -210,7 +213,7 @@ async def revoke_session(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -254,7 +257,7 @@ async def magic_link(
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return
     magic_token = hashlib.sha224(bytes(f'{random()}{user_agent}{ip_addr}', 'ascii')).hexdigest()
-    login_url = f"{utils.DASHBOARD_URL}/login/{magic_token}"
+    login_url = f"{internals.DASHBOARD_URL}/login/{magic_token}"
     try:
         if member := models.MemberProfile(email=data.email).load():
             sendgrid = services.sendgrid.send_email(
@@ -274,7 +277,7 @@ async def magic_link(
                 sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
             )
             if link.save():
-                utils.logger.info(f"Magic Link for {member.account.name}")
+                internals.logger.info(f"Magic Link for {member.account.name}")
                 return f"/login/{link.magic_token}"
 
         response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -282,7 +285,7 @@ async def magic_link(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
+        internals.logger.exception(err)
         return
 
 @router.get("/magic-link/{magic_token}",
@@ -308,29 +311,29 @@ async def login(
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     try:
-        object_key = f"{utils.APP_ENV}/magic-links/{magic_token}.json"
+        object_key = f"{internals.APP_ENV}/magic-links/{magic_token}.json"
         ret = services.aws.get_s3(object_key)
         if not ret:
             response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-            utils.logger.info(
+            internals.logger.info(
                 f'"","","{ip_addr}","{user_agent}",""'
             )
             return
         link = models.MagicLink(**json.loads(ret))
         if not link:
             response.status_code = status.HTTP_404_NOT_FOUND
-            utils.logger.info(
+            internals.logger.info(
                 f'"","","{ip_addr}","{user_agent}",""'
             )
             return
         member = models.MemberProfile(email=link.email).load()
         if not member:
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-            utils.logger.info(
+            internals.logger.info(
                 f'"","{link.email}","{ip_addr}","{user_agent}",""'
             )
             return
-        utils.logger.info(
+        internals.logger.info(
             f'"{member.account.name}","{link.email}","{ip_addr}","{user_agent}",""'
         )
         session_token = hashlib.sha224(bytes(f'{member.email}{ip_addr}{user_agent}', 'ascii')).hexdigest()
@@ -352,4 +355,4 @@ async def login(
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        utils.logger.exception(err)
+        internals.logger.exception(err)

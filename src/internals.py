@@ -11,8 +11,6 @@ from typing import Union
 import validators
 from pydantic import IPvAnyAddress
 
-import models
-
 JITTER_SECONDS = int(getenv("JITTER_SECONDS", "30"))
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
@@ -194,6 +192,7 @@ class Authorization:
         not_before_seconds: int = JITTER_SECONDS,
         expire_after_seconds: int = JITTER_SECONDS
     ):
+        import models  # pylint: disable=import-outside-toplevel
         self._hmac = HMAC(
             authorization_header,
             str(request_url),

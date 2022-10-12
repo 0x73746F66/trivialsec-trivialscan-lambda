@@ -4,7 +4,7 @@ import requests
 from sendgrid import SendGridAPIClient
 
 import services.aws
-import utils
+import internals
 
 logger = logging.getLogger()
 
@@ -42,7 +42,7 @@ def send_email(
     bcc: Union[str, None] = "support@trivialsec.com"
 ):
     sendgrid_api_key = services.aws.get_ssm(
-        f'/{utils.APP_ENV}/Deploy/{utils.APP_NAME}/sendgrid_api_key', WithDecryption=True)
+        f'/{internals.APP_ENV}/Deploy/{internals.APP_NAME}/sendgrid_api_key', WithDecryption=True)
     sendgrid = SendGridAPIClient(sendgrid_api_key)
     tmp_url = sendgrid.client.mail.send._build_url(query_params={})  # pylint: disable=protected-access
     personalization = {
@@ -71,7 +71,7 @@ def send_email(
                 "enable": False,
             },
             "sandbox_mode": {
-                "enable": utils.APP_ENV != "Prod"
+                "enable": internals.APP_ENV != "Prod"
             }
         },
         'template_id': SENDGRID_TEMPLATES.get(template),
@@ -92,7 +92,7 @@ def send_email(
 
 def upsert_contact(recipient_email: str, list_name: str = 'subscribers'):
     sendgrid_api_key = services.aws.get_ssm(
-        f'/{utils.APP_ENV}/Deploy/{utils.APP_NAME}/sendgrid_api_key', WithDecryption=True)
+        f'/{internals.APP_ENV}/Deploy/{internals.APP_NAME}/sendgrid_api_key', WithDecryption=True)
     sendgrid = SendGridAPIClient(sendgrid_api_key)
     res = requests.put(
         url='https://api.sendgrid.com/v3/marketing/contacts',

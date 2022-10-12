@@ -6,7 +6,7 @@ from typing import Union, List
 from fastapi import Header, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
 
-import utils
+import internals
 import models
 import services.aws
 
@@ -35,7 +35,7 @@ async def retrieve_summary(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -47,7 +47,7 @@ async def retrieve_summary(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
+    summary_key = path.join(internals.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
     try:
         ret = services.aws.get_s3(summary_key)
         if not ret:
@@ -63,7 +63,7 @@ async def retrieve_summary(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        utils.logger.exception(err)
+        internals.logger.exception(err)
         return err
 
 @router.get("/report/{report_id}",
@@ -89,7 +89,7 @@ async def retrieve_report(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -101,8 +101,8 @@ async def retrieve_report(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
-    evaluations_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "evaluations.json")
+    summary_key = path.join(internals.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
+    evaluations_key = path.join(internals.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "evaluations.json")
     try:
         ret = services.aws.get_s3(summary_key)
         if not ret:
@@ -124,7 +124,7 @@ async def retrieve_report(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        utils.logger.exception(err)
+        internals.logger.exception(err)
         return err
 
 @router.get("/reports",
@@ -149,7 +149,7 @@ async def retrieve_reports(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -163,14 +163,14 @@ async def retrieve_reports(
 
     summary_keys = []
     data = []
-    prefix_key = path.join(utils.APP_ENV, "accounts",
+    prefix_key = path.join(internals.APP_ENV, "accounts",
                            x_trivialscan_account, "results")
     try:
         summary_keys = services.aws.list_s3(prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        utils.logger.exception(err)
+        internals.logger.exception(err)
         return []
 
     if not summary_keys:
@@ -192,7 +192,7 @@ async def retrieve_reports(
             item["results_uri"] = f'/result/{summary_key.split("/")[-2]}/summary'
             data.append(item)
         except RuntimeError as err:
-            utils.logger.exception(err)
+            internals.logger.exception(err)
             continue
 
     return data
@@ -221,7 +221,7 @@ async def retrieve_host(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -233,7 +233,7 @@ async def retrieve_host(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    host_key = path.join(utils.APP_ENV, "hosts", hostname, str(port), "latest.json")
+    host_key = path.join(internals.APP_ENV, "hosts", hostname, str(port), "latest.json")
     try:
         ret = services.aws.get_s3(host_key)
         if not ret:
@@ -244,7 +244,7 @@ async def retrieve_host(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        utils.logger.exception(err)
+        internals.logger.exception(err)
         return err
 
 @router.get("/certificate/{sha1_fingerprint}",
@@ -272,7 +272,7 @@ async def retrieve_certificate(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -284,8 +284,8 @@ async def retrieve_certificate(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    pem_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
-    cert_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.json")
+    pem_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
+    cert_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.json")
     try:
         ret = services.aws.get_s3(cert_key)
         if not ret:
@@ -298,7 +298,7 @@ async def retrieve_certificate(
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        utils.logger.exception(err)
+        internals.logger.exception(err)
 
 @router.post("/store/{report_type}",
              status_code=status.HTTP_200_OK,
@@ -325,7 +325,7 @@ async def store(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         raw_body=contents.decode("utf8"),
         authorization_header=authorization,
         request_url=request.url,
@@ -372,7 +372,7 @@ async def store(
 
     if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".pem"):
         sha1_fingerprint = file.filename.replace(".pem", "")
-        object_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
+        object_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
         if services.aws.store_s3(object_key, contents):
             return {"results_uri": f"/certificate/{sha1_fingerprint}"}
 

@@ -10,7 +10,7 @@ from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
 import validators
 
-import utils
+import internals
 import models
 import services.sendgrid
 import services.aws
@@ -65,7 +65,7 @@ async def account_register(
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not ip_addr or not user_agent:
-        utils.logger.warning(f"ip_addr {ip_addr} user_agent {user_agent}")
+        internals.logger.warning(f"ip_addr {ip_addr} user_agent {user_agent}")
     member = models.MemberProfile(
         account=account,
         email=account.primary_email,
@@ -86,7 +86,7 @@ async def account_register(
             response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
             return
         services.sendgrid.upsert_contact(recipient_email=member.email, list_name="members")
-        activation_url = f"{utils.DASHBOARD_URL}/register/{member.confirmation_token}"
+        activation_url = f"{internals.DASHBOARD_URL}/register/{member.confirmation_token}"
         sendgrid = services.sendgrid.send_email(
             subject="Trivial Security - Confirmation",
             recipient=member.email,
@@ -107,7 +107,7 @@ async def account_register(
             return member
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
+        internals.logger.exception(err)
         return
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -142,12 +142,12 @@ async def claim_client(
             response.status_code = status.HTTP_403_FORBIDDEN
             return
         if validators.email(client_name) is True:
-            utils.logger.warning(
+            internals.logger.warning(
                 f"Email {client_name} can not be used for client name")
             response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
             return
         # api_key Auth
-        authz = utils.Authorization(
+        authz = internals.Authorization(
             raw_body=request._body.decode("utf8"),  # pylint: disable=protected-access
             authorization_header=authorization,
             request_url=request.url,
@@ -155,11 +155,11 @@ async def claim_client(
             ip_addr=ip_addr,
             method="POST",
         )
-        utils.logger.warning(f"Validating Authorization {authz.is_valid}")
+        internals.logger.warning(f"Validating Authorization {authz.is_valid}")
         if not authz.is_valid:
             response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
             response.status_code = status.HTTP_403_FORBIDDEN
-            utils.logger.error("Invalid Authorization")
+            internals.logger.error("Invalid Authorization")
             return
         if models.Client(account=authz.account, name=client_name).exists():
             response.status_code = status.HTTP_409_CONFLICT
@@ -179,7 +179,7 @@ async def claim_client(
             return client
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
+        internals.logger.exception(err)
         return
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -208,7 +208,7 @@ async def retrieve_clients(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -222,14 +222,14 @@ async def retrieve_clients(
 
     object_keys = []
     data = []
-    prefix_key = path.join(utils.APP_ENV, "accounts",
+    prefix_key = path.join(internals.APP_ENV, "accounts",
                            x_trivialscan_account, "client-tokens")
     try:
         object_keys = services.aws.list_s3(prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        utils.logger.exception(err)
+        internals.logger.exception(err)
         return []
 
     if not object_keys:
@@ -247,7 +247,7 @@ async def retrieve_clients(
             if isinstance(item, dict):
                 data.append(item)
         except RuntimeError as err:
-            utils.logger.exception(err)
+            internals.logger.exception(err)
             continue
 
     return data
@@ -276,7 +276,7 @@ async def support_request(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         raw_body=request._body.decode("utf8"),  # pylint: disable=protected-access
         authorization_header=authorization,
         request_url=request.url,
@@ -287,7 +287,7 @@ async def support_request(
     if not authz.is_valid:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
-        utils.logger.error("Invalid Authorization")
+        internals.logger.error("Invalid Authorization")
         return
     try:
         sendgrid = services.sendgrid.send_email(
@@ -304,7 +304,7 @@ async def support_request(
         if sendgrid._content:  # pylint: disable=protected-access
             res = json.loads(sendgrid._content.decode())  # pylint: disable=protected-access
             if isinstance(res, dict) and res.get('errors'):
-                utils.logger.error(res.get('errors'))
+                internals.logger.error(res.get('errors'))
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
                 return
 
@@ -321,7 +321,7 @@ async def support_request(
             return support
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        utils.logger.exception(err)
+        internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
@@ -348,7 +348,7 @@ async def activate_client(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,
@@ -393,7 +393,7 @@ async def deactived_client(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    authz = utils.Authorization(
+    authz = internals.Authorization(
         authorization_header=authorization,
         request_url=request.url,
         user_agent=user_agent,

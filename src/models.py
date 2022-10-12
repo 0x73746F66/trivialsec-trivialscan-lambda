@@ -7,11 +7,11 @@ from typing import Union, Any, Optional
 from datetime import datetime
 
 import validators
-from pydantic import BaseModel, Field, AnyHttpUrl, validator, root_validator, conint, PositiveInt, PositiveFloat, IPvAnyAddress, EmailStr
+from pydantic import BaseModel, Field, AnyHttpUrl, validator, conint, PositiveInt, PositiveFloat, IPvAnyAddress, EmailStr
 
+import internals
 import services
 import services.aws
-import utils
 
 
 class DAL(metaclass=ABCMeta):
@@ -83,25 +83,25 @@ class MemberAccount(AccountRegistration, DAL):
             self.name = account_name
         if not self.name:
             return
-        object_key = f"{utils.APP_ENV}/accounts/{self.name}/registration.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            utils.logger.warning(f"Missing account object: {object_key}")
+            internals.logger.warning(f"Missing account object: {object_key}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         if not data or not isinstance(data, dict):
-            utils.logger.warning(
+            internals.logger.warning(
                 f"Missing account data for object: {object_key}")
             return
         super().__init__(**data)
         return self
 
     def save(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.name}/registration.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
@@ -109,7 +109,7 @@ class MemberAccount(AccountRegistration, DAL):
         )
 
     def delete(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.name}/registration.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
         return services.aws.delete_s3(object_key)
 
 class MemberProfile(BaseModel, DAL):
@@ -135,32 +135,32 @@ class MemberProfile(BaseModel, DAL):
         if validators.email(self.email) is False:
             return
         suffix = f"/members/{self.email}/profile.json"
-        prefix_matches = services.aws.list_s3(prefix_key=f"{utils.APP_ENV}/accounts")
+        prefix_matches = services.aws.list_s3(prefix_key=f"{internals.APP_ENV}/accounts")
         matches = [k for k in prefix_matches if k.endswith(suffix)]
         if len(matches) > 1:
-            utils.logger.critical("MemberProfile.load found too many matches, this is a data taint, likely manual data edits")
-            utils.logger.info(matches)
+            internals.logger.critical("MemberProfile.load found too many matches, this is a data taint, likely manual data edits")
+            internals.logger.info(matches)
         if len(matches) == 0:
-            utils.logger.warning(f"Missing member for: {member_email}")
+            internals.logger.warning(f"Missing member for: {member_email}")
             return
         raw = services.aws.get_s3(matches[0])
         if not raw:
-            utils.logger.warning(f"Missing member for: {member_email}")
+            internals.logger.warning(f"Missing member for: {member_email}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         data = json.loads(raw)
         if not data or not isinstance(data, dict):
-            utils.logger.warning(f"Missing member data for: {member_email}")
+            internals.logger.warning(f"Missing member data for: {member_email}")
             return
         super().__init__(**data)
         return self
 
     def save(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
@@ -168,7 +168,7 @@ class MemberProfile(BaseModel, DAL):
         )
 
     def delete(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"
         return services.aws.delete_s3(object_key)
 
 class ClientInfo(BaseModel):
@@ -196,24 +196,24 @@ class Client(BaseModel, DAL):
             self.name = client_name
         if account_name:
             self.account = MemberAccount(name=account_name).load()
-        object_key = f"{utils.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            utils.logger.warning(f"Missing account object: {object_key}")
+            internals.logger.warning(f"Missing account object: {object_key}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         if not data or not isinstance(data, dict):
-            utils.logger.warning(f"Missing account data for object: {object_key}")
+            internals.logger.warning(f"Missing account data for object: {object_key}")
             return
         super().__init__(**data)
         return self
 
     def save(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
@@ -221,7 +221,7 @@ class Client(BaseModel, DAL):
         )
 
     def delete(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
         return services.aws.delete_s3(object_key)
 
 class MagicLinkRequest(BaseModel):
@@ -240,32 +240,32 @@ class MagicLink(MagicLinkRequest, DAL):
     def load(self, magic_token: Union[str, None] = None) -> Union['Client', None]:
         if magic_token:
             self.magic_token = magic_token
-        object_key = f"{utils.APP_ENV}/magic-links/{self.magic_token}.json"
+        object_key = f"{internals.APP_ENV}/magic-links/{self.magic_token}.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            utils.logger.warning(f"Missing MagicLink {object_key}")
+            internals.logger.warning(f"Missing MagicLink {object_key}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         if not data or not isinstance(data, dict):
-            utils.logger.warning(
+            internals.logger.warning(
                 f"Missing MagicLink {object_key}")
             return
         super().__init__(**data)
         return self
 
     def save(self) -> bool:
-        object_key = f"{utils.APP_ENV}/magic-links/{self.magic_token}.json"
+        object_key = f"{internals.APP_ENV}/magic-links/{self.magic_token}.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str)
         )
 
     def delete(self) -> bool:
-        object_key = f"{utils.APP_ENV}/magic-links/{self.magic_token}.json"
+        object_key = f"{internals.APP_ENV}/magic-links/{self.magic_token}.json"
         return services.aws.delete_s3(object_key)
 
 class MemberSession(BaseModel, DAL):
@@ -286,24 +286,24 @@ class MemberSession(BaseModel, DAL):
             self.session_token = session_token
         if not self.session_token or validators.email(self.member.email) is False:
             return
-        object_key = f"{utils.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            utils.logger.warning(f"Missing session object: {object_key}")
+            internals.logger.warning(f"Missing session object: {object_key}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         if not data or not isinstance(data, dict):
-            utils.logger.warning(f"Missing session data for object: {object_key}")
+            internals.logger.warning(f"Missing session data for object: {object_key}")
             return
         super().__init__(**data)
         return self
 
     def save(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
@@ -311,7 +311,7 @@ class MemberSession(BaseModel, DAL):
         )
 
     def delete(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
         return services.aws.delete_s3(object_key)
 
 class CheckToken(BaseModel):
@@ -345,18 +345,18 @@ class Support(SupportRequest, DAL):
         if member_email:
             self.member = MemberProfile(email=member_email).load()
         clean_subject = ''.join(e for e in '-'.join(self.subject.split()).replace('/', '-').lower() if e.isalnum() or e == '-')
-        object_key = f"{utils.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            utils.logger.warning(f"Missing Support {object_key}")
+            internals.logger.warning(f"Missing Support {object_key}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         if not data or not isinstance(data, dict):
-            utils.logger.warning(
+            internals.logger.warning(
                 f"Missing Support {object_key}")
             return
         super().__init__(**data)
@@ -364,7 +364,7 @@ class Support(SupportRequest, DAL):
 
     def save(self) -> bool:
         clean_subject = ''.join(e for e in '-'.join(self.subject.split()).replace('/', '-').lower() if e.isalnum() or e == '-')
-        object_key = f"{utils.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str)
@@ -372,7 +372,7 @@ class Support(SupportRequest, DAL):
 
     def delete(self) -> bool:
         clean_subject = ''.join(e for e in '-'.join(self.subject.split()).replace('/', '-').lower() if e.isalnum() or e == '-')
-        object_key = f"{utils.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"
         return services.aws.delete_s3(object_key)
 
 class DefaultInfo(BaseModel):
@@ -438,32 +438,32 @@ class ReportSummary(DefaultInfo, DAL):
         if account_name:
             self.account_name = account_name
 
-        object_key = f"{utils.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            utils.logger.warning(f"Missing ReportSummary {object_key}")
+            internals.logger.warning(f"Missing ReportSummary {object_key}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         if not data or not isinstance(data, dict):
-            utils.logger.warning(
+            internals.logger.warning(
                 f"Missing ReportSummary {object_key}")
             return
         super().__init__(**data)
         return self
 
     def save(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str)
         )
 
     def delete(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
         return services.aws.delete_s3(object_key)
 
 class HostTLSProtocol(BaseModel):
@@ -536,7 +536,7 @@ class Host(BaseModel, DAL):
         if hostname:
             self.transport = HostTransport(hostname=hostname, port=port, peer_address=peer_address)
 
-        prefix_key = f"{utils.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}"
+        prefix_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}"
         if self.transport.peer_address and self.last_updated:
             scan_date = datetime.fromisoformat(self.last_updated).strftime("%Y%m%d")
             object_key = f"{prefix_key}/{self.transport.peer_address}/{scan_date}.json"
@@ -544,15 +544,15 @@ class Host(BaseModel, DAL):
             object_key = f"{prefix_key}/latest.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            utils.logger.warning(f"Missing Host {object_key}")
+            internals.logger.warning(f"Missing Host {object_key}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         if not data or not isinstance(data, dict):
-            utils.logger.warning(
+            internals.logger.warning(
                 f"Missing Host {object_key}")
             return
         super().__init__(**data)
@@ -560,13 +560,13 @@ class Host(BaseModel, DAL):
 
     def save(self) -> bool:
         scan_date = datetime.fromisoformat(self.last_updated).strftime("%Y%m%d")
-        object_key = f"{utils.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/{self.transport.peer_address}/{scan_date}.json"
+        object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/{self.transport.peer_address}/{scan_date}.json"
         if not services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str)
         ):
             return False
-        object_key = f"{utils.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/latest.json"
+        object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/latest.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str)
@@ -574,7 +574,7 @@ class Host(BaseModel, DAL):
 
     def delete(self) -> bool:
         scan_date = datetime.fromisoformat(self.last_updated).strftime("%Y%m%d")
-        object_key = f"{utils.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/{self.transport.peer_address}/{scan_date}.json"
+        object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/{self.transport.peer_address}/{scan_date}.json"
         return services.aws.delete_s3(object_key)
 
 class Certificate(BaseModel, DAL):
@@ -617,32 +617,32 @@ class Certificate(BaseModel, DAL):
         if sha1_fingerprint:
             self.sha1_fingerprint = sha1_fingerprint
 
-        object_key = f"{utils.APP_ENV}/certificates/{self.sha1_fingerprint}.json"
+        object_key = f"{internals.APP_ENV}/certificates/{self.sha1_fingerprint}.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            utils.logger.warning(f"Missing Certificate {object_key}")
+            internals.logger.warning(f"Missing Certificate {object_key}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         if not data or not isinstance(data, dict):
-            utils.logger.warning(
+            internals.logger.warning(
                 f"Missing Certificate {object_key}")
             return
         super().__init__(**data)
         return self
 
     def save(self) -> bool:
-        object_key = f"{utils.APP_ENV}/certificates/{self.sha1_fingerprint}.json"
+        object_key = f"{internals.APP_ENV}/certificates/{self.sha1_fingerprint}.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str)
         )
 
     def delete(self) -> bool:
-        object_key = f"{utils.APP_ENV}/certificates/{self.sha1_fingerprint}.json"
+        object_key = f"{internals.APP_ENV}/certificates/{self.sha1_fingerprint}.json"
         return services.aws.delete_s3(object_key)
 
 class ComplianceItem(BaseModel):
@@ -716,30 +716,30 @@ class EvaluationReport(ReportSummary, DAL):
         if account_name:
             self.account_name = account_name
 
-        object_key = f"{utils.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            utils.logger.warning(f"Missing EvaluationReport {object_key}")
+            internals.logger.warning(f"Missing EvaluationReport {object_key}")
             return
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
-            utils.logger.debug(err, exc_info=True)
+            internals.logger.debug(err, exc_info=True)
             return
         if not data or not isinstance(data, dict):
-            utils.logger.warning(
+            internals.logger.warning(
                 f"Missing EvaluationReport {object_key}")
             return
         super().__init__(**data)
         return self
 
     def save(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str)
         )
 
     def delete(self) -> bool:
-        object_key = f"{utils.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
         return services.aws.delete_s3(object_key)
