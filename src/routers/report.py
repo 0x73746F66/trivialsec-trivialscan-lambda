@@ -8,6 +8,7 @@ from starlette.requests import Request
 
 import utils
 import models
+import services.aws
 
 router = APIRouter()
 
@@ -15,6 +16,7 @@ router = APIRouter()
     response_model=models.ReportSummary,
     response_model_exclude_unset=True,
     status_code=status.HTTP_200_OK,
+    tags=["Scan Reports"],
 )
 async def retrieve_summary(
     request: Request,
@@ -47,10 +49,7 @@ async def retrieve_summary(
 
     summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
     try:
-        ret = utils.get_s3(
-            bucket_name=utils.STORE_BUCKET,
-            path_key=summary_key,
-        )
+        ret = services.aws.get_s3(summary_key)
         if not ret:
             response.status_code = status.HTTP_404_NOT_FOUND
             return
@@ -71,6 +70,7 @@ async def retrieve_summary(
     response_model=models.EvaluationReport,
     response_model_exclude_unset=True,
     status_code=status.HTTP_200_OK,
+    tags=["Scan Reports"],
 )
 async def retrieve_report(
     request: Request,
@@ -104,10 +104,7 @@ async def retrieve_report(
     summary_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
     evaluations_key = path.join(utils.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "evaluations.json")
     try:
-        ret = utils.get_s3(
-            bucket_name=utils.STORE_BUCKET,
-            path_key=summary_key,
-        )
+        ret = services.aws.get_s3(summary_key)
         if not ret:
             response.status_code = status.HTTP_404_NOT_FOUND
             return
@@ -117,10 +114,7 @@ async def retrieve_report(
         if data.get("config").get("dashboard_api_url"):
             del data["config"]["dashboard_api_url"]
         data["results_uri"] = f'/result/{report_id}/summary'
-        ret = utils.get_s3(
-            bucket_name=utils.STORE_BUCKET,
-            path_key=evaluations_key,
-        )
+        ret = services.aws.get_s3(evaluations_key)
         if not ret:
             response.status_code = status.HTTP_404_NOT_FOUND
             return
@@ -137,6 +131,7 @@ async def retrieve_report(
     response_model=List[models.ReportSummary],
     response_model_exclude_unset=True,
     status_code=status.HTTP_200_OK,
+    tags=["Scan Reports"],
 )
 async def retrieve_reports(
     request: Request,
@@ -171,10 +166,7 @@ async def retrieve_reports(
     prefix_key = path.join(utils.APP_ENV, "accounts",
                            x_trivialscan_account, "results")
     try:
-        summary_keys = utils.list_s3(
-            bucket_name=utils.STORE_BUCKET,
-            prefix_key=prefix_key,
-        )
+        summary_keys = services.aws.list_s3(prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -189,10 +181,7 @@ async def retrieve_reports(
         if not summary_key.endswith("summary.json"):
             continue
         try:
-            ret = utils.get_s3(
-                bucket_name=utils.STORE_BUCKET,
-                path_key=summary_key,
-            )
+            ret = services.aws.get_s3(summary_key)
             if not ret:
                 continue
             item = json.loads(ret)
@@ -212,6 +201,7 @@ async def retrieve_reports(
     response_model=models.Host,
     response_model_exclude_unset=True,
     status_code=status.HTTP_200_OK,
+    tags=["Scan Reports"],
 )
 async def retrieve_host(
     request: Request,
@@ -245,10 +235,7 @@ async def retrieve_host(
 
     host_key = path.join(utils.APP_ENV, "hosts", hostname, str(port), "latest.json")
     try:
-        ret = utils.get_s3(
-            bucket_name=utils.STORE_BUCKET,
-            path_key=host_key,
-        )
+        ret = services.aws.get_s3(host_key)
         if not ret:
             response.status_code = status.HTTP_404_NOT_FOUND
             return
@@ -264,6 +251,7 @@ async def retrieve_host(
     response_model=models.Certificate,
     response_model_exclude_unset=True,
     status_code=status.HTTP_200_OK,
+    tags=["Scan Reports"],
 )
 async def retrieve_certificate(
     request: Request,
@@ -299,18 +287,12 @@ async def retrieve_certificate(
     pem_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
     cert_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.json")
     try:
-        ret = utils.get_s3(
-            bucket_name=utils.STORE_BUCKET,
-            path_key=cert_key,
-        )
+        ret = services.aws.get_s3(cert_key)
         if not ret:
             response.status_code = status.HTTP_404_NOT_FOUND
             return
         if include_pem:
-            ret["pem"] = utils.get_s3(
-                bucket_name=utils.STORE_BUCKET,
-                path_key=pem_key,
-            )
+            ret["pem"] = services.aws.get_s3(pem_key)
 
         return json.loads(ret)
 
@@ -318,7 +300,10 @@ async def retrieve_certificate(
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         utils.logger.exception(err)
 
-@router.post("/store/{report_type}", status_code=status.HTTP_200_OK)
+@router.post("/store/{report_type}",
+             status_code=status.HTTP_200_OK,
+             tags=["Scan Reports"],
+             )
 async def store(
     request: Request,
     response: Response,
@@ -365,22 +350,31 @@ async def store(
     if report_type is models.ReportType.REPORT:
         contents["version"] = x_trivialscan_version
         report_id = token_urlsafe(56)
-        if utils.store_summary(report=contents, path_prefix=report_id):
+        report = models.ReportSummary(**contents)
+        if report.save():
             return {"results_uri": f"/result/{report_id}/summary"}
 
     if report_type is models.ReportType.EVALUATIONS:
         report_id = file.filename.replace(".json", "")
-        if utils.store_evaluations(report=contents, account_name=x_trivialscan_account, path_prefix=report_id):
+        report = models.EvaluationReport(**contents)
+        if report.save():
             return {"results_uri": f"/result/{report_id}"}
 
     if report_type is models.ReportType.HOST:
-        return {"ok": utils.store_host(report=contents)}
+        report = models.Host(**contents)
+        if report.save():
+            return {"results_uri": f"/host/{report.transport.hostname}/{report.transport.port}"}
 
     if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".json"):
-        return {"ok": utils.store_certificate(report=contents)}
+        report = models.Certificate(**contents)
+        if report.save():
+            return {"results_uri": f"/certificate/{report.sha1_fingerprint}"}
 
     if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".pem"):
-        return {"ok": utils.store_certificate_pem(pem=contents, sha1_fingerprint=file.filename.replace(".pem", ""))}
+        sha1_fingerprint = file.filename.replace(".pem", "")
+        object_key = path.join(utils.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
+        if services.aws.store_s3(object_key, contents):
+            return {"results_uri": f"/certificate/{sha1_fingerprint}"}
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return

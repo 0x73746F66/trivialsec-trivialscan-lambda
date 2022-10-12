@@ -12,6 +12,8 @@ import validators
 
 import utils
 import models
+import services.sendgrid
+import services.aws
 
 router = APIRouter()
 
@@ -19,7 +21,8 @@ router = APIRouter()
 @router.post("/account/register",
     response_model=models.MemberProfile,
     response_model_exclude_unset=True,
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
+    tags=["Member Account"],
 )
 async def account_register(
     request: Request,
@@ -43,7 +46,7 @@ async def account_register(
     if validators.email(data.primary_email) is not True:
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return
-    if utils.member_exists(data.primary_email):
+    if models.MemberProfile(email=data.primary_email).exists():
         response.status_code = status.HTTP_409_CONFLICT
         return
     account = models.MemberAccount(
@@ -73,18 +76,18 @@ async def account_register(
         timestamp=account.timestamp,
     )
     try:
-        if utils.is_registered(account.name):
+        if models.MemberAccount(name=account.name).exists():
             response.status_code = status.HTTP_208_ALREADY_REPORTED
             return
-        if not utils.save_member(member):
+        if not member.save():
             response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
             return
-        if not utils.save_account(account):
+        if not account.save():
             response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
             return
-        utils.upsert_contact(recipient_email=member.email, list_name="members")
+        services.sendgrid.upsert_contact(recipient_email=member.email, list_name="members")
         activation_url = f"{utils.DASHBOARD_URL}/register/{member.confirmation_token}"
-        sendgrid = utils.send_email(
+        sendgrid = services.sendgrid.send_email(
             subject="Trivial Security - Confirmation",
             recipient=member.email,
             template='registrations',
@@ -100,7 +103,7 @@ async def account_register(
             timestamp=round(time() * 1000),
             sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
         )
-        if utils.save_magic_link(link):
+        if link.save():
             return member
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -114,6 +117,7 @@ async def account_register(
              response_model=models.Client,
              response_model_exclude_unset=True,
              status_code=status.HTTP_201_CREATED,
+             tags=["Member Account"],
              )
 async def claim_client(
     request: Request,
@@ -144,8 +148,7 @@ async def claim_client(
             return
         # api_key Auth
         authz = utils.Authorization(
-            raw_body=request._body.decode(
-                "utf8"),  # pylint: disable=protected-access
+            raw_body=request._body.decode("utf8"),  # pylint: disable=protected-access
             authorization_header=authorization,
             request_url=request.url,
             user_agent=user_agent,
@@ -158,7 +161,7 @@ async def claim_client(
             response.status_code = status.HTTP_403_FORBIDDEN
             utils.logger.error("Invalid Authorization")
             return
-        if utils.is_registered(authz.account.name, client_name):
+        if models.Client(account=authz.account, name=client_name).exists():
             response.status_code = status.HTTP_409_CONFLICT
             return
 
@@ -172,7 +175,7 @@ async def claim_client(
             user_agent=user_agent,
             timestamp=round(time() * 1000),  # JavaScript support
         )
-        if utils.save_client(client):
+        if client.save():
             return client
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -186,6 +189,7 @@ async def claim_client(
             response_model=List[models.Client],
             response_model_exclude_unset=True,
             status_code=status.HTTP_200_OK,
+            tags=["Member Account"],
             )
 async def retrieve_clients(
     request: Request,
@@ -221,10 +225,7 @@ async def retrieve_clients(
     prefix_key = path.join(utils.APP_ENV, "accounts",
                            x_trivialscan_account, "client-tokens")
     try:
-        object_keys = utils.list_s3(
-            bucket_name=utils.STORE_BUCKET,
-            prefix_key=prefix_key,
-        )
+        object_keys = services.aws.list_s3(prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -239,10 +240,7 @@ async def retrieve_clients(
         if not object_key.endswith(".json"):
             continue
         try:
-            ret = utils.get_s3(
-                bucket_name=utils.STORE_BUCKET,
-                path_key=object_key,
-            )
+            ret = services.aws.get_s3(object_key)
             if not ret:
                 continue
             item = json.loads(ret)
@@ -258,6 +256,7 @@ async def retrieve_clients(
     response_model=models.Support,
     response_model_exclude_unset=True,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Member Account"],
 )
 async def support_request(
     request: Request,
@@ -291,7 +290,7 @@ async def support_request(
         utils.logger.error("Invalid Authorization")
         return
     try:
-        sendgrid = utils.send_email(
+        sendgrid = services.sendgrid.send_email(
             subject=f"Support | {data.subject}",
             sender_name=authz.member.account.name,
             sender=authz.member.email,
@@ -302,8 +301,8 @@ async def support_request(
                 "json": json.dumps(authz.member.dict(), indent=2, default=str, sort_keys=True),
             }
         )
-        if sendgrid._content:
-            res = json.loads(sendgrid._content.decode())
+        if sendgrid._content:  # pylint: disable=protected-access
+            res = json.loads(sendgrid._content.decode())  # pylint: disable=protected-access
             if isinstance(res, dict) and res.get('errors'):
                 utils.logger.error(res.get('errors'))
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -318,7 +317,7 @@ async def support_request(
             timestamp=round(time() * 1000),  # JavaScript support
             sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
         )
-        if utils.save_support(support):
+        if support.save():
             return support
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -331,21 +330,20 @@ async def support_request(
             response_model=models.Client,
             response_model_exclude_unset=True,
             status_code=status.HTTP_200_OK,
+            tags=["Member Account"],
             )
 async def activate_client(
     request: Request,
     response: Response,
     client_name: str,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Activate a deactived client
     """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get(
-        "http", {}).get("userAgent")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
@@ -355,19 +353,18 @@ async def activate_client(
         request_url=request.url,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
-    client = utils.load_client(x_trivialscan_account, client_name)
+    client = models.Client(account=authz.account, name=client_name).load()
     if not client:
         response.status_code = status.HTTP_404_NOT_FOUND
         return
     if client.active is not True:
         client.active = True
-        if not utils.save_client(client):
+        if not client.save():
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
 
@@ -377,13 +374,13 @@ async def activate_client(
             response_model=models.Client,
             response_model_exclude_unset=True,
             status_code=status.HTTP_200_OK,
+            tags=["Member Account"],
             )
 async def deactived_client(
     request: Request,
     response: Response,
     client_name: str,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Deactived a client
@@ -401,19 +398,18 @@ async def deactived_client(
         request_url=request.url,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
-    client = utils.load_client(x_trivialscan_account, client_name)
+    client = models.Client(account=authz.account, name=client_name).load()
     if not client:
         response.status_code = status.HTTP_404_NOT_FOUND
         return
     if client.active is not False:
         client.active = False
-        if not utils.save_client(client):
+        if not client.save():
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
 

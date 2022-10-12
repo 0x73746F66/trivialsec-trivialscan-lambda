@@ -11,6 +11,8 @@ import validators
 
 import utils
 import models
+import services.aws
+import services.sendgrid
 
 router = APIRouter()
 
@@ -19,6 +21,7 @@ router = APIRouter()
     response_model=models.CheckToken,
     response_model_exclude_unset=True,
     status_code=status.HTTP_202_ACCEPTED,
+    tags=["Member Profile"],
 )
 async def validate_authorization(
     request: Request,
@@ -53,10 +56,6 @@ async def validate_authorization(
         "member": authz.member,
         "session": authz.session,
         "authorisation_valid": authz.is_valid,
-        "registered": utils.is_registered(
-            account_name=x_trivialscan_account,
-            trivialscan_client=None if not authz.client else authz.client.name,
-        ),
         "ip_addr": ip_addr,
         "user_agent": user_agent,
     }
@@ -65,12 +64,12 @@ async def validate_authorization(
     response_model=models.MemberProfile,
     response_model_exclude_unset=True,
     status_code=status.HTTP_200_OK,
+    tags=["Member Profile"],
 )
 async def member_profile(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Return Member Profile for authorized user
@@ -87,7 +86,6 @@ async def member_profile(
         request_url=request.url,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -96,19 +94,67 @@ async def member_profile(
 
     return authz.member
 
+
 @router.get("/sessions",
-    response_model=list[models.MemberSession],
-    response_model_exclude_unset=True,
-    status_code=status.HTTP_200_OK,
-)
+            response_model=list[models.MemberSession],
+            response_model_exclude_unset=True,
+            status_code=status.HTTP_200_OK,
+            tags=["Member Profile"],
+            )
 async def member_sessions(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Return active sessions for the current authorized user
+    """
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get(
+        "http", {}).get("userAgent")
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    authz = utils.Authorization(
+        authorization_header=authorization,
+        request_url=request.url,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
+
+    prefix_key = f"{utils.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"
+    sessions = []
+    prefix_matches = services.aws.list_s3(prefix_key)
+    if len(prefix_matches) == 0:
+        return []
+    for object_path in prefix_matches:
+        raw = services.aws.get_s3(object_path)
+        if raw:
+            sessions.append(models.MemberSession(**json.loads(raw)))
+    if not sessions:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return []
+    return sessions
+
+@router.get("/members",
+    response_model=list[models.MemberProfile],
+    response_model_exclude_unset=True,
+    status_code=status.HTTP_200_OK,
+    tags=["Member Profile"],
+)
+async def list_members(
+    request: Request,
+    response: Response,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Return registered members
     """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
@@ -122,20 +168,71 @@ async def member_sessions(
         request_url=request.url,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
-    sessions = utils.load_sessions(authz.member.account.name, authz.member.email)
+
+    prefix_key = f"{utils.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"
+    sessions = []
+    prefix_matches = services.aws.list_s3(prefix_key)
+    if len(prefix_matches) == 0:
+        return []
+    for object_path in prefix_matches:
+        raw = services.aws.get_s3(object_path)
+        if raw:
+            sessions.append(models.MemberSession(**json.loads(raw)))
     if not sessions:
         response.status_code = status.HTTP_404_NOT_FOUND
         return []
     return sessions
 
+@router.get("/revoke/{session_token}",
+            response_model=list[models.MemberSession],
+            response_model_exclude_unset=True,
+            status_code=status.HTTP_200_OK,
+            tags=["Member Profile"],
+            )
+async def revoke_session(
+    request: Request,
+    response: Response,
+    session_token: str,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Revoke an active login session
+    """
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    authz = utils.Authorization(
+        authorization_header=authorization,
+        request_url=request.url,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
+    session = models.MemberSession(member=authz.member, session_token=session_token).load()
+    if not session:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return
+    if not session.delete():
+        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+        return
+
+    return session
+
 @router.post("/magic-link",
-    status_code=status.HTTP_202_ACCEPTED
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["Member Profile"],
 )
 async def magic_link(
     request: Request,
@@ -159,8 +256,8 @@ async def magic_link(
     magic_token = hashlib.sha224(bytes(f'{random()}{user_agent}{ip_addr}', 'ascii')).hexdigest()
     login_url = f"{utils.DASHBOARD_URL}/login/{magic_token}"
     try:
-        if member := utils.load_member(data.email):
-            sendgrid = utils.send_email(
+        if member := models.MemberProfile(email=data.email).load():
+            sendgrid = services.sendgrid.send_email(
                 recipient=data.email,
                 subject="Trivial Security Magic Link",
                 template='magic_link',
@@ -176,7 +273,7 @@ async def magic_link(
                 timestamp=round(time() * 1000),
                 sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
             )
-            if utils.save_magic_link(link):
+            if link.save():
                 utils.logger.info(f"Magic Link for {member.account.name}")
                 return f"/login/{link.magic_token}"
 
@@ -191,7 +288,8 @@ async def magic_link(
 @router.get("/magic-link/{magic_token}",
     response_model=models.MemberSession,
     response_model_exclude_unset=True,
-    status_code=status.HTTP_200_OK
+    status_code=status.HTTP_200_OK,
+    tags=["Member Profile"],
 )
 async def login(
     request: Request,
@@ -211,7 +309,7 @@ async def login(
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     try:
         object_key = f"{utils.APP_ENV}/magic-links/{magic_token}.json"
-        ret = utils.get_s3(utils.STORE_BUCKET, object_key)
+        ret = services.aws.get_s3(object_key)
         if not ret:
             response.status_code = status.HTTP_406_NOT_ACCEPTABLE
             utils.logger.info(
@@ -225,7 +323,7 @@ async def login(
                 f'"","","{ip_addr}","{user_agent}",""'
             )
             return
-        member = utils.load_member(link.email)
+        member = models.MemberProfile(email=link.email).load()
         if not member:
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             utils.logger.info(
@@ -244,12 +342,12 @@ async def login(
             user_agent=user_agent,
             timestamp=round(time() * 1000),
         )
-        if not utils.save_member_session(session):
+        if not session.save():
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
         if member.confirmation_token == magic_token:
             member.confirmed = True
-        if utils.save_member(member):
+        if member.save():
             return session
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     except RuntimeError as err:
