@@ -41,8 +41,7 @@ async def validate_authorization(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
         account_name=x_trivialscan_account,
@@ -50,7 +49,6 @@ async def validate_authorization(
 
     return {
         "version": x_trivialscan_version,
-        "account_name": x_trivialscan_account,
         "account": authz.account,
         "client": authz.client,
         "member": authz.member,
@@ -82,8 +80,7 @@ async def member_profile(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
     )
@@ -118,8 +115,7 @@ async def member_sessions(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
     )
@@ -164,8 +160,7 @@ async def list_members(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
     )
@@ -191,10 +186,8 @@ async def list_members(
         return []
     return members
 
-@router.get("/revoke/{session_token}",
-            response_model=list[models.MemberSession],
-            response_model_exclude_unset=True,
-            status_code=status.HTTP_200_OK,
+@router.delete("/revoke/{session_token}",
+            status_code=status.HTTP_202_ACCEPTED,
             tags=["Member Profile"],
             )
 async def revoke_session(
@@ -214,8 +207,7 @@ async def revoke_session(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
     )
@@ -229,9 +221,6 @@ async def revoke_session(
         return
     if not session.delete():
         response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-        return
-
-    return session
 
 @router.post("/magic-link",
     status_code=status.HTTP_202_ACCEPTED,

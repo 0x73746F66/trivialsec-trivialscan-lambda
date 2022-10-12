@@ -316,7 +316,6 @@ class MemberSession(BaseModel, DAL):
 
 class CheckToken(BaseModel):
     version: Union[str, None] = Field(default=None)
-    account_name: Union[str, None] = Field(default=None)
     session: Union[MemberSession, None] = Field(default=None)
     client: Union[Client, None] = Field(default=None)
     account: Union[MemberAccount, None] = Field(default=None)

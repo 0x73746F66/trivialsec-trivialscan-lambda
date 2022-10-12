@@ -23,7 +23,6 @@ async def retrieve_summary(
     response: Response,
     report_id: str,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves a summary of a Trivial Scanner report for the provided report identiffier
@@ -36,18 +35,16 @@ async def retrieve_summary(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    summary_key = path.join(internals.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
+    summary_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results", report_id, "summary.json")
     try:
         ret = services.aws.get_s3(summary_key)
         if not ret:
@@ -77,7 +74,6 @@ async def retrieve_report(
     response: Response,
     report_id: str,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves a full Trivial Scanner report for the provided report identiffier
@@ -90,19 +86,17 @@ async def retrieve_report(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    summary_key = path.join(internals.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "summary.json")
-    evaluations_key = path.join(internals.APP_ENV, "accounts", x_trivialscan_account, "results", report_id, "evaluations.json")
+    summary_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results", report_id, "summary.json")
+    evaluations_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results", report_id, "evaluations.json")
     try:
         ret = services.aws.get_s3(summary_key)
         if not ret:
@@ -137,7 +131,6 @@ async def retrieve_reports(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
@@ -150,11 +143,9 @@ async def retrieve_reports(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -163,8 +154,7 @@ async def retrieve_reports(
 
     summary_keys = []
     data = []
-    prefix_key = path.join(internals.APP_ENV, "accounts",
-                           x_trivialscan_account, "results")
+    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")
     try:
         summary_keys = services.aws.list_s3(prefix_key)
 
@@ -209,7 +199,6 @@ async def retrieve_host(
     hostname: str,
     port: int = 443,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves TLS data on any hostname, providing an optional port number
@@ -222,11 +211,9 @@ async def retrieve_host(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -259,7 +246,6 @@ async def retrieve_certificate(
     sha1_fingerprint: str,
     include_pem: bool = False,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves TLS Certificate data by SHA1 fingerprint, optionally provides the PEM encoded certificate
@@ -273,11 +259,9 @@ async def retrieve_certificate(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -326,13 +310,11 @@ async def store(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        raw_body=contents.decode("utf8"),
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
         account_name=x_trivialscan_account,
-        method="POST",
+        raw_body=contents.decode("utf8"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED

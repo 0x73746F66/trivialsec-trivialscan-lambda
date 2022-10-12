@@ -125,6 +125,7 @@ async def claim_client(
     client_name: str,
     client_info: models.ClientInfo,
     authorization: Union[str, None] = Header(default=None),
+    x_trivialscan_account: Union[str, None] = Header(default=None),
     x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
@@ -148,12 +149,10 @@ async def claim_client(
             return
         # api_key Auth
         authz = internals.Authorization(
-            raw_body=request._body.decode("utf8"),  # pylint: disable=protected-access
-            authorization_header=authorization,
-            request_url=request.url,
+            request=request,
             user_agent=user_agent,
             ip_addr=ip_addr,
-            method="POST",
+            account_name=x_trivialscan_account,
         )
         internals.logger.warning(f"Validating Authorization {authz.is_valid}")
         if not authz.is_valid:
@@ -195,7 +194,6 @@ async def retrieve_clients(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves a collection of your clients
@@ -209,11 +207,9 @@ async def retrieve_clients(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        account_name=x_trivialscan_account,
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -222,9 +218,8 @@ async def retrieve_clients(
 
     object_keys = []
     data = []
-    prefix_key = path.join(internals.APP_ENV, "accounts",
-                           x_trivialscan_account, "client-tokens")
     try:
+        prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "client-tokens")
         object_keys = services.aws.list_s3(prefix_key)
 
     except RuntimeError as err:
@@ -277,12 +272,9 @@ async def support_request(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        raw_body=request._body.decode("utf8"),  # pylint: disable=protected-access
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
-        method="POST",
     )
     if not authz.is_valid:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
@@ -349,8 +341,7 @@ async def activate_client(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
     )
@@ -394,8 +385,7 @@ async def deactived_client(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     authz = internals.Authorization(
-        authorization_header=authorization,
-        request_url=request.url,
+        request=request,
         user_agent=user_agent,
         ip_addr=ip_addr,
     )

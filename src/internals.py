@@ -9,6 +9,7 @@ from os import getenv
 from typing import Union
 
 import validators
+from starlette.requests import Request
 from pydantic import IPvAnyAddress
 
 JITTER_SECONDS = int(getenv("JITTER_SECONDS", "30"))
@@ -181,29 +182,29 @@ class HMAC:
 
 class Authorization:
     def __init__(self,
-        authorization_header: str,
-        request_url: str,
+        request: Request,
         user_agent: Union[str, None] = None,
         ip_addr: Union[IPvAnyAddress, None] = None,
         account_name: Union[str, None] = None,
-        method: str = "GET",
-        raw_body: str = None,
         algorithm: str = None,
         not_before_seconds: int = JITTER_SECONDS,
-        expire_after_seconds: int = JITTER_SECONDS
+        expire_after_seconds: int = JITTER_SECONDS,
+        raw_body: Union[str, None] = None,
     ):
         import models  # pylint: disable=import-outside-toplevel
+        if not raw_body and hasattr(request, '_body'):
+            raw_body = request._body.decode("utf8")  # pylint: disable=protected-access
         self._hmac = HMAC(
-            authorization_header,
-            str(request_url),
-            method,
-            raw_body,
-            algorithm,
-            not_before_seconds,
-            expire_after_seconds
+            authorization_header=request.headers.get("Authorization"),
+            request_url=str(request.url),
+            method=request.method.upper(),
+            raw_body=raw_body,
+            algorithm=algorithm,
+            not_before_seconds=not_before_seconds,
+            expire_after_seconds=expire_after_seconds,
         )
-        self.ip_addr = ip_addr
-        self.user_agent = user_agent
+        self.ip_addr = ip_addr if ip_addr else request.headers.get("X-Forwarded-For")
+        self.user_agent = user_agent if user_agent else request.headers.get("User-Agent")
         self.is_valid: bool = False
         self.account: Union[models.MemberAccount, None] = None
         self.session: Union[models.MemberSession, None] = None
