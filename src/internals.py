@@ -9,6 +9,7 @@ from os import getenv
 from typing import Union
 
 import validators
+from user_agents import parse as ua_parser
 from starlette.requests import Request
 from pydantic import IPvAnyAddress
 
@@ -192,6 +193,9 @@ class Authorization:
         raw_body: Union[str, None] = None,
     ):
         import models  # pylint: disable=import-outside-toplevel
+        postman_token = request.headers.get("Postman-Token")
+        if postman_token:
+            logger.info(f"Postman-Token: {postman_token}")
         if not raw_body and hasattr(request, '_body'):
             raw_body = request._body.decode("utf8")  # pylint: disable=protected-access
         self._hmac = HMAC(
@@ -205,28 +209,44 @@ class Authorization:
         )
         self.ip_addr = ip_addr if ip_addr else request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP"))
         self.user_agent = user_agent if user_agent else request.headers.get("User-Agent")
+        if not self.ip_addr:
+            logger.error("IP Address not determined, potential conflict if not deliberate or is running locally")
+
         self.is_valid: bool = False
         self.account: Union[models.MemberAccount, None] = None
         self.session: Union[models.MemberSession, None] = None
         self.client: Union[models.Client, None] = None
         self.member: Union[models.MemberProfile, None] = None
         logger.info(f"Authorization validation id {self._hmac.id}")
+        secret_key = None
         if validators.email(self._hmac.id) is True:
+            if not self.user_agent:
+                logger.critical("Missing User-Agent")
+                return
+            ua = ua_parser(self.user_agent)
+            if ua.is_bot:
+                logger.critical("DENY Bot User-Agent")
+                return
+            if not any([ua.is_mobile, ua.is_tablet, ua.is_pc]) and not postman_token:
+                logger.critical("DENY unrecognisable User-Agent")
+                return
             self.member = models.MemberProfile(email=self._hmac.id).load()
             self.account = self.member.account.load()
-            session_token = hashlib.sha224(bytes(f'{self.member.email}{ip_addr}{user_agent}', 'ascii')).hexdigest()
+            session_token = hashlib.sha224(bytes(f'{self.member.email}{self.ip_addr}{self.user_agent}', 'ascii')).hexdigest()
             logger.info(f"Session HMAC-based Authorization: session_token {session_token}")
             self.session = models.MemberSession(member=self.member, session_token=session_token).load()
-            self.is_valid = self._hmac.validate(self.session.access_token)
+            secret_key = self.session.access_token
         elif account_name is None or self._hmac.id == account_name:
             logger.info(f"Secret Key HMAC-based Authorization: account_name {account_name}")
             self.account = models.MemberAccount(name=self._hmac.id).load()
-            self.is_valid = self._hmac.validate(self.account.api_key)
+            secret_key = self.account.api_key
         elif account_name:
             logger.info(f"Client Token HMAC-based Authorization: client_name {self._hmac.id}")
             self.account = models.MemberAccount(name=account_name).load()
             self.client = models.Client(account=self.account, name=self._hmac.id).load()
             if self.client:
-                self.is_valid = self._hmac.validate(self.client.access_token)
-        else:
-            logger.error("Unhandled validation")
+                secret_key = self.client.access_token
+        if not secret_key:
+            logger.critical("Unhandled validation")
+            return
+        self.is_valid = self._hmac.validate(secret_key)

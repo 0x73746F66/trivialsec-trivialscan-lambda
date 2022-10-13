@@ -128,6 +128,7 @@ class MemberProfile(BaseModel, DAL):
     ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
     user_agent: Union[str, None] = Field(default=None)
     timestamp: Optional[int]
+    current: Optional[bool] = Field(default=False)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -301,7 +302,13 @@ class MemberSession(BaseModel, DAL):
     access_token: Optional[str]
     ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
     user_agent: Union[str, None] = Field(default=None)
+    browser: Union[str, None] = Field(default=None)
+    platform: Union[str, None] = Field(default=None)
+    lat: Optional[float]
+    lon: Optional[float]
     timestamp: Optional[int]
+    map_svg: Optional[str]
+    current: Optional[bool] = Field(default=False)
 
     def exists(self, member_email: Union[EmailStr, None] = None, session_token: Union[str, None] = None) -> bool:
         return self.load(member_email, session_token) is not None
@@ -357,7 +364,6 @@ class CheckToken(BaseModel):
     client: Union[Client, None] = Field(default=None)
     account: Union[MemberAccount, None] = Field(default=None)
     member: Union[MemberProfile, None] = Field(default=None)
-    sessions: list[MemberSession] = Field(default=[])
     authorisation_valid: bool = Field(default=False, title="HMAC Signature validation", description="Provides verifiable proof the client has possession of the Registration Token (without exposing/transmitting the token), using SHA256 hashing of the pertinent request information")
     ip_addr: Union[str, None] = Field(default=None, description="Source IP Address")
     user_agent: Union[str, None] = Field(default=None, description="Source HTTP Client")

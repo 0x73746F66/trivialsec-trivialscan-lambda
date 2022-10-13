@@ -37,9 +37,7 @@ app.include_router(report.router)
 async def startup_event():
     if getenv("AWS_EXECUTION_ENV") is None:
         internals.logger = logging.getLogger("uvicorn.default")
-        boto3.set_stream_logger('')
-    else:
-        boto3.set_stream_logger('boto3', getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
+    boto3.set_stream_logger('boto3', getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
     internals.logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
 
 handler = Mangum(app, lifespan="off")

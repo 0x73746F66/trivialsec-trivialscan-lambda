@@ -28,6 +28,8 @@ dependencies = [
     "requests==2.28.1",
     "sendgrid==6.9.7",
     "pydantic[email]==1.9.2",
+    "user-agents==2.2.0",
+    "geocoder==1.38.1",
 ]
 
 [tool.coverage.run]
