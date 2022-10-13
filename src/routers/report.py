@@ -28,17 +28,15 @@ async def retrieve_summary(
     """
     Retrieves a summary of a Trivial Scanner report for the provided report identiffier
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -80,17 +78,15 @@ async def retrieve_report(
     """
     Retrieves a full Trivial Scanner report for the provided report identiffier
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -138,17 +134,15 @@ async def retrieve_reports(
     """
     Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -207,17 +201,15 @@ async def retrieve_host(
     """
     Retrieves TLS data on any hostname, providing an optional port number
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -255,18 +247,15 @@ async def retrieve_certificate(
     """
     Retrieves TLS Certificate data by SHA1 fingerprint, optionally provides the PEM encoded certificate
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get(
-        "http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -305,19 +294,17 @@ async def store(
     """
     Stores various client report data generated by Trivial Scanner CLI
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     file = files[0]
     contents = await file.read()
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
         account_name=x_trivialscan_account,
         raw_body=contents.decode("utf8"),
     )

@@ -203,7 +203,7 @@ class Authorization:
             not_before_seconds=not_before_seconds,
             expire_after_seconds=expire_after_seconds,
         )
-        self.ip_addr = ip_addr if ip_addr else request.headers.get("X-Forwarded-For")
+        self.ip_addr = ip_addr if ip_addr else request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP"))
         self.user_agent = user_agent if user_agent else request.headers.get("User-Agent")
         self.is_valid: bool = False
         self.account: Union[models.MemberAccount, None] = None

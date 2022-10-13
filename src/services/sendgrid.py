@@ -71,7 +71,7 @@ def send_email(
                 "enable": False,
             },
             "sandbox_mode": {
-                "enable": internals.APP_ENV != "Prod"
+                "enable": internals.APP_ENV == "Local"
             }
         },
         'template_id': SENDGRID_TEMPLATES.get(template),

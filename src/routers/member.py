@@ -34,17 +34,15 @@ async def validate_authorization(
     """
     Checks registration status of the provided account name, client name, and access token (or API key)
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
         account_name=x_trivialscan_account,
     )
     prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"
@@ -64,8 +62,8 @@ async def validate_authorization(
         "session": authz.session,
         "sessions": sessions,
         "authorisation_valid": authz.is_valid,
-        "ip_addr": ip_addr,
-        "user_agent": user_agent,
+        "ip_addr": authz.ip_addr,
+        "user_agent": authz.user_agent,
     }
 
 @router.get("/me",
@@ -83,17 +81,15 @@ async def member_profile(
     """
     Return Member Profile for authorized user
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -118,18 +114,15 @@ async def member_sessions(
     """
     Return active sessions for the current authorized user
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get(
-        "http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -165,17 +158,15 @@ async def list_members(
     """
     Return registered members
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -212,17 +203,15 @@ async def revoke_session(
     """
     Revoke an active login session
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -253,8 +242,8 @@ async def magic_link(
         503 An exception was encountered and logged
     """
     event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent", request.headers.get("User-Agent"))
     if validators.email(data.email) is not True:
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return
@@ -311,8 +300,8 @@ async def login(
         500 An unexpected and unhandled request path occurred
     """
     event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent", request.headers.get("User-Agent"))
     try:
         object_key = f"{internals.APP_ENV}/magic-links/{magic_token}.json"
         ret = services.aws.get_s3(object_key)
@@ -376,17 +365,15 @@ async def update_email(
     """
     Updates the email address for the logged in member.
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
@@ -396,10 +383,11 @@ async def update_email(
     try:
         sendgrid = services.sendgrid.send_email(
             subject="Request to Change Email Address",
-            recipient=authz.member.email,
+            recipient=authz.member.account.primary_email,
             template='recovery_request',
             data={
-                "activation_url": "Not implemented",
+                "accept_url": f"{internals.DASHBOARD_URL}/accept/{hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest()}",
+                "old_email": authz.member.email,
                 "new_email": data.email,
             }
         )

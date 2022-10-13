@@ -50,21 +50,21 @@ async def account_register(
     if models.MemberProfile(email=data.primary_email).exists():
         response.status_code = status.HTTP_409_CONFLICT
         return
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent", request.headers.get("User-Agent"))
     account = models.MemberAccount(
         name=data.name or ''.join(e for e in data.display.lower() if e.isalnum()),
         display=data.display,
         primary_email=data.primary_email,
         billing_email=data.primary_email,
         api_key=token_urlsafe(nbytes=32),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-        user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        timestamp = round(time() * 1000),  # JavaScript support
+        ip_addr=ip_addr,
+        user_agent=user_agent,
+        timestamp=round(time() * 1000),  # JavaScript support
     )
     if not account.name:
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not ip_addr or not user_agent:
         internals.logger.warning(f"ip_addr {ip_addr} user_agent {user_agent}")
     member = models.MemberProfile(
@@ -87,7 +87,7 @@ async def account_register(
             response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
             return
         services.sendgrid.upsert_contact(recipient_email=member.email, list_name="members")
-        activation_url = f"{internals.DASHBOARD_URL}/register/{member.confirmation_token}"
+        activation_url = f"{internals.DASHBOARD_URL}/login/{member.confirmation_token}"
         sendgrid = services.sendgrid.send_email(
             subject="Trivial Security - Confirmation",
             recipient=member.email,
@@ -135,11 +135,6 @@ async def claim_client(
     Client names must be unique, if the coresponding registration token was lost a new client and token must be created.
     """
     try:
-        event = request.scope.get("aws.event", {})
-        ip_addr = event.get("requestContext", {}).get(
-            "http", {}).get("sourceIp")
-        user_agent = event.get("requestContext", {}).get(
-            "http", {}).get("userAgent")
         if not authorization:
             response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
             response.status_code = status.HTTP_403_FORBIDDEN
@@ -150,10 +145,11 @@ async def claim_client(
             response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
             return
         # api_key Auth
+        event = request.scope.get("aws.event", {})
         authz = internals.Authorization(
             request=request,
-            user_agent=user_agent,
-            ip_addr=ip_addr,
+            user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+            ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
             account_name=x_trivialscan_account,
         )
         internals.logger.warning(f"Validating Authorization {authz.is_valid}")
@@ -172,8 +168,8 @@ async def claim_client(
             name=client_name,
             cli_version=x_trivialscan_version,
             access_token=token_urlsafe(nbytes=32),
-            ip_addr=ip_addr,
-            user_agent=user_agent,
+            ip_addr=authz.ip_addr,
+            user_agent=authz.user_agent,
             timestamp=round(time() * 1000),  # JavaScript support
         )
         if client.save():
@@ -201,18 +197,15 @@ async def retrieve_clients(
     """
     Retrieves a collection of your clients
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get(
-        "http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -266,19 +259,15 @@ async def support_request(
     """
     Generates a support request for the logged in member.
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get(
-        "http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get(
-        "http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
@@ -308,8 +297,8 @@ async def support_request(
             member=authz.member,
             subject=data.subject,
             message=data.message,
-            ip_addr=ip_addr,
-            user_agent=user_agent,
+            ip_addr=authz.ip_addr,
+            user_agent=authz.user_agent,
             timestamp=round(time() * 1000),  # JavaScript support
             sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
         )
@@ -338,17 +327,15 @@ async def activate_client(
     """
     Activate a deactived client
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -382,18 +369,15 @@ async def deactived_client(
     """
     Deactived a client
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get(
-        "http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -427,17 +411,15 @@ async def update_billing_email(
     """
     Updates the billing email address for the logged in members account.
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
-    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=user_agent,
-        ip_addr=ip_addr,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
@@ -450,7 +432,7 @@ async def update_billing_email(
             recipient=data.billing_email,
             template='updated_email',
             data={
-                "activation_url": "Not implemented",
+                "activation_url": f"{internals.DASHBOARD_URL}/accept/{hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest()}",
                 "old_email": authz.member.account.billing_email,
                 "requester_email": authz.member.email,
             }
