@@ -112,6 +112,13 @@ class MemberAccount(AccountRegistration, DAL):
         object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
         return services.aws.delete_s3(object_key)
 
+class MemberAccountRedacted(MemberAccount):
+    class Config:
+        validate_assignment = True
+    @validator("api_key")
+    def set_api_key(cls, _):
+        return None
+
 class MemberProfile(BaseModel, DAL):
     account: Optional[MemberAccount]
     email: EmailStr
@@ -171,6 +178,16 @@ class MemberProfile(BaseModel, DAL):
         object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"
         return services.aws.delete_s3(object_key)
 
+class MemberProfileRedacted(MemberProfile):
+    class Config:
+        validate_assignment = True
+    @validator("account")
+    def set_account(cls, account):
+        return None if not isinstance(account, MemberAccount) else MemberAccountRedacted(**account.dict())
+    @validator("confirmation_token")
+    def set_confirmation_token(cls, _):
+        return None
+
 class ClientInfo(BaseModel):
     operating_system: str
     operating_system_release: str
@@ -223,6 +240,16 @@ class Client(BaseModel, DAL):
     def delete(self) -> bool:
         object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
         return services.aws.delete_s3(object_key)
+
+class ClientRedacted(Client):
+    class Config:
+        validate_assignment = True
+    @validator("account")
+    def set_account(cls, account):
+        return None if not isinstance(account, MemberAccount) else MemberAccountRedacted(**account.dict())
+    @validator("access_token")
+    def set_access_token(cls, _):
+        return None
 
 class MagicLinkRequest(BaseModel):
     email: EmailStr
@@ -314,12 +341,23 @@ class MemberSession(BaseModel, DAL):
         object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
         return services.aws.delete_s3(object_key)
 
+class MemberSessionRedacted(MemberSession):
+    class Config:
+        validate_assignment = True
+    @validator("member")
+    def set_member(cls, member):
+        return None if not isinstance(member, MemberProfile) else MemberProfileRedacted(**member.dict())
+    @validator("access_token")
+    def set_access_token(cls, _):
+        return None
+
 class CheckToken(BaseModel):
     version: Union[str, None] = Field(default=None)
     session: Union[MemberSession, None] = Field(default=None)
     client: Union[Client, None] = Field(default=None)
     account: Union[MemberAccount, None] = Field(default=None)
     member: Union[MemberProfile, None] = Field(default=None)
+    sessions: list[MemberSession] = Field(default=[])
     authorisation_valid: bool = Field(default=False, title="HMAC Signature validation", description="Provides verifiable proof the client has possession of the Registration Token (without exposing/transmitting the token), using SHA256 hashing of the pertinent request information")
     ip_addr: Union[str, None] = Field(default=None, description="Source IP Address")
     user_agent: Union[str, None] = Field(default=None, description="Source HTTP Client")

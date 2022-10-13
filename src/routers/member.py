@@ -20,6 +20,7 @@ router = APIRouter()
 @router.get("/validate",
     response_model=models.CheckToken,
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Member Profile"],
 )
@@ -46,21 +47,31 @@ async def validate_authorization(
         ip_addr=ip_addr,
         account_name=x_trivialscan_account,
     )
-
+    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"
+    sessions = []
+    prefix_matches = services.aws.list_s3(prefix_key)
+    if len(prefix_matches) == 0:
+        return []
+    for object_path in prefix_matches:
+        raw = services.aws.get_s3(object_path)
+        if raw:
+            sessions.append(models.MemberSession(**json.loads(raw)))
     return {
         "version": x_trivialscan_version,
         "account": authz.account,
         "client": authz.client,
         "member": authz.member,
         "session": authz.session,
+        "sessions": sessions,
         "authorisation_valid": authz.is_valid,
         "ip_addr": ip_addr,
         "user_agent": user_agent,
     }
 
 @router.get("/me",
-    response_model=models.MemberProfile,
+    response_model=models.MemberProfileRedacted,
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     tags=["Member Profile"],
 )
@@ -93,8 +104,9 @@ async def member_profile(
 
 
 @router.get("/sessions",
-            response_model=list[models.MemberSession],
+            response_model=list[models.MemberSessionRedacted],
             response_model_exclude_unset=True,
+    response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Member Profile"],
             )
@@ -139,8 +151,9 @@ async def member_sessions(
     return sessions
 
 @router.get("/members",
-    response_model=list[models.MemberProfile],
+    response_model=list[models.MemberProfileRedacted],
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     tags=["Member Profile"],
 )
@@ -280,6 +293,7 @@ async def magic_link(
 @router.get("/magic-link/{magic_token}",
     response_model=models.MemberSession,
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     tags=["Member Profile"],
 )
@@ -345,3 +359,71 @@ async def login(
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
+
+@router.post("/member/email",
+    # response_model=models.Support,
+    # response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["Member Account"],
+)
+async def update_email(
+    request: Request,
+    response: Response,
+    data: models.SupportRequest,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Updates the email address for the logged in member.
+    """
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    authz = internals.Authorization(
+        request=request,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
+    )
+    if not authz.is_valid:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        internals.logger.error("Invalid Authorization")
+        return
+    try:
+        sendgrid = services.sendgrid.send_email(
+            subject="Request to Change Email Address",
+            recipient=authz.member.email,
+            template='recovery_request',
+            data={
+                "activation_url": "Not implemented",
+                "new_email": data.email,
+            }
+        )
+        if sendgrid._content:  # pylint: disable=protected-access
+            res = json.loads(sendgrid._content.decode())  # pylint: disable=protected-access
+            if isinstance(res, dict) and res.get('errors'):
+                internals.logger.error(res.get('errors'))
+                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+                return
+
+        # support = models.Support(
+        #     member=authz.member,
+        #     subject=data.subject,
+        #     message=data.message,
+        #     ip_addr=ip_addr,
+        #     user_agent=user_agent,
+        #     timestamp=round(time() * 1000),  # JavaScript support
+        #     sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
+        # )
+        # if support.save():
+        #     return support
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        internals.logger.exception(err)
+
+    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return

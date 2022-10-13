@@ -21,6 +21,7 @@ router = APIRouter()
 @router.post("/account/register",
     response_model=models.MemberProfile,
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_201_CREATED,
     tags=["Member Account"],
 )
@@ -116,6 +117,7 @@ async def account_register(
 @router.post("/claim/{client_name}",
              response_model=models.Client,
              response_model_exclude_unset=True,
+    response_model_exclude_none=True,
              status_code=status.HTTP_201_CREATED,
              tags=["Member Account"],
              )
@@ -185,8 +187,9 @@ async def claim_client(
     return
 
 @router.get("/clients",
-            response_model=List[models.Client],
+            response_model=List[models.ClientRedacted],
             response_model_exclude_unset=True,
+    response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Member Account"],
             )
@@ -250,6 +253,7 @@ async def retrieve_clients(
 @router.post("/support",
     response_model=models.Support,
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_202_ACCEPTED,
     tags=["Member Account"],
 )
@@ -319,8 +323,9 @@ async def support_request(
     return
 
 @router.get("/activate/{client_name}",
-            response_model=models.Client,
+            response_model=models.ClientRedacted,
             response_model_exclude_unset=True,
+    response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Member Account"],
             )
@@ -362,8 +367,9 @@ async def activate_client(
     return client
 
 @router.get("/deactived/{client_name}",
-            response_model=models.Client,
+            response_model=models.ClientRedacted,
             response_model_exclude_unset=True,
+    response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Member Account"],
             )
@@ -404,3 +410,72 @@ async def deactived_client(
             return
 
     return client
+
+@router.post("/account/email",
+    # response_model=models.Support,
+    # response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["Member Account"],
+)
+async def update_billing_email(
+    request: Request,
+    response: Response,
+    data: models.SupportRequest,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Updates the billing email address for the logged in members account.
+    """
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp")
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent")
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    authz = internals.Authorization(
+        request=request,
+        user_agent=user_agent,
+        ip_addr=ip_addr,
+    )
+    if not authz.is_valid:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        internals.logger.error("Invalid Authorization")
+        return
+    try:
+        sendgrid = services.sendgrid.send_email(
+            subject="Change of Billing Email Address verification",
+            recipient=data.billing_email,
+            template='updated_email',
+            data={
+                "activation_url": "Not implemented",
+                "old_email": authz.member.account.billing_email,
+                "requester_email": authz.member.email,
+            }
+        )
+        if sendgrid._content:  # pylint: disable=protected-access
+            res = json.loads(sendgrid._content.decode())  # pylint: disable=protected-access
+            if isinstance(res, dict) and res.get('errors'):
+                internals.logger.error(res.get('errors'))
+                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+                return
+
+        # support = models.Support(
+        #     member=authz.member,
+        #     subject=data.subject,
+        #     message=data.message,
+        #     ip_addr=ip_addr,
+        #     user_agent=user_agent,
+        #     timestamp=round(time() * 1000),  # JavaScript support
+        #     sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
+        # )
+        # if support.save():
+        #     return support
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        internals.logger.exception(err)
+
+    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return

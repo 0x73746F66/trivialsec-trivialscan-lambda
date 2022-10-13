@@ -15,6 +15,7 @@ router = APIRouter()
 @router.get("/summary/{report_id}",
     response_model=models.ReportSummary,
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
@@ -66,6 +67,7 @@ async def retrieve_summary(
 @router.get("/report/{report_id}",
     response_model=models.EvaluationReport,
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
@@ -124,6 +126,7 @@ async def retrieve_report(
 @router.get("/reports",
     response_model=List[models.ReportSummary],
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
@@ -190,6 +193,7 @@ async def retrieve_reports(
 @router.get("/host/{hostname}",
     response_model=models.Host,
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
@@ -237,6 +241,7 @@ async def retrieve_host(
 @router.get("/certificate/{sha1_fingerprint}",
     response_model=models.Certificate,
     response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
