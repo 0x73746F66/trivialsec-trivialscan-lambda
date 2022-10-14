@@ -790,6 +790,9 @@ class EvaluationReport(ReportSummary, DAL):
 class EmailEditRequest(BaseModel):
     email: EmailStr
 
+class NameEditRequest(BaseModel):
+    name: str
+
 class AcceptEdit(BaseModel, DAL):
     account: MemberAccount
     requester: MemberProfile
