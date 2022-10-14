@@ -423,18 +423,20 @@ async def update_billing_email(
     )
     if not authz.is_valid:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
+        response.status_code = status.HTTP_401_UNAUTHORIZED
         internals.logger.error("Invalid Authorization")
         return
     try:
         sendgrid = services.sendgrid.send_email(
-            subject="Change of Billing Email Address verification",
-            recipient=data.billing_email,
+            subject="Change of Billing Email Address notice",
+            recipient=authz.account.billing_email,
+            cc=data.email,
             template='updated_email',
             data={
-                "activation_url": f"{internals.DASHBOARD_URL}/accept/{hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest()}",
-                "old_email": authz.member.account.billing_email,
-                "requester_email": authz.member.email,
+                "old_email": authz.account.billing_email,
+                "new_email": data.email,
+                "modifying_email": authz.member.email,
+                "email_type_message": "account billing email address",
             }
         )
         if sendgrid._content:  # pylint: disable=protected-access
@@ -443,18 +445,13 @@ async def update_billing_email(
                 internals.logger.error(res.get('errors'))
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
                 return
+        internals.logger.info(f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
+        authz.account.billing_email = data.email
+        if not authz.account.save():
+            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            return
+        return authz.account
 
-        # support = models.Support(
-        #     member=authz.member,
-        #     subject=data.subject,
-        #     message=data.message,
-        #     ip_addr=authz.ip_addr,
-        #     user_agent=authz.user_agent,
-        #     timestamp=round(time() * 1000),  # JavaScript support
-        #     sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
-        # )
-        # if support.save():
-        #     return support
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
@@ -476,7 +473,7 @@ async def update_primary_email(
     authorization: Union[str, None] = Header(default=None),
 ):
     """
-    Updates the email address for the logged in member.
+    Updates the primary contact email address for the account.
     """
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
@@ -497,34 +494,30 @@ async def update_primary_email(
         return
     try:
         sendgrid = services.sendgrid.send_email(
-            subject="Request to Change Email Address",
-            recipient=authz.member.account.primary_email,
-            template='recovery_request',
+            subject="Change of Billing Email Address notice",
+            recipient=authz.account.primary_email,
+            cc=data.email,
+            template='updated_email',
             data={
-                "accept_url": f"{internals.DASHBOARD_URL}/accept/{hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest()}",
-                "old_email": authz.member.email,
+                "old_email": authz.account.primary_email,
                 "new_email": data.email,
+                "modifying_email": authz.member.email,
+                "email_type_message": "account primary contact email address",
             }
         )
         if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(sendgrid._content.decode()
-                             )  # pylint: disable=protected-access
+            res = json.loads(sendgrid._content.decode())  # pylint: disable=protected-access
             if isinstance(res, dict) and res.get('errors'):
                 internals.logger.error(res.get('errors'))
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
                 return
+        internals.logger.info(f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
+        authz.account.primary_email = data.email
+        if not authz.account.save():
+            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            return
+        return authz.account
 
-        # support = models.Support(
-        #     member=authz.member,
-        #     subject=data.subject,
-        #     message=data.message,
-        #     ip_addr=authz.ip_addr,
-        #     user_agent=authz.user_agent,
-        #     timestamp=round(time() * 1000),  # JavaScript support
-        #     sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
-        # )
-        # if support.save():
-        #     return support
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)

@@ -382,7 +382,7 @@ async def login(
              response_model_exclude_unset=True,
              response_model_exclude_none=True,
              status_code=status.HTTP_202_ACCEPTED,
-             tags=["Member Account"],
+             tags=["Member Profile"],
              )
 async def update_email(
     request: Request,
@@ -391,7 +391,7 @@ async def update_email(
     authorization: Union[str, None] = Header(default=None),
 ):
     """
-    Updates the email address for the logged in member.
+    Updates the login email address for the current logged in member.
     """
     if not authorization:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'

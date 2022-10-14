@@ -39,6 +39,7 @@ def send_email(
     group: str = 'notifications',
     sender: str = 'support@trivialsec.com',
     sender_name: str = 'Chris @ Trivial Security',
+    cc: Union[str, None] = None,
     bcc: Union[str, None] = "support@trivialsec.com"
 ):
     sendgrid_api_key = services.aws.get_ssm(
@@ -54,26 +55,37 @@ def send_email(
             }
         ],
     }
+    mail_settings = {
+        "footer": {
+            "enable": False,
+        },
+        "sandbox_mode": {
+            "enable": internals.APP_ENV == "Local"
+        }
+    }
+    if cc is not None and cc != recipient:
+        mail_settings['cc'] = {'email': cc,
+                               'enable': True}
+        personalization['cc'] = [
+            {
+                'email': cc,
+                'enable': True
+            }
+        ]
     if bcc is not None and bcc != recipient:
+        mail_settings['bcc'] = {'email': bcc,
+                               'enable': True}
         personalization['bcc'] = [
             {
                 'email': bcc,
-                'enable': bcc is not None and bcc != recipient
+                'enable': True
             }
         ]
     req_body = {
         'subject': subject,
         'from': {'email': "donotreply@trivialsec.com", 'name': sender_name},
         'reply_to': {'email': sender},
-        'mail_settings': {
-            'bcc': {'email': bcc, 'enable': bcc is not None and bcc != recipient},
-            "footer": {
-                "enable": False,
-            },
-            "sandbox_mode": {
-                "enable": internals.APP_ENV == "Local"
-            }
-        },
+        'mail_settings': mail_settings,
         'template_id': SENDGRID_TEMPLATES.get(template),
         'asm': {
             'group_id': SENDGRID_GROUPS.get(group)
