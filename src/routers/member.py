@@ -65,7 +65,7 @@ async def validate_authorization(
 
 
 @router.get("/me",
-            response_model=models.MemberProfileRedacted,
+            response_model=models.MemberSessionRedacted,
             response_model_exclude_unset=True,
             response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
@@ -95,8 +95,7 @@ async def member_profile(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
-
-    return authz.member
+    return authz.session
 
 
 @router.get("/sessions",
@@ -379,8 +378,8 @@ async def login(
 
 
 @router.post("/member/email",
-             # response_model=models.Support,
-             # response_model_exclude_unset=True,
+             response_model=models.AcceptEdit,
+             response_model_exclude_unset=True,
              response_model_exclude_none=True,
              status_code=status.HTTP_202_ACCEPTED,
              tags=["Member Account"],
@@ -388,7 +387,7 @@ async def login(
 async def update_email(
     request: Request,
     response: Response,
-    data: models.SupportRequest,
+    data: models.EmailEditRequest,
     authorization: Union[str, None] = Header(default=None),
 ):
     """
@@ -412,35 +411,41 @@ async def update_email(
         internals.logger.error("Invalid Authorization")
         return
     try:
+        accept_token = hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest()
         sendgrid = services.sendgrid.send_email(
             subject="Request to Change Email Address",
             recipient=authz.member.account.primary_email,
             template='recovery_request',
             data={
-                "accept_url": f"{internals.DASHBOARD_URL}/accept/{hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest()}",
+                "accept_url": f"{internals.DASHBOARD_URL}/accept/{accept_token}",
                 "old_email": authz.member.email,
                 "new_email": data.email,
             }
         )
         if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(sendgrid._content.decode()
-                             )  # pylint: disable=protected-access
+            res = json.loads(sendgrid._content.decode())  # pylint: disable=protected-access
             if isinstance(res, dict) and res.get('errors'):
                 internals.logger.error(res.get('errors'))
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
                 return
 
-        # support = models.Support(
-        #     member=authz.member,
-        #     subject=data.subject,
-        #     message=data.message,
-        #     ip_addr=ip_addr,
-        #     user_agent=user_agent,
-        #     timestamp=round(time() * 1000),  # JavaScript support
-        #     sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
-        # )
-        # if support.save():
-        #     return support
+        link = models.AcceptEdit(
+            account=authz.account,
+            requester=authz.member,
+            accept_token=accept_token,
+            old_value=authz.member.email,
+            ip_addr=authz.ip_addr,
+            new_value=data.email,
+            change_model='MemberProfile',
+            change_prop='email',
+            model_key='email',
+            model_value=authz.member.email,
+            user_agent=authz.user_agent,
+            timestamp=round(time() * 1000),  # JavaScript support
+            sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
+        )
+        if link.save():
+            return link
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)

@@ -265,7 +265,7 @@ class MagicLink(MagicLinkRequest, DAL):
     def exists(self, magic_token: Union[str, None] = None) -> bool:
         return self.load(magic_token) is not None
 
-    def load(self, magic_token: Union[str, None] = None) -> Union['Client', None]:
+    def load(self, magic_token: Union[str, None] = None) -> Union['MagicLink', None]:
         if magic_token:
             self.magic_token = magic_token
         object_key = f"{internals.APP_ENV}/magic-links/{self.magic_token}.json"
@@ -382,7 +382,7 @@ class Support(SupportRequest, DAL):
     def exists(self, member_email: Union[EmailStr, None] = None, subject: Union[str, None] = None) -> bool:
         return self.load(member_email, subject) is not None
 
-    def load(self, member_email: Union[EmailStr, None] = None, subject: Union[str, None] = None) -> Union['Client', None]:
+    def load(self, member_email: Union[EmailStr, None] = None, subject: Union[str, None] = None) -> Union['Support', None]:
         if subject:
             self.subject = subject
         if member_email:
@@ -785,4 +785,56 @@ class EvaluationReport(ReportSummary, DAL):
 
     def delete(self) -> bool:
         object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
+        return services.aws.delete_s3(object_key)
+
+class EmailEditRequest(BaseModel):
+    email: EmailStr
+
+class AcceptEdit(BaseModel, DAL):
+    account: MemberAccount
+    requester: MemberProfile
+    accept_token: str
+    old_value: Any
+    new_value: Any
+    change_model: str
+    change_prop: str
+    model_key: str
+    model_value: str
+    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
+    user_agent: Union[str, None] = Field(default=None)
+    timestamp: Union[int, None] = Field(default=None)
+    sendgrid_message_id: Union[str, None] = Field(default=None)
+
+    def exists(self, accept_token: Union[str, None] = None) -> bool:
+        return self.load(accept_token) is not None
+
+    def load(self, accept_token: Union[str, None] = None) -> Union['AcceptEdit', None]:
+        if accept_token:
+            self.accept_token = accept_token
+        object_key = f"{internals.APP_ENV}/accept-links/{self.accept_token}.json"
+        raw = services.aws.get_s3(object_key)
+        if not raw:
+            internals.logger.warning(f"Missing AcceptEdit {object_key}")
+            return
+        try:
+            data = json.loads(raw)
+        except json.decoder.JSONDecodeError as err:
+            internals.logger.debug(err, exc_info=True)
+            return
+        if not data or not isinstance(data, dict):
+            internals.logger.warning(
+                f"Missing MagicLink {object_key}")
+            return
+        super().__init__(**data)
+        return self
+
+    def save(self) -> bool:
+        object_key = f"{internals.APP_ENV}/accept-links/{self.accept_token}.json"
+        return services.aws.store_s3(
+            object_key,
+            json.dumps(self.dict(), default=str)
+        )
+
+    def delete(self) -> bool:
+        object_key = f"{internals.APP_ENV}/accept-links/{self.accept_token}.json"
         return services.aws.delete_s3(object_key)
