@@ -397,13 +397,17 @@ async def update_email(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+    if validators.email(data.email) is not True:
+        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        return
+    if models.MemberProfile(email=data.email).exists():
+        response.status_code = status.HTTP_409_CONFLICT
+        return
     event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=event.get("requestContext", {}).get(
-            "http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get(
-            "http", {}).get("sourceIp"),
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
@@ -446,6 +450,78 @@ async def update_email(
         )
         if link.save():
             return link
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        internals.logger.exception(err)
+
+    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return
+
+@router.post("/member/invite",
+             response_model=models.MemberProfileRedacted,
+             response_model_exclude_unset=True,
+             response_model_exclude_none=True,
+             status_code=status.HTTP_202_ACCEPTED,
+             tags=["Member Profile"],
+             )
+async def send_member_invitation(
+    request: Request,
+    response: Response,
+    data: models.MemberInvitationRequest,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Invites a member to join the organisation
+    """
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    if validators.email(data.email) is not True:
+        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        return
+    if models.MemberProfile(email=data.email).exists():
+        response.status_code = status.HTTP_409_CONFLICT
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+    )
+    if not authz.is_valid:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        internals.logger.error("Invalid Authorization")
+        return
+    try:
+        # sendgrid = services.sendgrid.send_email(
+        #     subject="Change of Billing Email Address notice",
+        #     recipient=authz.account.billing_email,
+        #     cc=data.email,
+        #     template='updated_email',
+        #     data={
+        #         "old_email": authz.account.billing_email,
+        #         "new_email": data.email,
+        #         "modifying_email": authz.member.email,
+        #         "email_type_message": "account billing email address",
+        #     }
+        # )
+        # if sendgrid._content:  # pylint: disable=protected-access
+        #     res = json.loads(sendgrid._content.decode()
+        #                      )  # pylint: disable=protected-access
+        #     if isinstance(res, dict) and res.get('errors'):
+        #         internals.logger.error(res.get('errors'))
+        #         response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+        #         return
+        # internals.logger.info(
+        #     f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
+        # authz.account.billing_email = data.email
+        # if not authz.account.save():
+        #     response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+        #     return
+        return authz.account
+
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)

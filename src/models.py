@@ -793,6 +793,9 @@ class EmailEditRequest(BaseModel):
 class NameEditRequest(BaseModel):
     name: str
 
+class MemberInvitationRequest(BaseModel):
+    email: EmailStr
+
 class AcceptEdit(BaseModel, DAL):
     account: MemberAccount
     requester: MemberProfile
