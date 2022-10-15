@@ -10,6 +10,7 @@ import validators
 from user_agents import parse as ua_parser
 from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
+from pydantic import EmailStr
 
 import internals
 import models
@@ -369,7 +370,7 @@ async def login(
             return
         if member.confirmation_token == magic_token:
             member.confirmed = True
-        if member.save():
+        if member.save() and link.delete():
             return session
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     except RuntimeError as err:
@@ -457,6 +458,58 @@ async def update_email(
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
+
+@router.get("/accept/{token}",
+            status_code=status.HTTP_202_ACCEPTED,
+            tags=["Member Profile"],
+            )
+async def accept_token(
+    request: Request,
+    response: Response,
+    token: str,
+):
+    """
+    Login for members with magic link emailed to them
+
+    Return codes:
+        406 The prodided values are not acceptable or not sent
+        424 The email address is not registered
+        500 An unexpected and unhandled request path occurred
+    """
+    event = request.scope.get("aws.event", {})
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent", request.headers.get("User-Agent"))
+    try:
+        link = models.AcceptEdit(accept_token=token).load()
+        if not link:
+            response.status_code = status.HTTP_404_NOT_FOUND
+            internals.logger.info(
+                f'"","","{ip_addr}","{user_agent}",""'
+            )
+            return
+        _cls: models.DAL = getattr(models, link.change_model, None)
+        if not _cls:
+            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            return
+        model: models.DAL = _cls(**{link.model_key: link.model_value}).load()
+        old_value = getattr(model, link.change_prop)
+        if link.old_value != old_value:
+            response.status_code = status.HTTP_208_ALREADY_REPORTED
+            return
+        setattr(model, link.change_prop, link.new_value)
+        if not model.save():
+            response.status_code = status.HTTP_412_PRECONDITION_FAILED
+            return
+        if link.change_model == 'MemberProfile' and link.model_key == 'email':
+            if old_memebr := models.MemberProfile(email=link.old_value).load():
+                old_memebr.delete()
+        return link.delete()
+
+    except RuntimeError as err:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        internals.logger.exception(err)
+
+
 @router.post("/member/invite",
              response_model=models.MemberProfileRedacted,
              response_model_exclude_unset=True,
@@ -538,3 +591,41 @@ async def send_member_invitation(
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
+
+
+@router.delete("/member/{email}",
+               status_code=status.HTTP_202_ACCEPTED,
+               tags=["Member Profile"],
+               )
+async def delete_member(
+    request: Request,
+    response: Response,
+    email: EmailStr,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Deletes a spcific MemebrProfile within the same account as teh authorized requester
+    """
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
+    member = models.MemberProfile(email=email).load()
+    if not member:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return
+    if authz.account.name != member.account.name:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return
+
+    return member.delete()

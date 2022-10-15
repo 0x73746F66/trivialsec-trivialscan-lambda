@@ -231,10 +231,27 @@ class Authorization:
                 logger.critical("DENY unrecognisable User-Agent")
                 return
             self.member = models.MemberProfile(email=self._hmac.id).load()
+            if not self.member:
+                logger.critical(f"DENY missing MemberProfile {self._hmac.id}")
+                return
             self.account = self.member.account.load()
             session_token = hashlib.sha224(bytes(f'{self.member.email}{self.ip_addr}{self.user_agent}', 'ascii')).hexdigest()
             logger.info(f"Session HMAC-based Authorization: session_token {session_token}")
             self.session = models.MemberSession(member=self.member, session_token=session_token).load()
+            if any([
+                self.account.display != self.member.account.display,
+                self.account.billing_email != self.member.account.billing_email,
+                self.account.primary_email != self.member.account.primary_email,
+            ]):
+                self.member.account = self.account
+                self.member.save()
+            if any([
+                self.account.display != self.session.member.account.display,
+                self.account.billing_email != self.session.member.account.billing_email,
+                self.account.primary_email != self.session.member.account.primary_email,
+            ]):
+                self.session.member = self.member
+                self.session.save()
             secret_key = self.session.access_token
         elif account_name is None or self._hmac.id == account_name:
             logger.info(f"Secret Key HMAC-based Authorization: account_name {account_name}")
@@ -245,6 +262,13 @@ class Authorization:
             self.account = models.MemberAccount(name=account_name).load()
             self.client = models.Client(account=self.account, name=self._hmac.id).load()
             if self.client:
+                if any([
+                    self.account.display != self.client.account.display,
+                    self.account.billing_email != self.client.account.billing_email,
+                    self.account.primary_email != self.client.account.primary_email,
+                ]):
+                    self.client.account = self.account
+                    self.client.save()
                 secret_key = self.client.access_token
         if not secret_key:
             logger.critical("Unhandled validation")

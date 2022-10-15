@@ -8,7 +8,7 @@ from datetime import datetime
 
 import validators
 from pydantic import BaseModel, Field, AnyHttpUrl, validator, conint, PositiveInt, PositiveFloat, IPvAnyAddress, EmailStr
-
+from pydantic.error_wrappers import ValidationError
 import internals
 import services
 import services.aws
@@ -112,6 +112,35 @@ class MemberAccount(AccountRegistration, DAL):
         object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
         return services.aws.delete_s3(object_key)
 
+    def update_members(self) -> bool:
+        prefix_key = f"{internals.APP_ENV}/accounts/{self.name}/"
+        members: list['MemberProfile'] = []
+        member_matches = services.aws.list_s3(f"{prefix_key}members/")
+        results: list[bool] = []
+        for object_path in member_matches:
+            if not object_path.endswith("profile.json"):
+                continue
+            raw = services.aws.get_s3(object_path)
+            if raw:
+                try:
+                    member = MemberProfile(**json.loads(raw))
+                except ValidationError:
+                    internals.logger.warning(f"Bad data for MemberProfile\n{raw}")
+                    results.append(False)
+                    continue
+                member.account = self
+                results.append(member.save())
+                members.append(member)
+        for member in members:
+            session_matches = services.aws.list_s3(f"{prefix_key}members/{member.email}/sessions/")
+            for object_path in session_matches:
+                raw = services.aws.get_s3(object_path)
+                if raw:
+                    session = MemberSession(**json.loads(raw))
+                    session.member = member
+                    results.append(session.save())
+        return all(results)
+
 class MemberAccountRedacted(MemberAccount):
     class Config:
         validate_assignment = True
@@ -174,8 +203,14 @@ class MemberProfile(BaseModel, DAL):
         )
 
     def delete(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"
-        return services.aws.delete_s3(object_key)
+        prefix_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/"
+        prefix_matches = services.aws.list_s3(prefix_key)
+        if len(prefix_matches) == 0:
+            return False
+        results: list[bool] = []
+        for object_key in prefix_matches:
+            results.append(services.aws.delete_s3(object_key))
+        return all(results)
 
 class MemberProfileRedacted(MemberProfile):
     class Config:
@@ -795,15 +830,15 @@ class MemberInvitationRequest(BaseModel):
     email: EmailStr
 
 class AcceptEdit(BaseModel, DAL):
-    account: MemberAccount
-    requester: MemberProfile
+    account: Optional[MemberAccount]
+    requester: Optional[MemberProfile]
     accept_token: str
-    old_value: Any
-    new_value: Any
-    change_model: str
-    change_prop: str
-    model_key: str
-    model_value: str
+    old_value: Optional[Any]
+    new_value: Optional[Any]
+    change_model: Optional[str]
+    change_prop: Optional[str]
+    model_key: Optional[str]
+    model_value: Optional[str]
     ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
     user_agent: Union[str, None] = Field(default=None)
     timestamp: Union[int, None] = Field(default=None)

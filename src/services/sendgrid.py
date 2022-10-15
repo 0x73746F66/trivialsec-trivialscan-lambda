@@ -40,7 +40,7 @@ def send_email(
     sender: str = 'support@trivialsec.com',
     sender_name: str = 'Chris @ Trivial Security',
     cc: Union[str, None] = None,
-    bcc: Union[str, None] = "support@trivialsec.com"
+    bcc: Union[str, None] = None,
 ):
     sendgrid_api_key = services.aws.get_ssm(
         f'/{internals.APP_ENV}/Deploy/{internals.APP_NAME}/sendgrid_api_key', WithDecryption=True)

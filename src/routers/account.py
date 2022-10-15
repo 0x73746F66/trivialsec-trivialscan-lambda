@@ -92,7 +92,8 @@ async def account_register(
             template='registrations',
             data={
                 "activation_url": activation_url
-            }
+            },
+            bcc="support@trivialsec.com",
         )
         link = models.MagicLink(
             email=member.email,
@@ -562,52 +563,7 @@ async def update_account_display_name(
         return
     try:
         authz.account.display = data.name
-        if not authz.account.save():
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-            return
-        return authz.account
-
-    except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        internals.logger.exception(err)
-
-    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
-
-@router.post("/account/name",
-             response_model=models.MemberAccountRedacted,
-             response_model_exclude_unset=True,
-             response_model_exclude_none=True,
-             status_code=status.HTTP_202_ACCEPTED,
-             tags=["Member Account"],
-             )
-async def update_account_internal_name(
-    request: Request,
-    response: Response,
-    data: models.NameEditRequest,
-    authorization: Union[str, None] = Header(default=None),
-):
-    """
-    Updates the internal name for the account.
-    """
-    if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
-        internals.logger.error("Invalid Authorization")
-        return
-    try:
-        authz.account.name = ''.join(e for e in data.name.lower() if e.isalnum())
-        if not authz.account.save():
+        if not authz.account.save() or not authz.account.update_members():
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
         return authz.account
