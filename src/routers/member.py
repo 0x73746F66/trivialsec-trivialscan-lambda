@@ -178,7 +178,7 @@ async def list_members(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/"
+    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/"
     members: list[models.MemberProfile] = []
     prefix_matches = services.aws.list_s3(prefix_key)
     if len(prefix_matches) == 0:
@@ -480,9 +480,6 @@ async def send_member_invitation(
     if validators.email(data.email) is not True:
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return
-    if models.MemberProfile(email=data.email).exists():
-        response.status_code = status.HTTP_409_CONFLICT
-        return
     event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
@@ -495,33 +492,46 @@ async def send_member_invitation(
         internals.logger.error("Invalid Authorization")
         return
     try:
-        # sendgrid = services.sendgrid.send_email(
-        #     subject="Change of Billing Email Address notice",
-        #     recipient=authz.account.billing_email,
-        #     cc=data.email,
-        #     template='updated_email',
-        #     data={
-        #         "old_email": authz.account.billing_email,
-        #         "new_email": data.email,
-        #         "modifying_email": authz.member.email,
-        #         "email_type_message": "account billing email address",
-        #     }
-        # )
-        # if sendgrid._content:  # pylint: disable=protected-access
-        #     res = json.loads(sendgrid._content.decode()
-        #                      )  # pylint: disable=protected-access
-        #     if isinstance(res, dict) and res.get('errors'):
-        #         internals.logger.error(res.get('errors'))
-        #         response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-        #         return
-        # internals.logger.info(
-        #     f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
-        # authz.account.billing_email = data.email
-        # if not authz.account.save():
-        #     response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-        #     return
-        return authz.account
-
+        if models.MemberProfile(email=data.email).exists():
+            response.status_code = status.HTTP_409_CONFLICT
+            return
+        member = models.MemberProfile(
+            account=authz.account,
+            email=data.email,
+            confirmed=False,
+            confirmation_token=hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest(),
+            timestamp=round(time() * 1000),  # JavaScript support
+        )
+        if not member.save():
+            response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+            return
+        services.sendgrid.upsert_contact(recipient_email=member.email, list_name="members")
+        activation_url = f"{internals.DASHBOARD_URL}/login/{member.confirmation_token}"
+        sendgrid = services.sendgrid.send_email(
+            subject="Trivial Security | Member Invitation",
+            recipient=data.email,
+            cc=authz.member.email,
+            template='invitations',
+            data={
+                "email": data.email,
+                "invited_by": authz.member.email,
+                "activation_url": activation_url,
+            }
+        )
+        if sendgrid._content:  # pylint: disable=protected-access
+            res = json.loads(sendgrid._content.decode())  # pylint: disable=protected-access
+            if isinstance(res, dict) and res.get('errors'):
+                internals.logger.error(res.get('errors'))
+                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+                return
+        link = models.MagicLink(
+            email=member.email,
+            magic_token=member.confirmation_token,
+            timestamp=round(time() * 1000),
+            sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
+        )
+        if link.save():
+            return member
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)

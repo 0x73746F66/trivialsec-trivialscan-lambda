@@ -125,8 +125,6 @@ class MemberProfile(BaseModel, DAL):
     email_md5: Optional[str]
     confirmed: bool = Field(default=False)
     confirmation_token: Union[str, None] = Field(default=None)
-    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
-    user_agent: Union[str, None] = Field(default=None)
     timestamp: Optional[int]
     current: Optional[bool] = Field(default=False)
 

@@ -72,8 +72,6 @@ async def account_register(
         email=account.primary_email,
         confirmed=False,
         confirmation_token=hashlib.sha224(bytes(f'{random()}{user_agent}{ip_addr}', 'ascii')).hexdigest(),
-        ip_addr=ip_addr,
-        user_agent=user_agent,
         timestamp=account.timestamp,
     )
     try:
