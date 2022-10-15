@@ -34,6 +34,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
   statement {
     sid = "${var.app_env}TrivialScanApiObjAccess"
     actions   = [
+      "s3:DeleteObject",
       "s3:GetObject",
       "s3:PutObject",
     ]

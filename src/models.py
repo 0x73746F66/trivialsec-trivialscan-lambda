@@ -223,10 +223,10 @@ class MemberProfileRedacted(MemberProfile):
         return None
 
 class ClientInfo(BaseModel):
-    operating_system: str
-    operating_system_release: str
-    operating_system_version: str
-    architecture: str
+    operating_system: Optional[str]
+    operating_system_release: Optional[str]
+    operating_system_version: Optional[str]
+    architecture: Optional[str]
 
 class Client(BaseModel, DAL):
     account: Optional[MemberAccount]
