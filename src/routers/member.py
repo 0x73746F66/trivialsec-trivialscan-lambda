@@ -50,9 +50,6 @@ async def validate_authorization(
             "http", {}).get("sourceIp"),
         account_name=x_trivialscan_account,
     )
-    internals.logger.info(
-        f'"{authz.account.name}","{authz.session.member.email}","{authz.ip_addr}","{authz.user_agent}",""'
-    )
     return {
         "version": x_trivialscan_version,
         "account": authz.account,
@@ -141,7 +138,7 @@ async def member_sessions(
         if raw:
             sessions.append(models.MemberSession(**json.loads(raw)))
     if not sessions:
-        response.status_code = status.HTTP_404_NOT_FOUND
+        response.status_code = status.HTTP_204_NO_CONTENT
         return []
     for session in sessions:
         session.current = session.session_token == authz.session.session_token
@@ -191,7 +188,7 @@ async def list_members(
         if raw:
             members.append(models.MemberProfile(**json.loads(raw)))
     if not members:
-        response.status_code = status.HTTP_404_NOT_FOUND
+        response.status_code = status.HTTP_204_NO_CONTENT
         return []
     for member in members:
         member.current = member.email == authz.member.email
@@ -229,7 +226,7 @@ async def revoke_session(
     session = models.MemberSession(
         member=authz.member, session_token=session_token).load()
     if not session:
-        response.status_code = status.HTTP_404_NOT_FOUND
+        response.status_code = status.HTTP_204_NO_CONTENT
         return
     if not session.delete():
         response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -258,28 +255,31 @@ async def magic_link(
     user_agent = event.get("requestContext", {}).get("http", {}).get(
         "userAgent", request.headers.get("User-Agent"))
     if validators.email(data.email) is not True:
-        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return
     magic_token = hashlib.sha224(
         bytes(f'{random()}{user_agent}{ip_addr}', 'ascii')).hexdigest()
     login_url = f"{internals.DASHBOARD_URL}/login/{magic_token}"
     try:
         if member := models.MemberProfile(email=data.email).load():
-            sendgrid = services.sendgrid.send_email(
-                recipient=data.email,
-                subject="Trivial Security Magic Link",
-                template='magic_link',
-                data={
-                    "magic_link": login_url
-                }
-            )
+            sendgrid_message_id = None
+            if not request.headers.get("Postman-Token"):
+                sendgrid = services.sendgrid.send_email(
+                    recipient=data.email,
+                    subject="Trivial Security Magic Link",
+                    template='magic_link',
+                    data={
+                        "magic_link": login_url
+                    }
+                )
+                sendgrid_message_id = sendgrid.headers.get('X-Message-Id')
             link = models.MagicLink(
                 email=data.email,
                 magic_token=magic_token,
                 ip_addr=ip_addr,
                 user_agent=user_agent,
                 timestamp=round(time() * 1000),
-                sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
+                sendgrid_message_id=sendgrid_message_id,
             )
             if link.save():
                 internals.logger.info(f"Magic Link for {member.account.name}")
@@ -310,6 +310,7 @@ async def login(
     Login for members with magic link emailed to them
 
     Return codes:
+        204 The one-time use magic link no longer exists, probably not a bug if it is already used
         406 The prodided values are not acceptable or not sent
         424 The email address is not registered
         500 An unexpected and unhandled request path occurred
@@ -330,7 +331,7 @@ async def login(
             return
         link = models.MagicLink(**json.loads(ret))
         if not link:
-            response.status_code = status.HTTP_404_NOT_FOUND
+            response.status_code = status.HTTP_204_NO_CONTENT
             internals.logger.info(
                 f'"","","{ip_addr}","{user_agent}",""'
             )
@@ -399,7 +400,7 @@ async def update_email(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     if validators.email(data.email) is not True:
-        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return
     if models.MemberProfile(email=data.email).exists():
         response.status_code = status.HTTP_409_CONFLICT
@@ -472,6 +473,7 @@ async def accept_token(
     Login for members with magic link emailed to them
 
     Return codes:
+        204 The one-time use accept link no longer exists, probably not a bug if it is already used
         406 The prodided values are not acceptable or not sent
         424 The email address is not registered
         500 An unexpected and unhandled request path occurred
@@ -482,7 +484,7 @@ async def accept_token(
     try:
         link = models.AcceptEdit(accept_token=token).load()
         if not link:
-            response.status_code = status.HTTP_404_NOT_FOUND
+            response.status_code = status.HTTP_204_NO_CONTENT
             internals.logger.info(
                 f'"","","{ip_addr}","{user_agent}",""'
             )
@@ -531,7 +533,7 @@ async def send_member_invitation(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     if validators.email(data.email) is not True:
-        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return
     event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
@@ -556,7 +558,7 @@ async def send_member_invitation(
             timestamp=round(time() * 1000),  # JavaScript support
         )
         if not member.save():
-            response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+            response.status_code = status.HTTP_400_BAD_REQUEST
             return
         services.sendgrid.upsert_contact(recipient_email=member.email, list_name="members")
         activation_url = f"{internals.DASHBOARD_URL}/login/{member.confirmation_token}"
@@ -622,7 +624,7 @@ async def delete_member(
         return
     member = models.MemberProfile(email=email).load()
     if not member:
-        response.status_code = status.HTTP_404_NOT_FOUND
+        response.status_code = status.HTTP_204_NO_CONTENT
         return
     if authz.account.name != member.account.name:
         response.status_code = status.HTTP_401_UNAUTHORIZED

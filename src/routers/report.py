@@ -1,7 +1,7 @@
 import json
 from os import path
 from secrets import token_urlsafe
-from typing import Union, List
+from typing import Union
 
 from fastapi import Header, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
@@ -42,28 +42,14 @@ async def retrieve_summary(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
-
-    summary_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results", report_id, "summary.json")
-    try:
-        ret = services.aws.get_s3(summary_key)
-        if not ret:
-            response.status_code = status.HTTP_404_NOT_FOUND
-            return
-        data = json.loads(ret)
-        data["results_uri"] = f'/result/{report_id}/summary'
-        if data.get("config").get("token"):
-            del data["config"]["token"]
-        if data.get("config").get("dashboard_api_url"):
-            del data["config"]["dashboard_api_url"]
-        return data
-
-    except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        internals.logger.exception(err)
-        return err
+    summary = models.ReportSummary(report_id=report_id, account_name=authz.account.name).load()
+    if not summary:
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return
+    return summary
 
 @router.get("/report/{report_id}",
-    response_model=models.EvaluationReport,
+    response_model=models.FullReport,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -92,35 +78,15 @@ async def retrieve_report(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
+    report = models.FullReport(report_id=report_id, account_name=authz.account.name).load()
+    if not report:
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return
 
-    summary_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results", report_id, "summary.json")
-    evaluations_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results", report_id, "evaluations.json")
-    try:
-        ret = services.aws.get_s3(summary_key)
-        if not ret:
-            response.status_code = status.HTTP_404_NOT_FOUND
-            return
-        data = json.loads(ret)
-        if data.get("config").get("token"):
-            del data["config"]["token"]
-        if data.get("config").get("dashboard_api_url"):
-            del data["config"]["dashboard_api_url"]
-        data["results_uri"] = f'/result/{report_id}/summary'
-        ret = services.aws.get_s3(evaluations_key)
-        if not ret:
-            response.status_code = status.HTTP_404_NOT_FOUND
-            return
-
-        data["evaluations"] = json.loads(ret)
-        return data
-
-    except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        internals.logger.exception(err)
-        return err
+    return report
 
 @router.get("/reports",
-    response_model=List[models.ReportSummary],
+    response_model=list[models.ReportSummary],
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -161,7 +127,7 @@ async def retrieve_reports(
         return []
 
     if not summary_keys:
-        response.status_code = status.HTTP_404_NOT_FOUND
+        response.status_code = status.HTTP_204_NO_CONTENT
         return []
 
     for summary_key in summary_keys:
@@ -220,7 +186,7 @@ async def retrieve_host(
     try:
         ret = services.aws.get_s3(host_key)
         if not ret:
-            response.status_code = status.HTTP_404_NOT_FOUND
+            response.status_code = status.HTTP_204_NO_CONTENT
             return
 
         return json.loads(ret)
@@ -267,7 +233,7 @@ async def retrieve_certificate(
     try:
         ret = services.aws.get_s3(cert_key)
         if not ret:
-            response.status_code = status.HTTP_404_NOT_FOUND
+            response.status_code = status.HTTP_204_NO_CONTENT
             return
         if include_pem:
             ret["pem"] = services.aws.get_s3(pem_key)
@@ -279,7 +245,7 @@ async def retrieve_certificate(
         internals.logger.exception(err)
 
 @router.post("/store/{report_type}",
-             status_code=status.HTTP_200_OK,
+             status_code=status.HTTP_201_CREATED,
              tags=["Scan Reports"],
              )
 async def store(
@@ -324,15 +290,33 @@ async def store(
     if report_type is models.ReportType.REPORT:
         contents["version"] = x_trivialscan_version
         report_id = token_urlsafe(56)
-        report = models.ReportSummary(**contents)
+        results_uri = f"/result/{report_id}/summary"
+        report = models.ReportSummary(report_id=report_id, results_uri=results_uri, **contents)
         if report.save():
-            return {"results_uri": f"/result/{report_id}/summary"}
+            return {"results_uri": results_uri}
 
     if report_type is models.ReportType.EVALUATIONS:
         report_id = file.filename.replace(".json", "")
-        report = models.EvaluationReport(**contents)
-        if report.save():
-            return {"results_uri": f"/result/{report_id}"}
+        report = models.ReportSummary(report_id=report_id, account_name=authz.account.name).load()
+        if not report:
+            response.status_code = status.HTTP_412_PRECONDITION_FAILED
+            return
+        items = []
+        for _item in contents:
+            if item := models.EvaluationItem(
+                generator=report.generator,
+                version=report.version,
+                account_name=authz.account.name,
+                client_name=report.client_name,
+                report_id=report_id,
+                **_item,
+            ).save():
+                items.append(item)
+            else:
+                internals.logger.warning(f"Failed to store EvaluationItem {report_id}\n{_item}")
+
+        if len(items) == len(contents):
+            return {"results_uri": f"/result/{report_id}/details"}
 
     if report_type is models.ReportType.HOST:
         report = models.Host(**contents)

@@ -1,4 +1,5 @@
 # pylint: disable=no-self-argument, arguments-differ
+from genericpath import exists
 import json
 import hashlib
 from abc import ABCMeta, abstractmethod
@@ -473,7 +474,7 @@ class ConfigOutput(BaseModel):
 class ConfigTarget(BaseModel):
     hostname: str
     port: PositiveInt = Field(default=443)
-    client_certificate: Union[bool, None] = Field(default=False)
+    client_certificate: Union[str, None] = Field(default=None)
     http_request_paths: list[str] = Field(default=["/"])
 
 class Config(BaseModel):
@@ -495,13 +496,13 @@ class Flags(BaseModel):
 class ReportSummary(DefaultInfo, DAL):
     report_id: str
     project_name: Union[str, None]
-    targets: list[str]
-    date: datetime
+    targets: Optional[list[str]]
+    date: Optional[datetime]
     execution_duration_seconds: Union[PositiveFloat, None] = Field(default=None)
     score: int = Field(default=0)
-    results: dict[str, int]
+    results: Optional[dict[str, int]]
     certificates: list[str] = Field(default=[])
-    results_uri: str
+    results_uri: Optional[str]
     flags: Union[Flags, None] = Field(default=None)
     config: Union[Config, None] = Field(default=None)
 
@@ -614,7 +615,7 @@ class Host(BaseModel, DAL):
 
         prefix_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}"
         if self.transport.peer_address and self.last_updated:
-            scan_date = datetime.fromisoformat(self.last_updated).strftime("%Y%m%d")
+            scan_date = self.last_updated.strftime("%Y%m%d")
             object_key = f"{prefix_key}/{self.transport.peer_address}/{scan_date}.json"
         else:
             object_key = f"{prefix_key}/latest.json"
@@ -635,7 +636,7 @@ class Host(BaseModel, DAL):
         return self
 
     def save(self) -> bool:
-        scan_date = datetime.fromisoformat(self.last_updated).strftime("%Y%m%d")
+        scan_date = self.last_updated.strftime("%Y%m%d")
         object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/{self.transport.peer_address}/{scan_date}.json"
         if not services.aws.store_s3(
             object_key,
@@ -649,7 +650,7 @@ class Host(BaseModel, DAL):
         )
 
     def delete(self) -> bool:
-        scan_date = datetime.fromisoformat(self.last_updated).strftime("%Y%m%d")
+        scan_date = self.last_updated.strftime("%Y%m%d")
         object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/{self.transport.peer_address}/{scan_date}.json"
         return services.aws.delete_s3(object_key)
 
@@ -658,7 +659,7 @@ class Certificate(BaseModel, DAL):
     expired: Optional[bool]
     expiry_status: Optional[str]
     extensions: list = Field(default=[])
-    external_refs: dict[str, AnyHttpUrl] = Field(default={})
+    external_refs: dict[str, Union[AnyHttpUrl, None]] = Field(default={})
     is_self_signed: Optional[bool]
     issuer: Optional[str]
     known_compromised: Optional[bool]
@@ -673,7 +674,7 @@ class Certificate(BaseModel, DAL):
     revocation_crl_urls: list[AnyHttpUrl] = Field(default=[])
     san: list[str] = Field(default=[])
     serial_number: Optional[str]
-    serial_number_decimal: Optional[PositiveInt]
+    serial_number_decimal: Optional[Any]
     serial_number_hex: Optional[str]
     sha1_fingerprint: str
     sha256_fingerprint: Optional[str]
@@ -748,9 +749,9 @@ class ThreatItem(BaseModel):
 
 class ReferenceItem(BaseModel):
     name: str
-    url: AnyHttpUrl
+    url: Union[AnyHttpUrl, None]
 
-class EvaluationItem(DefaultInfo):
+class EvaluationItem(DefaultInfo, DAL):
     class Config:
         validate_assignment = True
     report_id: str
@@ -780,22 +781,23 @@ class EvaluationItem(DefaultInfo):
     def set_cvss3(cls, cvss3):
         return None if not isinstance(cvss3, str) else cvss3
 
-class EvaluationReport(ReportSummary, DAL):
-    evaluations: list[EvaluationItem]
+    def exists(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None, group_id: Union[str, None] = None, rule_id: Union[str, None] = None) -> bool:
+        return self.load(report_id, account_name, group_id, rule_id) is not None
 
-    def exists(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> bool:
-        return self.load(report_id, account_name) is not None
-
-    def load(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> Union['EvaluationReport', None]:
+    def load(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None, group_id: Union[str, None] = None, rule_id: Union[str, None] = None) -> Union['EvaluationItem', None]:
         if report_id:
             self.report_id = report_id
         if account_name:
             self.account_name = account_name
+        if group_id:
+            self.group_id = group_id
+        if rule_id:
+            self.rule_id = rule_id
 
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/{self.group_id}/{self.rule_id}.json"
         raw = services.aws.get_s3(object_key)
         if not raw:
-            internals.logger.warning(f"Missing EvaluationReport {object_key}")
+            internals.logger.warning(f"Missing EvaluationItem {object_key}")
             return
         try:
             data = json.loads(raw)
@@ -804,21 +806,91 @@ class EvaluationReport(ReportSummary, DAL):
             return
         if not data or not isinstance(data, dict):
             internals.logger.warning(
-                f"Missing EvaluationReport {object_key}")
+                f"Missing EvaluationItem {object_key}")
             return
         super().__init__(**data)
         return self
 
     def save(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/{self.group_id}/{self.rule_id}.json"
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str)
         )
 
     def delete(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/evaluations.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/{self.group_id}/{self.rule_id}.json"
         return services.aws.delete_s3(object_key)
+
+class FullReport(ReportSummary, DAL):
+    evaluations: Optional[list[EvaluationItem]] = Field(default=[])
+
+    def exists(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> bool:
+        if report_id:
+            self.report_id = report_id
+        if account_name:
+            self.account_name = account_name
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
+        return services.aws.object_exists(object_key)
+
+    def load(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> Union['FullReport', None]:
+        if report_id:
+            self.report_id = report_id
+        if account_name:
+            self.account_name = account_name
+
+        prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
+        prefix_matches = services.aws.list_s3(prefix_key)
+        if len(prefix_matches) == 0:
+            return []
+        for object_path in prefix_matches:
+            if not object_path.endswith("summary.json"):
+                continue
+            raw = services.aws.get_s3(object_path)
+            if not raw:
+                internals.logger.warning(f"Missing ReportSummary {object_path}")
+                continue
+            data = json.loads(raw)
+            super().__init__(**data)
+            internals.logger.info("Added ReportSummary")
+
+        for object_path in prefix_matches:
+            if object_path.endswith("summary.json"):
+                continue
+            raw = services.aws.get_s3(object_path)
+            if not raw:
+                internals.logger.warning(f"Missing EvaluationItem {object_path}")
+                continue
+            data = json.loads(raw)
+            internals.logger.info("Added EvaluationItem")
+            self.evaluations.append(EvaluationItem(**data))
+
+        return self
+
+    def save(self) -> bool:
+        if not self.exists():
+            return False
+        results: list[bool] = []
+        prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
+        for item in self.evaluations:
+            object_key = f"{prefix_key}{item.group_id}/{item.rule_id}.json"
+            results.append(services.aws.store_s3(
+                object_key,
+                json.dumps(item.dict(), default=str),
+            ))
+
+        return all(results)
+
+    def delete(self) -> bool:
+        if not self.exists():
+            return False
+        results: list[bool] = []
+        prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
+        for item in self.evaluations:
+            object_key = f"{prefix_key}{item.group_id}/{item.rule_id}.json"
+            results.append(services.aws.delete_s3(object_key))
+
+        return all(results)
 
 class EmailEditRequest(BaseModel):
     email: EmailStr
@@ -877,3 +949,10 @@ class AcceptEdit(BaseModel, DAL):
     def delete(self) -> bool:
         object_key = f"{internals.APP_ENV}/accept-links/{self.accept_token}.json"
         return services.aws.delete_s3(object_key)
+
+
+class StripeEvent(BaseModel):
+    address: str
+    balance: int
+    created: int
+    data: dict

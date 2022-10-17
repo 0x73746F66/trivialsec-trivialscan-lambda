@@ -34,18 +34,19 @@ async def account_register(
     Registers an new account
 
     Return codes:
-        422 The prodided values are not acceptable or not sent
+        400 The prodided values are not acceptable or not sent
         409 The email address has already been registered
+        424 Issue with internal data structures, likely caused by manual data manipulation
         208 The account is already registered
         503 An exception was encountered and logged
         500 An unexpected and unhandled request path occurred
     """
     event = request.scope.get("aws.event", {})
     if not data.display:
-        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return
     if validators.email(data.primary_email) is not True:
-        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return
     if models.MemberProfile(email=data.primary_email).exists():
         response.status_code = status.HTTP_409_CONFLICT
@@ -63,7 +64,7 @@ async def account_register(
         timestamp=round(time() * 1000),  # JavaScript support
     )
     if not account.name:
-        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
         return
     if not ip_addr or not user_agent:
         internals.logger.warning(f"ip_addr {ip_addr} user_agent {user_agent}")
@@ -79,10 +80,10 @@ async def account_register(
             response.status_code = status.HTTP_208_ALREADY_REPORTED
             return
         if not member.save():
-            response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
         if not account.save():
-            response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
         services.sendgrid.upsert_contact(recipient_email=member.email, list_name="members")
         activation_url = f"{internals.DASHBOARD_URL}/login/{member.confirmation_token}"
@@ -116,7 +117,7 @@ async def account_register(
 @router.post("/claim/{client_name}",
              response_model=models.Client,
              response_model_exclude_unset=True,
-    response_model_exclude_none=True,
+             response_model_exclude_none=True,
              status_code=status.HTTP_201_CREATED,
              tags=["Member Account"],
              )
@@ -139,9 +140,9 @@ async def claim_client(
             response.status_code = status.HTTP_403_FORBIDDEN
             return
         if validators.email(client_name) is True:
-            internals.logger.warning(
-                f"Email {client_name} can not be used for client name")
-            response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+            print(f"Email {client_name} can not be used for client name")
+            internals.logger.warning(f"Email {client_name} can not be used for client name")
+            response.status_code = status.HTTP_400_BAD_REQUEST
             return
         # api_key Auth
         event = request.scope.get("aws.event", {})
@@ -154,7 +155,7 @@ async def claim_client(
         internals.logger.warning(f"Validating Authorization {authz.is_valid}")
         if not authz.is_valid:
             response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-            response.status_code = status.HTTP_403_FORBIDDEN
+            response.status_code = status.HTTP_401_UNAUTHORIZED
             internals.logger.error("Invalid Authorization")
             return
         if models.Client(account=authz.account, name=client_name).exists():
@@ -223,7 +224,7 @@ async def retrieve_clients(
         return []
 
     if not object_keys:
-        response.status_code = status.HTTP_404_NOT_FOUND
+        response.status_code = status.HTTP_204_NO_CONTENT
         return []
 
     for object_key in object_keys:
@@ -342,7 +343,7 @@ async def activate_client(
         return
     client = models.Client(account=authz.account, name=client_name).load()
     if not client:
-        response.status_code = status.HTTP_404_NOT_FOUND
+        response.status_code = status.HTTP_204_NO_CONTENT
         return
     if client.active is not True:
         client.active = True
@@ -384,7 +385,7 @@ async def deactived_client(
         return
     client = models.Client(account=authz.account, name=client_name).load()
     if not client:
-        response.status_code = status.HTTP_404_NOT_FOUND
+        response.status_code = status.HTTP_204_NO_CONTENT
         return
     if client.active is not False:
         client.active = False
@@ -415,7 +416,7 @@ async def update_billing_email(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     if validators.email(data.email) is not True:
-        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return
     event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
@@ -482,7 +483,7 @@ async def update_primary_email(
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     if validators.email(data.email) is not True:
-        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return
     event = request.scope.get("aws.event", {})
     authz = internals.Authorization(

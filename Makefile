@@ -63,7 +63,7 @@ env:
 	@echo -e $(bold)$(primary)CI_BUILD_REF$(clear) = $(CI_BUILD_REF)
 	@echo -e $(bold)$(primary)API_URL$(clear) = $(API_URL)
 
-output:
+output: env init
 	@echo -e $(bold)$(primary)trivialscan_arn$(clear) = $(shell terraform -chdir=plans output trivialscan_arn)
 	@echo -e $(bold)$(primary)function_url$(clear) = $(shell terraform -chdir=plans output function_url)
 	@echo -e $(bold)$(primary)trivialscan_role$(clear) = $(shell terraform -chdir=plans output trivialscan_role)

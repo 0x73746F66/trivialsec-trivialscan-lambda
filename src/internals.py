@@ -193,8 +193,7 @@ class Authorization:
         raw_body: Union[str, None] = None,
     ):
         import models  # pylint: disable=import-outside-toplevel
-        postman_token = request.headers.get("Postman-Token")
-        if postman_token:
+        if postman_token := request.headers.get("Postman-Token"):
             logger.info(f"Postman-Token: {postman_token}")
         if not raw_body and hasattr(request, '_body'):
             raw_body = request._body.decode("utf8")  # pylint: disable=protected-access
@@ -256,10 +255,13 @@ class Authorization:
         elif account_name is None or self._hmac.id == account_name:
             logger.info(f"Secret Key HMAC-based Authorization: account_name {account_name}")
             self.account = models.MemberAccount(name=self._hmac.id).load()
-            secret_key = self.account.api_key
+            if self.account:
+                secret_key = self.account.api_key
         elif account_name:
             logger.info(f"Client Token HMAC-based Authorization: client_name {self._hmac.id}")
             self.account = models.MemberAccount(name=account_name).load()
+            if not self.account:
+                return
             self.client = models.Client(account=self.account, name=self._hmac.id).load()
             if self.client:
                 if any([
