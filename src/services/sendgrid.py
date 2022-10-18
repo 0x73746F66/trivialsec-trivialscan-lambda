@@ -42,8 +42,7 @@ def send_email(
     cc: Union[str, None] = None,
     bcc: Union[str, None] = None,
 ):
-    sendgrid_api_key = services.aws.get_ssm(
-        f'/{internals.APP_ENV}/Deploy/{internals.APP_NAME}/sendgrid_api_key', WithDecryption=True)
+    sendgrid_api_key = services.aws.get_ssm(f'/{internals.APP_ENV}/{internals.APP_NAME}/Sendgrid/api-key', WithDecryption=True)
     sendgrid = SendGridAPIClient(sendgrid_api_key)
     tmp_url = sendgrid.client.mail.send._build_url(query_params={})  # pylint: disable=protected-access
     personalization = {
@@ -103,8 +102,7 @@ def send_email(
 
 
 def upsert_contact(recipient_email: str, list_name: str = 'subscribers'):
-    sendgrid_api_key = services.aws.get_ssm(
-        f'/{internals.APP_ENV}/Deploy/{internals.APP_NAME}/sendgrid_api_key', WithDecryption=True)
+    sendgrid_api_key = services.aws.get_ssm(f'/{internals.APP_ENV}/{internals.APP_NAME}/Sendgrid/api-key', WithDecryption=True)
     sendgrid = SendGridAPIClient(sendgrid_api_key)
     res = requests.put(
         url='https://api.sendgrid.com/v3/marketing/contacts',

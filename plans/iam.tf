@@ -48,7 +48,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
       "ssm:GetParameter",
     ]
     resources = [
-      "arn:aws:ssm:${local.aws_default_region}:${local.aws_master_account_id}:parameter/${var.app_env}/Deploy/${var.app_name}/*",
+      "arn:aws:ssm:${local.aws_default_region}:${local.aws_master_account_id}:parameter/${var.app_env}/${var.app_name}/*",
     ]
   }
 }

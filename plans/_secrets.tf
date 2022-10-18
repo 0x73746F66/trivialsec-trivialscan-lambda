@@ -13,3 +13,8 @@ variable "stripe_webhook_key" {
   type        = string
   sensitive   = true
 }
+variable "stripe_secret_key" {
+  description = "STRIPE_SECRET_KEY"
+  type        = string
+  sensitive   = true
+}

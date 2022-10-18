@@ -30,6 +30,7 @@ dependencies = [
     "pydantic[email]==1.9.2",
     "user-agents==2.2.0",
     "geocoder==1.38.1",
+    "stripe==4.2.0",
 ]
 
 [tool.coverage.run]

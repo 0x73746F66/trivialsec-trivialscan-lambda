@@ -1,65 +1,48 @@
 from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
+import stripe
+from stripe.error import SignatureVerificationError
 
 import internals
-import models
+import services.aws
 import services.stripe
 
 router = APIRouter()
 
-
 @router.post("/stripe/webhook",
     status_code=status.HTTP_200_OK,
-    tags=["Stripe"],
+    include_in_schema=False,
 )
 async def webhook_received(
     request: Request,
     response: Response,
-    stripe_signature=Header(None),
-    data: models.StripeEvent,
+    stripe_signature=Header(),
 ):
     """
     Handle Stripe webhook events
     """
-    event = request.scope.get("aws.event", {})
-    raw_body = await request.body()
     try:
+        webhook_secret = services.aws.get_ssm(f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/webhook-key", WithDecryption=True)
+        raw_body = await request.body()
         event = stripe.Webhook.construct_event(
             payload=raw_body,
             sig_header=stripe_signature,
             secret=webhook_secret,
         )
-    except ValueError as e:
-        # Invalid payload
-        raise e
-    except stripe.error.SignatureVerificationError as e:
-        # Invalid signature
-        raise e
-
-    return {'success': True}
-
-
-@router.post("/stripe/checkout-session",
-             status_code=status.HTTP_200_OK,
-             tags=["Stripe"],
-             )
-def create_checkout_session(
-    posterID: str,
-):
-    domain_url = os.getenv("DOMAIN") or "http://localhost:3000"
-    album_price = os.getenv("POSTER_PRICE")
-
-    try:
-        checkout_session = stripe.checkout.Session.create(
-            success_url=domain_url
-            + "/order-confirmation?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url=domain_url + "/create-poster",
-            client_reference_id=userID,
-            payment_method_types=["card"],
-            mode="payment",
-            metadata={"poster_id": posterID},
-            line_items=[{"price": album_price, "quantity": 1}],
+        webhook = services.stripe.Webhook(
+            api_version=event['api_version'],
+            event_id=event['data'],
+            created=event['created'],
+            data_object=event['data']['object'],
+            event_type=event['type'],
         )
-        return {"sessionId": checkout_session["id"]}
-    except Exception as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        internals.logger.info(f'Stripe Webhook [{webhook.event_type}]')
+        return {'success': webhook.process()}
+    except ValueError as err:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        internals.logger.critical(err)
+    except SignatureVerificationError as err:
+        response.status_code = status.HTTP_403_FORBIDDEN
+        internals.logger.critical(err)
+
+    return {'success': False}

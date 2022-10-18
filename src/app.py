@@ -8,7 +8,7 @@ from mangum import Mangum
 import boto3
 
 import internals
-from routers import account, member, report
+from routers import account, member, report, stripe
 
 DEFAULT_LOG_LEVEL = "WARNING"
 LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
@@ -32,6 +32,7 @@ app.add_middleware(
 app.include_router(account.router)
 app.include_router(member.router)
 app.include_router(report.router)
+app.include_router(stripe.router)
 
 @app.on_event("startup")
 async def startup_event():
