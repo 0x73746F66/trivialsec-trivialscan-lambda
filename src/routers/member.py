@@ -128,7 +128,7 @@ async def member_sessions(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"
+    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"  # type: ignore
     sessions: list[models.MemberSession] = []
     prefix_matches = services.aws.list_s3(prefix_key)
     if len(prefix_matches) == 0:
@@ -141,7 +141,7 @@ async def member_sessions(
         response.status_code = status.HTTP_204_NO_CONTENT
         return []
     for session in sessions:
-        session.current = session.session_token == authz.session.session_token
+        session.current = session.session_token == authz.session.session_token  # type: ignore
     return sessions
 
 @router.get("/members",
@@ -176,7 +176,7 @@ async def list_members(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/"
+    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/"  # type: ignore
     members: list[models.MemberProfile] = []
     prefix_matches = services.aws.list_s3(prefix_key)
     if len(prefix_matches) == 0:
@@ -191,7 +191,7 @@ async def list_members(
         response.status_code = status.HTTP_204_NO_CONTENT
         return []
     for member in members:
-        member.current = member.email == authz.member.email
+        member.current = member.email == authz.member.email  # type: ignore
     return members
 
 @router.delete("/revoke/{session_token}",
@@ -223,8 +223,7 @@ async def revoke_session(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
-    session = models.MemberSession(
-        member=authz.member, session_token=session_token).load()
+    session = models.MemberSession(member=authz.member, session_token=session_token).load()  # type: ignore
     if not session:
         response.status_code = status.HTTP_204_NO_CONTENT
         return
@@ -254,7 +253,7 @@ async def magic_link(
         "sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
     user_agent = event.get("requestContext", {}).get("http", {}).get(
         "userAgent", request.headers.get("User-Agent"))
-    if validators.email(data.email) is not True:
+    if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     magic_token = hashlib.sha224(
@@ -282,7 +281,7 @@ async def magic_link(
                 sendgrid_message_id=sendgrid_message_id,
             )
             if link.save():
-                internals.logger.info(f"Magic Link for {member.account.name}")
+                internals.logger.info(f"Magic Link for {member.account.name}")  # type: ignore
                 return f"/login/{link.magic_token}"
 
         response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -344,7 +343,7 @@ async def login(
             )
             return
         internals.logger.info(
-            f'"{member.account.name}","{link.email}","{ip_addr}","{user_agent}",""'
+            f'"{member.account.name}","{link.email}","{ip_addr}","{user_agent}",""'  # type: ignore
         )
         if not user_agent:
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -358,7 +357,7 @@ async def login(
             ip_addr=ip_addr,
             user_agent=user_agent,
             timestamp=round(time() * 1000),
-        )
+        )  # type: ignore
         ua = ua_parser(session.user_agent)
         session.browser = ua.get_browser()
         session.platform = f"{ua.get_os()} {ua.get_device()}"
@@ -399,7 +398,7 @@ async def update_email(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    if validators.email(data.email) is not True:
+    if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     if models.MemberProfile(email=data.email).exists():
@@ -417,14 +416,14 @@ async def update_email(
         internals.logger.error("Invalid Authorization")
         return
     try:
-        accept_token = hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest()
+        token = hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest()
         sendgrid = services.sendgrid.send_email(
             subject="Request to Change Email Address",
-            recipient=authz.member.account.primary_email,
+            recipient=authz.member.account.primary_email,  # type: ignore
             template='recovery_request',
             data={
-                "accept_url": f"{internals.DASHBOARD_URL}/accept/{accept_token}",
-                "old_email": authz.member.email,
+                "accept_url": f"{internals.DASHBOARD_URL}/accept/{token}",
+                "old_email": authz.member.email,  # type: ignore
                 "new_email": data.email,
             }
         )
@@ -438,14 +437,14 @@ async def update_email(
         link = models.AcceptEdit(
             account=authz.account,
             requester=authz.member,
-            accept_token=accept_token,
-            old_value=authz.member.email,
+            accept_token=token,
+            old_value=authz.member.email,  # type: ignore
             ip_addr=authz.ip_addr,
             new_value=data.email,
             change_model='MemberProfile',
             change_prop='email',
             model_key='email',
-            model_value=authz.member.email,
+            model_value=authz.member.email,  # type: ignore
             user_agent=authz.user_agent,
             timestamp=round(time() * 1000),  # JavaScript support
             sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
@@ -482,23 +481,23 @@ async def accept_token(
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent", request.headers.get("User-Agent"))
     try:
-        link = models.AcceptEdit(accept_token=token).load()
+        link = models.AcceptEdit(accept_token=token).load()  # type: ignore
         if not link:
             response.status_code = status.HTTP_204_NO_CONTENT
             internals.logger.info(
                 f'"","","{ip_addr}","{user_agent}",""'
             )
             return
-        _cls: models.DAL = getattr(models, link.change_model, None)
+        _cls: models.DAL = getattr(models, link.change_model, None)  # type: ignore
         if not _cls:
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
-        model: models.DAL = _cls(**{link.model_key: link.model_value}).load()
-        old_value = getattr(model, link.change_prop)
+        model: models.DAL = _cls(**{link.model_key: link.model_value}).load()  # type: ignore
+        old_value = getattr(model, link.change_prop)  # type: ignore
         if link.old_value != old_value:
             response.status_code = status.HTTP_208_ALREADY_REPORTED
             return
-        setattr(model, link.change_prop, link.new_value)
+        setattr(model, link.change_prop, link.new_value)  # type: ignore
         if not model.save():
             response.status_code = status.HTTP_412_PRECONDITION_FAILED
             return
@@ -532,7 +531,7 @@ async def send_member_invitation(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    if validators.email(data.email) is not True:
+    if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     event = request.scope.get("aws.event", {})
@@ -565,11 +564,11 @@ async def send_member_invitation(
         sendgrid = services.sendgrid.send_email(
             subject="Trivial Security | Member Invitation",
             recipient=data.email,
-            cc=authz.member.email,
+            cc=authz.member.email,  # type: ignore
             template='invitations',
             data={
                 "email": data.email,
-                "invited_by": authz.member.email,
+                "invited_by": authz.member.email,  # type: ignore
                 "activation_url": activation_url,
             }
         )
@@ -581,7 +580,7 @@ async def send_member_invitation(
                 return
         link = models.MagicLink(
             email=member.email,
-            magic_token=member.confirmation_token,
+            magic_token=member.confirmation_token,  # type: ignore
             timestamp=round(time() * 1000),
             sendgrid_message_id=sendgrid.headers.get('X-Message-Id')
         )
@@ -626,7 +625,7 @@ async def delete_member(
     if not member:
         response.status_code = status.HTTP_204_NO_CONTENT
         return
-    if authz.account.name != member.account.name:
+    if authz.account.name != member.account.name:  # type: ignore
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return
 

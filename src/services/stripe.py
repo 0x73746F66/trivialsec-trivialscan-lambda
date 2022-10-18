@@ -224,4 +224,3 @@ class Webhook:
                 json.dumps(charges_data, default=str)
             ))
         return all(results)
-

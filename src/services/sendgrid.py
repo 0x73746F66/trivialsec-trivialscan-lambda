@@ -63,8 +63,7 @@ def send_email(
         }
     }
     if cc is not None and cc != recipient:
-        mail_settings['cc'] = {'email': cc,
-                               'enable': True}
+        mail_settings['cc'] = {'email': cc, 'enable': True}  # type: ignore
         personalization['cc'] = [
             {
                 'email': cc,
@@ -72,8 +71,7 @@ def send_email(
             }
         ]
     if bcc is not None and bcc != recipient:
-        mail_settings['bcc'] = {'email': bcc,
-                               'enable': True}
+        mail_settings['bcc'] = {'email': bcc, 'enable': True}  # type: ignore
         personalization['bcc'] = [
             {
                 'email': bcc,

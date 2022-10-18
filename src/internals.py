@@ -61,7 +61,7 @@ class HMAC:
 
     @property
     def ts(self):
-        return int(self.parsed_header.get('ts'))
+        return int(self.parsed_header.get('ts'))  # type: ignore
 
     @property
     def mac(self):
@@ -73,7 +73,7 @@ class HMAC:
         port = 443 if parsed_url.port is None else parsed_url.port
         bits = []
         bits.append(self.request_method.upper())
-        bits.append(parsed_url.hostname.lower())
+        bits.append(parsed_url.hostname.lower())  # type: ignore
         bits.append(str(port))
         bits.append(parsed_url.path)
         bits.append(str(self.ts))
@@ -85,8 +85,8 @@ class HMAC:
             authorization_header: str,
             request_url: str,
             method: str = "GET",
-            raw_body: str = None,
-            algorithm: str = None,
+            raw_body: Union[str, None] = None,  # type: ignore
+            algorithm: Union[str, None] = None,  # type: ignore
             not_before_seconds: int = JITTER_SECONDS,
             expire_after_seconds: int = JITTER_SECONDS,
         ):
@@ -94,7 +94,7 @@ class HMAC:
         self.raw = raw_body
         self.request_method = method
         self.request_url = request_url
-        if not self.supported_algorithms.get(algorithm):
+        if not self.supported_algorithms.get(algorithm):  # type: ignore
             algorithm = self.default_algorithm
         self.algorithm = algorithm
         self._expire_after_seconds = expire_after_seconds
@@ -107,11 +107,11 @@ class HMAC:
         pairs = []
         if pairs_str:
             for pair in pairs_str.split(","):
-                if not pairs or self.auth_param_re.match(pairs[-1]):
+                if not pairs or self.auth_param_re.match(pairs[-1]):  # type: ignore
                     pairs.append(pair)
                 else:
                     pairs[-1] = pairs[-1] + "," + pair
-            if not self.auth_param_re.match(pairs[-1]):
+            if not self.auth_param_re.match(pairs[-1]):  # type: ignore
                 raise ValueError('Malformed auth parameters')
         for pair in pairs:
             (key, value) = pair.strip().split("=", 1)
@@ -157,7 +157,7 @@ class HMAC:
             # Constant time string comparision, mitigates side channel attacks.
             if len(prev) != len(this):
                 return False
-            for _x, _y in zip(chk_bytes(prev), chk_bytes(this)):
+            for _x, _y in zip(chk_bytes(prev), chk_bytes(this)):  # type: ignore
                 result |= _x ^ _y
         return result == 0
 
@@ -169,17 +169,17 @@ class HMAC:
         if not self.is_valid_timestamp():
             logger.error(f'jitter detected {self.ts}')
             return False
-        if not self.supported_algorithms.get(self.algorithm):
+        if not self.supported_algorithms.get(self.algorithm):  # type: ignore
             logger.error(f'algorithm {self.algorithm} is not supported')
             return False
 
-        digestmod = self.supported_algorithms.get(self.algorithm)
+        digestmod = self.supported_algorithms.get(self.algorithm)  # type: ignore
         # Sign HMAC using server-side secret (not provided by client)
         digest = hmac.new(secret_key.encode(
-            'utf8'), self.canonical_string.encode('utf8'), digestmod).hexdigest()
+            'utf8'), self.canonical_string.encode('utf8'), digestmod).hexdigest()  # type: ignore
         self.server_mac = digest
         # Compare server-side HMAC with client provided HMAC
-        if invalid := not hmac.compare_digest(digest, self.mac):
+        if invalid := not hmac.compare_digest(digest, self.mac):  # type: ignore
             logger.error(f'server_mac {self.server_mac} canonical_string {self.canonical_string}')
         return not invalid
 
@@ -189,7 +189,7 @@ class Authorization:
         user_agent: Union[str, None] = None,
         ip_addr: Union[IPvAnyAddress, None] = None,
         account_name: Union[str, None] = None,
-        algorithm: str = None,
+        algorithm: Union[str, None] = None,  # type: ignore
         not_before_seconds: int = JITTER_SECONDS,
         expire_after_seconds: int = JITTER_SECONDS,
         raw_body: Union[str, None] = None,
@@ -220,7 +220,7 @@ class Authorization:
         self.member: Union[models.MemberProfile, None] = None
         logger.info(f"Authorization validation id {self._hmac.id}")
         secret_key = None
-        if validators.email(self._hmac.id) is True:
+        if validators.email(self._hmac.id) is True:  # type: ignore
             if not self.user_agent:
                 logger.critical("Missing User-Agent")
                 return
@@ -235,41 +235,41 @@ class Authorization:
             if not self.member:
                 logger.critical(f"DENY missing MemberProfile {self._hmac.id}")
                 return
-            self.account = self.member.account.load()
+            self.account = self.member.account.load()  # type: ignore
             session_token = hashlib.sha224(bytes(f'{self.member.email}{self.ip_addr}{self.user_agent}', 'ascii')).hexdigest()
             logger.info(f"Session HMAC-based Authorization: session_token {session_token}")
-            self.session = models.MemberSession(member=self.member, session_token=session_token).load()
+            self.session = models.MemberSession(member=self.member, session_token=session_token).load()  # type: ignore
             if any([
-                self.account.display != self.member.account.display,
-                self.account.billing_email != self.member.account.billing_email,
-                self.account.primary_email != self.member.account.primary_email,
+                self.account.display != self.member.account.display,  # type: ignore
+                self.account.billing_email != self.member.account.billing_email,  # type: ignore
+                self.account.primary_email != self.member.account.primary_email,  # type: ignore
             ]):
                 self.member.account = self.account
                 self.member.save()
             if any([
-                self.account.display != self.session.member.account.display,
-                self.account.billing_email != self.session.member.account.billing_email,
-                self.account.primary_email != self.session.member.account.primary_email,
+                self.account.display != self.session.member.account.display,  # type: ignore
+                self.account.billing_email != self.session.member.account.billing_email,  # type: ignore
+                self.account.primary_email != self.session.member.account.primary_email,  # type: ignore
             ]):
-                self.session.member = self.member
-                self.session.save()
-            secret_key = self.session.access_token
+                self.session.member = self.member  # type: ignore
+                self.session.save()  # type: ignore
+            secret_key = self.session.access_token  # type: ignore
         elif account_name is None or self._hmac.id == account_name:
             logger.info(f"Secret Key HMAC-based Authorization: account_name {account_name}")
-            self.account = models.MemberAccount(name=self._hmac.id).load()
+            self.account = models.MemberAccount(name=self._hmac.id).load()  # type: ignore
             if self.account:
                 secret_key = self.account.api_key
         elif account_name:
             logger.info(f"Client Token HMAC-based Authorization: client_name {self._hmac.id}")
-            self.account = models.MemberAccount(name=account_name).load()
+            self.account = models.MemberAccount(name=account_name).load()  # type: ignore
             if not self.account:
                 return
-            self.client = models.Client(account=self.account, name=self._hmac.id).load()
+            self.client = models.Client(account=self.account, name=self._hmac.id).load()  # type: ignore
             if self.client:
                 if any([
-                    self.account.display != self.client.account.display,
-                    self.account.billing_email != self.client.account.billing_email,
-                    self.account.primary_email != self.client.account.primary_email,
+                    self.account.display != self.client.account.display,  # type: ignore
+                    self.account.billing_email != self.client.account.billing_email,  # type: ignore
+                    self.account.primary_email != self.client.account.primary_email,  # type: ignore
                 ]):
                     self.client.account = self.account
                     self.client.save()

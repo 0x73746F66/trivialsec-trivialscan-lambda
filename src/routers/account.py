@@ -13,6 +13,7 @@ import validators
 import internals
 import models
 import services.sendgrid
+import services.stripe
 import services.aws
 
 router = APIRouter()
@@ -45,7 +46,7 @@ async def account_register(
     if not data.display:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
-    if validators.email(data.primary_email) is not True:
+    if validators.email(data.primary_email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     if models.MemberProfile(email=data.primary_email).exists():
@@ -76,7 +77,7 @@ async def account_register(
         timestamp=account.timestamp,
     )
     try:
-        if models.MemberAccount(name=account.name).exists():
+        if models.MemberAccount(name=account.name).exists():  # type: ignore
             response.status_code = status.HTTP_208_ALREADY_REPORTED
             return
         if not member.save():
@@ -85,6 +86,9 @@ async def account_register(
         if not account.save():
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
+        try:
+            services.stripe.create_customer(email=account.billing_email)  # type: ignore
+        except: pass  # pylint: disable=bare-except
         services.sendgrid.upsert_contact(recipient_email=member.email, list_name="members")
         activation_url = f"{internals.DASHBOARD_URL}/login/{member.confirmation_token}"
         sendgrid = services.sendgrid.send_email(
@@ -98,7 +102,7 @@ async def account_register(
         )
         link = models.MagicLink(
             email=member.email,
-            magic_token=member.confirmation_token,
+            magic_token=member.confirmation_token,  # type: ignore
             ip_addr=ip_addr,
             user_agent=user_agent,
             timestamp=round(time() * 1000),
@@ -139,7 +143,7 @@ async def claim_client(
             response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
             response.status_code = status.HTTP_403_FORBIDDEN
             return
-        if validators.email(client_name) is True:
+        if validators.email(client_name) is True:  # type: ignore
             print(f"Email {client_name} can not be used for client name")
             internals.logger.warning(f"Email {client_name} can not be used for client name")
             response.status_code = status.HTTP_400_BAD_REQUEST
@@ -158,7 +162,7 @@ async def claim_client(
             response.status_code = status.HTTP_401_UNAUTHORIZED
             internals.logger.error("Invalid Authorization")
             return
-        if models.Client(account=authz.account, name=client_name).exists():
+        if models.Client(account=authz.account, name=client_name).exists():  # type: ignore
             response.status_code = status.HTTP_409_CONFLICT
             return
 
@@ -215,7 +219,7 @@ async def retrieve_clients(
     object_keys = []
     data = []
     try:
-        prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "client-tokens")
+        prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "client-tokens")  # type: ignore
         object_keys = services.aws.list_s3(prefix_key)
 
     except RuntimeError as err:
@@ -277,13 +281,13 @@ async def support_request(
     try:
         sendgrid = services.sendgrid.send_email(
             subject=f"Support | {data.subject}",
-            sender_name=authz.member.account.name,
-            sender=authz.member.email,
+            sender_name=authz.member.account.name,  # type: ignore
+            sender=authz.member.email,  # type: ignore
             recipient="support@trivialsec.com",
             template='support',
             data={
                 "message": data.message,
-                "json": json.dumps(authz.member.dict(), indent=2, default=str, sort_keys=True),
+                "json": json.dumps(authz.member.dict(), indent=2, default=str, sort_keys=True),  # type: ignore
             }
         )
         if sendgrid._content:  # pylint: disable=protected-access
@@ -294,7 +298,7 @@ async def support_request(
                 return
 
         support = models.Support(
-            member=authz.member,
+            member=authz.member,  # type: ignore
             subject=data.subject,
             message=data.message,
             ip_addr=authz.ip_addr,
@@ -341,7 +345,7 @@ async def activate_client(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
-    client = models.Client(account=authz.account, name=client_name).load()
+    client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
     if not client:
         response.status_code = status.HTTP_204_NO_CONTENT
         return
@@ -383,7 +387,7 @@ async def deactived_client(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
-    client = models.Client(account=authz.account, name=client_name).load()
+    client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
     if not client:
         response.status_code = status.HTTP_204_NO_CONTENT
         return
@@ -415,7 +419,7 @@ async def update_billing_email(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    if validators.email(data.email) is not True:
+    if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     event = request.scope.get("aws.event", {})
@@ -432,13 +436,13 @@ async def update_billing_email(
     try:
         sendgrid = services.sendgrid.send_email(
             subject="Change of Billing Email Address notice",
-            recipient=authz.account.billing_email,
+            recipient=authz.account.billing_email,  # type: ignore
             cc=data.email,
             template='updated_email',
             data={
-                "old_email": authz.account.billing_email,
+                "old_email": authz.account.billing_email,  # type: ignore
                 "new_email": data.email,
-                "modifying_email": authz.member.email,
+                "modifying_email": authz.member.email,  # type: ignore
                 "email_type_message": "account billing email address",
             }
         )
@@ -449,10 +453,13 @@ async def update_billing_email(
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
                 return
         internals.logger.info(f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
-        authz.account.billing_email = data.email
-        if not authz.account.save():
+        authz.account.billing_email = data.email  # type: ignore
+        if not authz.account.save():  # type: ignore
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
+        try:
+            services.stripe.create_customer(email=authz.account.billing_email)  # type: ignore
+        except: pass  # pylint: disable=bare-except
         return authz.account
 
     except RuntimeError as err:
@@ -482,7 +489,7 @@ async def update_primary_email(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
-    if validators.email(data.email) is not True:
+    if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     event = request.scope.get("aws.event", {})
@@ -501,13 +508,13 @@ async def update_primary_email(
     try:
         sendgrid = services.sendgrid.send_email(
             subject="Change of Billing Email Address notice",
-            recipient=authz.account.primary_email,
+            recipient=authz.account.primary_email,  # type: ignore
             cc=data.email,
             template='updated_email',
             data={
-                "old_email": authz.account.primary_email,
+                "old_email": authz.account.primary_email,  # type: ignore
                 "new_email": data.email,
-                "modifying_email": authz.member.email,
+                "modifying_email": authz.member.email,  # type: ignore
                 "email_type_message": "account primary contact email address",
             }
         )
@@ -518,8 +525,8 @@ async def update_primary_email(
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
                 return
         internals.logger.info(f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
-        authz.account.primary_email = data.email
-        if not authz.account.save():
+        authz.account.primary_email = data.email  # type: ignore
+        if not authz.account.save():  # type: ignore
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
         return authz.account
@@ -563,8 +570,8 @@ async def update_account_display_name(
         internals.logger.error("Invalid Authorization")
         return
     try:
-        authz.account.display = data.name
-        if not authz.account.save() or not authz.account.update_members():
+        authz.account.display = data.name  # type: ignore
+        if not authz.account.save() or not authz.account.update_members():  # type: ignore
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
         return authz.account

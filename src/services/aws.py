@@ -1,6 +1,6 @@
 from os import getenv
 from enum import Enum
-from typing import Union
+from typing import Any
 
 import boto3
 from retry.api import retry
@@ -62,7 +62,7 @@ def object_exists(file_path: str, bucket_name: str = STORE_BUCKET, **kwargs):
     delay=1.5,
     backoff=1,
 )
-def get_ssm(parameter: str, default=None, **kwargs) -> str:
+def get_ssm(parameter: str, default: Any = None, **kwargs) -> Any:
     internals.logger.info(f"requesting secret {parameter}")
     try:
         response = ssm_client.get_parameter(Name=parameter, **kwargs)
@@ -72,11 +72,11 @@ def get_ssm(parameter: str, default=None, **kwargs) -> str:
             else response.get("Parameter", {}).get("Value", default)
         )
     except ClientError as err:
-        if err.response["Error"]["Code"] == "ResourceNotFoundException":
+        if err.response["Error"]["Code"] == "ResourceNotFoundException":  # type: ignore
             internals.logger.warning(f"The requested secret {parameter} was not found")
-        elif err.response["Error"]["Code"] == "InvalidRequestException":
+        elif err.response["Error"]["Code"] == "InvalidRequestException":  # type: ignore
             internals.logger.warning(f"The request was invalid due to: {err}")
-        elif err.response["Error"]["Code"] == "InvalidParameterException":
+        elif err.response["Error"]["Code"] == "InvalidParameterException":  # type: ignore
             internals.logger.warning(f"The request had invalid params: {err}")
         else:
             internals.logger.exception(err)
@@ -105,15 +105,15 @@ def store_ssm(parameter: str, value: str, **kwargs) -> bool:
             else response.get("Version") is not None
         )
     except ClientError as err:
-        if err.response["Error"]["Code"] == "ParameterAlreadyExists":
+        if err.response["Error"]["Code"] == "ParameterAlreadyExists":  # type: ignore
             internals.logger.warning(f"The secret {parameter} already exists")
-        elif err.response["Error"]["Code"] == "InternalServerError":
+        elif err.response["Error"]["Code"] == "InternalServerError":  # type: ignore
             internals.logger.warning(f"The request was invalid due to: {err}")
-        elif err.response["Error"]["Code"] == "TooManyUpdates":
+        elif err.response["Error"]["Code"] == "TooManyUpdates":  # type: ignore
             internals.logger.warning(err, exc_info=True)
             raise RuntimeError(
                 "Please throttle your requests to continue using this service") from err
-        elif err.response["Error"]["Code"] == "ParameterLimitExceeded":
+        elif err.response["Error"]["Code"] == "ParameterLimitExceeded":  # type: ignore
             internals.logger.warning(err, exc_info=True)
             raise RuntimeError(
                 "Platform is exhausted and unable to respond, please try again soon") from err
@@ -155,18 +155,18 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> list[
             results = s3_client.list_objects_v2(**args)
 
         except ClientError as err:
-            if err.response["Error"]["Code"] == "NoSuchBucket":
+            if err.response["Error"]["Code"] == "NoSuchBucket":  # type: ignore
                 internals.logger.error(
                     f"The requested bucket {bucket_name} was not found")
-            elif err.response["Error"]["Code"] == "InvalidObjectState":
+            elif err.response["Error"]["Code"] == "InvalidObjectState":  # type: ignore
                 internals.logger.error(f"The request was invalid due to: {err}")
-            elif err.response["Error"]["Code"] == "InvalidParameterException":
+            elif err.response["Error"]["Code"] == "InvalidParameterException":  # type: ignore
                 internals.logger.error(f"The request had invalid params: {err}")
             else:
                 internals.logger.exception(err)
-            return
+            return []
         for item in results.get('Contents', []):
-            k = item.get('Key')
+            k = item['Key']  # type: ignore
             if k[-1] != '/':
                 keys.append(k)
         next_token = results.get('NextContinuationToken')
@@ -185,7 +185,7 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> list[
     delay=1.5,
     backoff=1,
 )
-def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default=None, **kwargs) -> str:
+def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None, **kwargs) -> Any:
     internals.logger.info(f"requesting bucket {bucket_name} object key {path_key}")
     try:
         response = s3_client.get_object(
@@ -193,12 +193,12 @@ def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default=None, **kwarg
         return response["Body"].read().decode("utf8")
 
     except ClientError as err:
-        if err.response["Error"]["Code"] == "NoSuchKey":
+        if err.response["Error"]["Code"] == "NoSuchKey":  # type: ignore
             internals.logger.warning(
                 f"The requested bucket {bucket_name} object key {path_key} was not found")
-        elif err.response["Error"]["Code"] == "InvalidObjectState":
+        elif err.response["Error"]["Code"] == "InvalidObjectState":  # type: ignore
             internals.logger.warning(f"The request was invalid due to: {err}")
-        elif err.response["Error"]["Code"] == "InvalidParameterException":
+        elif err.response["Error"]["Code"] == "InvalidParameterException":  # type: ignore
             internals.logger.warning(f"The request had invalid params: {err}")
         else:
             internals.logger.exception(err)
@@ -216,7 +216,7 @@ def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default=None, **kwarg
     delay=1.5,
     backoff=1,
 )
-def delete_s3(path_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> Union[bool, None]:
+def delete_s3(path_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> bool:
     internals.logger.info(f"requesting bucket {bucket_name} object key {path_key}")
     try:
         response = s3_client.delete_object(
@@ -228,15 +228,15 @@ def delete_s3(path_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> Union
         )
 
     except ClientError as err:
-        if err.response["Error"]["Code"] == "NoSuchKey":
-            internals.logger.warning(
-                f"The requested bucket {bucket_name} object key {path_key} was not found")
-        elif err.response["Error"]["Code"] == "InvalidObjectState":
+        if err.response["Error"]["Code"] == "NoSuchKey":  # type: ignore
+            internals.logger.warning(f"The requested bucket {bucket_name} object key {path_key} was not found")
+        elif err.response["Error"]["Code"] == "InvalidObjectState":  # type: ignore
             internals.logger.warning(f"The request was invalid due to: {err}")
-        elif err.response["Error"]["Code"] == "InvalidParameterException":
+        elif err.response["Error"]["Code"] == "InvalidParameterException":  # type: ignore
             internals.logger.warning(f"The request had invalid params: {err}")
         else:
             internals.logger.exception(err)
+    return False
 
 
 @retry(
@@ -257,7 +257,7 @@ def store_s3(path_key: str, value: str, bucket_name: str = STORE_BUCKET, storage
             Bucket=bucket_name,
             Key=path_key,
             Body=value,
-            StorageClass=storage_class.name,
+            StorageClass=str(storage_class.name),  # type: ignore
             **kwargs
         )
         return (
@@ -266,16 +266,16 @@ def store_s3(path_key: str, value: str, bucket_name: str = STORE_BUCKET, storage
             else response.get("ETag") is not None
         )
     except ClientError as err:
-        if err.response["Error"]["Code"] == "ParameterAlreadyExists":
+        if err.response["Error"]["Code"] == "ParameterAlreadyExists":  # type: ignore
             internals.logger.warning(
                 f"The object bucket {bucket_name} key {path_key} already exists")
-        elif err.response["Error"]["Code"] == "InternalServerError":
+        elif err.response["Error"]["Code"] == "InternalServerError":  # type: ignore
             internals.logger.warning(f"The request was invalid due to: {err}")
-        elif err.response["Error"]["Code"] == "TooManyUpdates":
+        elif err.response["Error"]["Code"] == "TooManyUpdates":  # type: ignore
             internals.logger.warning(err, exc_info=True)
             raise RuntimeError(
                 "Please throttle your requests to continue using this service") from err
-        elif err.response["Error"]["Code"] == "ParameterLimitExceeded":
+        elif err.response["Error"]["Code"] == "ParameterLimitExceeded":  # type: ignore
             internals.logger.warning(err, exc_info=True)
             raise RuntimeError(
                 "Platform is exhausted and unable to respond, please try again soon") from err

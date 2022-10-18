@@ -1,5 +1,4 @@
 # pylint: disable=no-self-argument, arguments-differ
-from genericpath import exists
 import json
 import hashlib
 from abc import ABCMeta, abstractmethod
@@ -109,7 +108,7 @@ class MemberAccount(AccountRegistration, DAL):
             storage_class=services.aws.StorageClass.STANDARD
         )
 
-    def delete(self) -> bool:
+    def delete(self) -> Union[bool, None]:
         object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
         return services.aws.delete_s3(object_key)
 
@@ -168,7 +167,7 @@ class MemberProfile(BaseModel, DAL):
     def load(self, member_email: Union[EmailStr, None] = None) -> Union['MemberProfile', None]:
         if member_email:
             self.email = member_email
-        if validators.email(self.email) is False:
+        if validators.email(self.email) is False:  # type: ignore
             return
         suffix = f"/members/{self.email}/profile.json"
         prefix_matches = services.aws.list_s3(prefix_key=f"{internals.APP_ENV}/accounts")
@@ -196,7 +195,7 @@ class MemberProfile(BaseModel, DAL):
         return self
 
     def save(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"  # type: ignore
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
@@ -204,7 +203,7 @@ class MemberProfile(BaseModel, DAL):
         )
 
     def delete(self) -> bool:
-        prefix_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/"
+        prefix_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/"  # type: ignore
         prefix_matches = services.aws.list_s3(prefix_key)
         if len(prefix_matches) == 0:
             return False
@@ -247,8 +246,8 @@ class Client(BaseModel, DAL):
         if client_name:
             self.name = client_name
         if account_name:
-            self.account = MemberAccount(name=account_name).load()
-        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
+            self.account = MemberAccount(name=account_name).load()  # type: ignore
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"  # type: ignore
         raw = services.aws.get_s3(object_key)
         if not raw:
             internals.logger.warning(f"Missing account object: {object_key}")
@@ -265,7 +264,7 @@ class Client(BaseModel, DAL):
         return self
 
     def save(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"  # type: ignore
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
@@ -273,7 +272,7 @@ class Client(BaseModel, DAL):
         )
 
     def delete(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"  # type: ignore
         return services.aws.delete_s3(object_key)
 
 class ClientRedacted(Client):
@@ -352,9 +351,9 @@ class MemberSession(BaseModel, DAL):
             self.member = MemberProfile(email=member_email).load()
         if session_token:
             self.session_token = session_token
-        if not self.session_token or validators.email(self.member.email) is False:
+        if not self.session_token or validators.email(self.member.email) is False:  # type: ignore
             return
-        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"  # type: ignore
         raw = services.aws.get_s3(object_key)
         if not raw:
             internals.logger.warning(f"Missing session object: {object_key}")
@@ -371,7 +370,7 @@ class MemberSession(BaseModel, DAL):
         return self
 
     def save(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"  # type: ignore
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
@@ -379,7 +378,7 @@ class MemberSession(BaseModel, DAL):
         )
 
     def delete(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"  # type: ignore
         return services.aws.delete_s3(object_key)
 
 class MemberSessionRedacted(MemberSession):
@@ -420,9 +419,9 @@ class Support(SupportRequest, DAL):
         if subject:
             self.subject = subject
         if member_email:
-            self.member = MemberProfile(email=member_email).load()
+            self.member = MemberProfile(email=member_email).load()  # type: ignore
         clean_subject = ''.join(e for e in '-'.join(self.subject.split()).replace('/', '-').lower() if e.isalnum() or e == '-')
-        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore
         raw = services.aws.get_s3(object_key)
         if not raw:
             internals.logger.warning(f"Missing Support {object_key}")
@@ -441,7 +440,7 @@ class Support(SupportRequest, DAL):
 
     def save(self) -> bool:
         clean_subject = ''.join(e for e in '-'.join(self.subject.split()).replace('/', '-').lower() if e.isalnum() or e == '-')
-        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str)
@@ -449,7 +448,7 @@ class Support(SupportRequest, DAL):
 
     def delete(self) -> bool:
         clean_subject = ''.join(e for e in '-'.join(self.subject.split()).replace('/', '-').lower() if e.isalnum() or e == '-')
-        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore
         return services.aws.delete_s3(object_key)
 
 class DefaultInfo(BaseModel):
@@ -577,7 +576,7 @@ class HostTLS(BaseModel):
 
 class HostHTTP(BaseModel):
     title: str
-    status_code: conint(ge=100, le=599)
+    status_code: conint(ge=100, le=599)  # type: ignore
     headers: dict[str, str]
     body_hash: str
 
@@ -611,7 +610,7 @@ class Host(BaseModel, DAL):
         if last_updated:
             self.last_updated = last_updated
         if hostname:
-            self.transport = HostTransport(hostname=hostname, port=port, peer_address=peer_address)
+            self.transport = HostTransport(hostname=hostname, port=port, peer_address=peer_address)  # type: ignore
 
         prefix_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}"
         if self.transport.peer_address and self.last_updated:
@@ -636,7 +635,7 @@ class Host(BaseModel, DAL):
         return self
 
     def save(self) -> bool:
-        scan_date = self.last_updated.strftime("%Y%m%d")
+        scan_date = self.last_updated.strftime("%Y%m%d")  # type: ignore
         object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/{self.transport.peer_address}/{scan_date}.json"
         if not services.aws.store_s3(
             object_key,
@@ -650,7 +649,7 @@ class Host(BaseModel, DAL):
         )
 
     def delete(self) -> bool:
-        scan_date = self.last_updated.strftime("%Y%m%d")
+        scan_date = self.last_updated.strftime("%Y%m%d")  # type: ignore
         object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/{self.transport.peer_address}/{scan_date}.json"
         return services.aws.delete_s3(object_key)
 
@@ -842,7 +841,7 @@ class FullReport(ReportSummary, DAL):
         prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
         prefix_matches = services.aws.list_s3(prefix_key)
         if len(prefix_matches) == 0:
-            return []
+            return []  # type: ignore
         for object_path in prefix_matches:
             if not object_path.endswith("summary.json"):
                 continue
@@ -863,7 +862,7 @@ class FullReport(ReportSummary, DAL):
                 continue
             data = json.loads(raw)
             internals.logger.info("Added EvaluationItem")
-            self.evaluations.append(EvaluationItem(**data))
+            self.evaluations.append(EvaluationItem(**data))  # type: ignore
 
         return self
 
@@ -872,7 +871,7 @@ class FullReport(ReportSummary, DAL):
             return False
         results: list[bool] = []
         prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
-        for item in self.evaluations:
+        for item in self.evaluations:  # type: ignore
             object_key = f"{prefix_key}{item.group_id}/{item.rule_id}.json"
             results.append(services.aws.store_s3(
                 object_key,
@@ -886,7 +885,7 @@ class FullReport(ReportSummary, DAL):
             return False
         results: list[bool] = []
         prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
-        for item in self.evaluations:
+        for item in self.evaluations:  # type: ignore
             object_key = f"{prefix_key}{item.group_id}/{item.rule_id}.json"
             results.append(services.aws.delete_s3(object_key))
 
