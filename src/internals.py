@@ -239,6 +239,9 @@ class Authorization:
             session_token = hashlib.sha224(bytes(f'{self.member.email}{self.ip_addr}{self.user_agent}', 'ascii')).hexdigest()
             logger.info(f"Session HMAC-based Authorization: session_token {session_token}")
             self.session = models.MemberSession(member=self.member, session_token=session_token).load()  # type: ignore
+            if not self.session:
+                logger.critical(f"DENY missing MemberSession {self._hmac.id}")
+                return
             if any([
                 self.account.display != self.member.account.display,  # type: ignore
                 self.account.billing_email != self.member.account.billing_email,  # type: ignore
