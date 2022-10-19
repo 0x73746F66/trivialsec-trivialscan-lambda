@@ -275,6 +275,7 @@ class Billing(BaseModel):
     display_amount: str = Field(default="free")
     display_period: Union[str, None] = Field(default=None)
     next_due: Union[int, None] = Field(default=None)
+    has_invoice: bool = Field(default=False)
 
 class MemberAccount(AccountRegistration, DAL):
     billing_email: Optional[EmailStr]
@@ -290,13 +291,14 @@ class MemberAccount(AccountRegistration, DAL):
         )
         if sub := Subscription().load(self.name):
             self.billing.is_trial = sub.status == SubscriptionStatus.TRIALING
+            self.billing.has_invoice = isinstance(sub.latest_invoice, str) and sub.latest_invoice.startswith("in_")
             self.billing.product_name = services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")
             currency = sub.subscription_item.price.currency
             amount = sub.subscription_item.price.unit_amount_decimal
             self.billing.display_amount = f'{currency.upper()} ${amount}'
             self.billing.display_period = sub.subscription_item.price.recurring.interval.capitalize()
             if not sub.cancel_at_period_end:
-                self.billing.next_due = sub.current_period_end
+                self.billing.next_due = sub.current_period_end * 1000 # JavaScript compatibility
             if sub.default_payment_method and sub.collection_method == SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY:
                 self.billing.description = "Stripe Payments"
             elif sub.collection_method == SubscriptionCollectionMethod.SEND_INVOICE:
