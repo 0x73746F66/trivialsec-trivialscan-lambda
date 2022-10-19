@@ -4,14 +4,16 @@ import hashlib
 from abc import ABCMeta, abstractmethod
 from enum import Enum
 from typing import Union, Any, Optional
+from decimal import Decimal
 from datetime import datetime
 
 import validators
 from pydantic import BaseModel, Field, AnyHttpUrl, validator, conint, PositiveInt, PositiveFloat, IPvAnyAddress, EmailStr
 from pydantic.error_wrappers import ValidationError
+
 import internals
-import services
 import services.aws
+import services.stripe
 
 
 class DAL(metaclass=ABCMeta):
@@ -63,10 +65,218 @@ class ReportType(str, Enum):
     REPORT = "report"
     EVALUATIONS = "evaluations"
 
+class PriceType(str, Enum):
+    ONE_TIME = "one_time"
+    RECURRING = "recurring"
+
+class BillingScheme(str, Enum):
+    PER_UNIT = "per_unit"
+    TIERED = "tiered"
+
+class SupportedCurrency(str, Enum):
+    USD = "usd"
+    AUD = "aud"
+
+class RecurringInterval(str, Enum):
+    MONTH = "month"
+    YEAR = "year"
+    WEEK = "week"
+    DAY = "day"
+
+class RecurringType(str, Enum):
+    LICENSED = "licensed"
+    METERED = "metered"
+
+class PriceRecurring(BaseModel):
+    aggregate_usage: Union[str, None] = Field(default=None)
+    interval: RecurringInterval
+    interval_count: int
+    trial_period_days: Union[str, None] = Field(default=None)
+    usage_type: RecurringType
+
+class SubscriptionPrice(BaseModel):
+    id: str
+    active: bool
+    billing_scheme: BillingScheme
+    created: int
+    currency: SupportedCurrency
+    livemode: bool
+    metadata: dict = Field(default={})
+    nickname: Union[str, None] = Field(default=None)
+    product: str
+    recurring: PriceRecurring
+    type: PriceType
+    unit_amount: Decimal
+    unit_amount_decimal: str
+
+class SubscriptionItem(BaseModel):
+    id: str
+    created: int
+    metadata: dict = Field(default={})
+    price: SubscriptionPrice
+    quantity: int
+    subscription: str
+    tax_rates: list = Field(default=[])
+
+class SubscriptionCollectionMethod(str, Enum):
+    CHARGE_AUTOMATICALLY = "charge_automatically"
+    SEND_INVOICE = "send_invoice"
+
+class SubscriptionPauseBehavior(str, Enum):
+    KEEP_AS_DRAFT = "keep_as_draft"
+    MARK_UNCOLLECTIBLE = "mark_uncollectible"
+    VOID = "void"
+
+class SubscriptionCouponDuration(str, Enum):
+    ONCE = "once"
+    REPEATING = "repeating"
+    FOREVER = "forever"
+
+class SubscriptionStatus(str, Enum):
+    INCOMPLETE = "incomplete"
+    INCOMPLETE_EXPIRED = "incomplete_expired"
+    TRIALING = "trialing"
+    ACTIVE = "active"
+    PAST_DUE = "past_due"
+    CANCELED = "canceled"
+    UNPAID = "unpaid"
+
+class SubscriptionPause(BaseModel):
+    behavior: SubscriptionPauseBehavior
+    resumes_at: int
+
+
+class SubscriptionCoupon(BaseModel):
+    id: str
+    amount_off: Union[Decimal, None] = Field(default=None)
+    created: int
+    currency: Union[SupportedCurrency, None] = Field(default=None)
+    duration: SubscriptionCouponDuration
+    duration_in_months: Union[int, None] = Field(default=None)
+    livemode: bool
+    max_redemptions: Union[int, None] = Field(default=None)
+    metadata: Union[dict, None] = Field(default={})
+    name: str
+    percent_off: Union[Decimal, None] = Field(default=None)
+    redeem_by: int
+    times_redeemed: int
+    valid: bool
+
+class SubscriptionDiscount(BaseModel):
+    id: str
+    coupon: SubscriptionCoupon
+    customer: str
+    end: Union[int, None] = Field(default=None)
+    invoice: Union[str, None] = Field(default=None)
+    invoice_item: Union[str, None] = Field(default=None)
+    promotion_code: str
+    start: int
+    subscription: str
+
+class SubscriptionPlan(BaseModel):
+    id: str
+    active: bool
+    aggregate_usage: Union[str, None] = Field(default=None)
+    amount: Decimal
+    amount_decimal: str
+    billing_scheme: BillingScheme
+    created: int
+    currency: SupportedCurrency
+    interval: RecurringInterval
+    interval_count: int
+    livemode: bool
+    metadata: Union[dict, None] = Field(default={})
+    nickname: Union[str, None] = Field(default=None)
+    product: str
+    trial_period_days: Union[int, None] = Field(default=None)
+    usage_type: RecurringType
+
+class Subscription(BaseModel, DAL):
+    id: Optional[str]
+    billing_cycle_anchor: Optional[int]
+    cancel_at: Union[int, None] = Field(default=None)
+    cancel_at_period_end: Union[bool, None] = Field(default=None)
+    canceled_at: Union[int, None] = Field(default=None)
+    collection_method: Optional[SubscriptionCollectionMethod]
+    created: Optional[int]
+    currency: Optional[SupportedCurrency]
+    current_period_end: Union[int, None] = Field(default=None)
+    current_period_start: Union[int, None] = Field(default=None)
+    customer: Optional[str]
+    days_until_due: Union[int, None] = Field(default=None)
+    default_payment_method: Optional[str]
+    description: Optional[str]
+    discount: Union[SubscriptionDiscount, None] = Field(default=None)
+    ended_at: Union[int, None] = Field(default=None)
+    latest_invoice: Optional[str]
+    livemode: Optional[bool]
+    metadata: Union[dict, None] = Field(default={})
+    next_pending_invoice_item_invoice: Union[int, None] = Field(default=None)
+    pause_collection: Union[SubscriptionPause, None] = Field(default=None)
+    plan: Optional[SubscriptionPlan]
+    quantity: Optional[int]
+    start_date: Optional[int]
+    status: Optional[SubscriptionStatus]
+    trial_end: Optional[int]
+    trial_start: Optional[int]
+    subscription_item: Optional[SubscriptionItem]
+
+    def exists(self, account_name: str) -> bool:
+        return self.load(account_name) is not None
+
+    def load(self, account_name: str) -> Union['Subscription', None]:
+        """
+        Derives a Stripe subscription based on having at least one active record
+        and returns only the most recent. Any other requirements should load the
+        data directly outside this class
+        """
+        if not account_name:
+            raise AttributeError('Subscription.load missing account_name')
+
+        subs = []
+        for _, product_name in services.stripe.PRODUCT_MAP.items():
+            prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{product_name}/"
+            matches = services.aws.list_s3(prefix_key=prefix_key)
+            for match in matches:
+                raw = services.aws.get_s3(match)
+                if not raw:
+                    continue
+                try:
+                    data = json.loads(raw)
+                except json.decoder.JSONDecodeError as err:
+                    internals.logger.debug(err, exc_info=True)
+                    continue
+                if not data or not isinstance(data, dict):
+                    internals.logger.debug(f"not data {match}")
+                    continue
+                if data.get('livemode') and data.get('status') in [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]:
+                    subs.append(data)
+
+        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get('created')))
+        if res:
+            super().__init__(**res[-1])
+            return self
+
+    def save(self) -> bool:
+        raise RuntimeWarning("This is not a supported method. Use the Stripe SDK/API to modify payments")
+
+    def delete(self) -> bool:
+        raise RuntimeWarning("This is not a supported method. Use the Stripe SDK/API to modify payments")
+
 class AccountRegistration(BaseModel):
     name: str
     display: Optional[str]
     primary_email: Optional[EmailStr]
+
+class Billing(BaseModel):
+    product_name: str
+    is_trial: bool = Field(default=False)
+    display_amount: str = Field(default="free")
+    display_period: Union[str, None] = Field(default=None)
+    description: Union[str, None] = Field(default=None)
+    card_issuer: Union[str, None] = Field(default=None)
+    card_expiry: Union[str, None] = Field(default=None)
+    next_due: Union[int, None] = Field(default=None)
 
 class MemberAccount(AccountRegistration, DAL):
     billing_email: Optional[EmailStr]
@@ -74,6 +284,34 @@ class MemberAccount(AccountRegistration, DAL):
     ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
     user_agent: Union[str, None] = Field(default=None)
     timestamp: Optional[int]
+    billing: Optional[Billing]
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.billing = Billing(
+            product_name=services.stripe.PRODUCTS.get(services.stripe.Product.COMMUNITY_EDITION).get("name")
+        )
+        if sub := Subscription().load(self.name):
+            self.billing.product_name = services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")
+            currency = sub.subscription_item.price.currency
+            amount = sub.subscription_item.price.unit_amount_decimal
+            self.billing.display_amount = f'{currency.upper()} ${amount}'
+            self.billing.display_period = sub.subscription_item.price.recurring.interval.capitalize()
+            if not sub.cancel_at_period_end:
+                self.billing.next_due = sub.current_period_end
+            if sub.default_payment_method and sub.collection_method == SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY:
+                if payment_method := services.stripe.get_payment_method(sub.default_payment_method):
+                    if payment_method.get('type') in ["card", "card_present", "interac_present"]:
+                        self.billing.card_issuer = payment_method[payment_method.get("type")].get("brand")
+                        self.billing.card_expiry = f'{payment_method[payment_method.get("type")].get("exp_month")}/{payment_method[payment_method.get("type")].get("exp_year")}'
+                        self.billing.description = "Card ending with " + payment_method[payment_method.get("type")].get("last4")
+                    elif bank_name := payment_method.get(payment_method.get('type'), {}).get("bank_name"):
+                        self.billing.description = bank_name
+                    elif bank_name := payment_method.get(payment_method.get('type'), {}).get("bank"):
+                        self.billing.description = bank_name
+                    elif last4 := payment_method.get(payment_method.get('type'), {}).get("last4"):
+                        self.billing.description = f'Account ending in {last4}'
+            elif sub.collection_method == SubscriptionCollectionMethod.SEND_INVOICE:
+                self.billing.description = "Send Invoice"
 
     def exists(self, account_name: Union[str, None] = None) -> bool:
         return self.load(account_name) is not None
@@ -187,7 +425,6 @@ class MemberProfile(BaseModel, DAL):
         except json.decoder.JSONDecodeError as err:
             internals.logger.debug(err, exc_info=True)
             return
-        data = json.loads(raw)
         if not data or not isinstance(data, dict):
             internals.logger.warning(f"Missing member data for: {member_email}")
             return
@@ -948,10 +1185,3 @@ class AcceptEdit(BaseModel, DAL):
     def delete(self) -> bool:
         object_key = f"{internals.APP_ENV}/accept-links/{self.accept_token}.json"
         return services.aws.delete_s3(object_key)
-
-
-class StripeEvent(BaseModel):
-    address: str
-    balance: int
-    created: int
-    data: dict

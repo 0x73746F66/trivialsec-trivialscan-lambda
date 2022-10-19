@@ -409,7 +409,7 @@ async def deactived_client(
 async def update_billing_email(
     request: Request,
     response: Response,
-    data: models.EmailEditRequest,
+data: models.EmailEditRequest,
     authorization: Union[str, None] = Header(default=None),
 ):
     """

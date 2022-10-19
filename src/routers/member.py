@@ -16,6 +16,7 @@ import internals
 import models
 import services.aws
 import services.sendgrid
+import services.stripe
 
 router = APIRouter()
 
@@ -44,10 +45,8 @@ async def validate_authorization(
     event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=event.get("requestContext", {}).get(
-            "http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get(
-            "http", {}).get("sourceIp"),
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
         account_name=x_trivialscan_account,
     )
     return {
@@ -94,7 +93,6 @@ async def member_profile(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
     return authz.session
-
 
 @router.get("/sessions",
             response_model=list[models.MemberSessionRedacted],

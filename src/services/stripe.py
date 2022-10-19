@@ -1,6 +1,5 @@
 import json
 from enum import Enum
-from typing import Union
 from datetime import datetime
 
 import stripe
@@ -10,7 +9,6 @@ from pydantic import EmailStr
 
 import services.aws
 import internals
-import models
 
 class Product(str, Enum):
     UNLIMITED = "unlimited"
@@ -31,26 +29,32 @@ PRODUCT_MAP = {
 PRODUCTS = {
     Product.UNLIMITED: {
         'id': "prod_McksvyXK7BHj0d",
+        'name': "Unlimited Plan",
         'prices': ["price_1LtVMOGZtHTgMn6lbqoePJui"],
     },
     Product.PROFESSIONAL: {
         'id': "prod_MckkLWvtbYeTdh",
+        'name': "Professional",
         'prices': ["price_1LtVF1GZtHTgMn6lO8JH0vFl", "price_1LtVF1GZtHTgMn6lJuTUrr7M"],
     },
     Product.COMMUNITY_EDITION: {
         'id': "prod_MckImIfrJUilft",
+        'name': "Community Edition",
         'prices': ["price_1LtUnoGZtHTgMn6lwciymxvV"],
     },
     Product.ENTERPRISE: {
         'id': "prod_KreCNP6tT8FWp3",
+        'name': "Enterprise",
         'prices': [],
     },
     Product.CONTINUOUS_MONITORING_BOOSTER: {
         'id': "prod_Mcl2wa3xDNSTlx",
+        'name': "Continuous Monitoring Booster",
         'prices': ["price_1LtVWiGZtHTgMn6l7bu4g4kd"],
     },
     Product.UNLIMITED_RESCANS: {
         'id': "prod_MckynJ669YGSzx",
+        'name': "Unlimited Rescans Addon",
         'prices': ["price_1LtVSlGZtHTgMn6laHNoAjTJ"],
     },
 }
@@ -146,8 +150,24 @@ def get_subscription(subscription_id: str) -> stripe.Subscription:
     except Exception as ex:
         internals.logger.exception(ex)
 
+@retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
+def get_payment_method(payment_method_id: str) -> stripe.PaymentMethod:
+    try:
+        return stripe.PaymentMethod.retrieve(payment_method_id)
 
-def get_account_by_billing_email(billing_email: EmailStr) -> Union[models.MemberAccount, None]:
+    except InvalidRequestError:
+        internals.logger.error(
+            f'[get_payment_method] Invalid parameters were supplied to Stripe API: {payment_method_id}')
+    except AuthenticationError:
+        internals.logger.error('[get_payment_method] Authentication with Stripe API failed')
+    except StripeError as ex:
+        internals.logger.exception(ex)
+    except Exception as ex:
+        internals.logger.exception(ex)
+
+
+def get_account_by_billing_email(billing_email: EmailStr):
+    from models import MemberAccount  # pylint: disable=import-outside-toplevel
     prefix_key = f"{internals.APP_ENV}/accounts/"
     matches = services.aws.list_s3(prefix_key)
     for object_path in matches:
@@ -155,7 +175,7 @@ def get_account_by_billing_email(billing_email: EmailStr) -> Union[models.Member
             continue
         raw = services.aws.get_s3(object_path)
         data = json.loads(raw)
-        account = models.MemberAccount(**data)
+        account = MemberAccount(**data)
         if account.billing_email == str(billing_email):
             return account
 
@@ -179,7 +199,8 @@ class Webhook:
             self.account = get_account_by_billing_email(self._customer.get('email'))
 
     def process(self) -> bool:
-        if not hasattr(self, 'account') or not isinstance(self.account, models.MemberAccount):
+        from models import MemberAccount  # pylint: disable=import-outside-toplevel
+        if not hasattr(self, 'account') or not isinstance(self.account, MemberAccount):
             return False
         if self.event_type == 'payment_intent.succeeded':
             self._payment_intent_succeeded()
@@ -199,7 +220,8 @@ class Webhook:
         subscription = get_subscription(self._data_object.get('id'))
         for _item in subscription['items']['data']:
             item = subscription.copy()
-            item['subscription_item'] = _item.copy()
+            item["subscription_item"] = _item.copy()
+            del item["items"]
             product_id = _item['price']['product']
             results.append(services.aws.store_s3(
                 f"{internals.APP_ENV}/accounts/{self.account.name}/subscriptions/{PRODUCT_MAP[product_id]}/{_item.get('id')}.json",
