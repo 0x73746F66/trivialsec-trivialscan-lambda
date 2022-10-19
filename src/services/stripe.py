@@ -150,22 +150,6 @@ def get_subscription(subscription_id: str) -> stripe.Subscription:
     except Exception as ex:
         internals.logger.exception(ex)
 
-@retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
-def get_payment_method(payment_method_id: str) -> stripe.PaymentMethod:
-    try:
-        return stripe.PaymentMethod.retrieve(payment_method_id)
-
-    except InvalidRequestError:
-        internals.logger.error(
-            f'[get_payment_method] Invalid parameters were supplied to Stripe API: {payment_method_id}')
-    except AuthenticationError:
-        internals.logger.error('[get_payment_method] Authentication with Stripe API failed')
-    except StripeError as ex:
-        internals.logger.exception(ex)
-    except Exception as ex:
-        internals.logger.exception(ex)
-
-
 def get_account_by_billing_email(billing_email: EmailStr):
     from models import MemberAccount  # pylint: disable=import-outside-toplevel
     prefix_key = f"{internals.APP_ENV}/accounts/"

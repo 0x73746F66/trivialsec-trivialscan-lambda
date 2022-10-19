@@ -271,11 +271,9 @@ class AccountRegistration(BaseModel):
 class Billing(BaseModel):
     product_name: str
     is_trial: bool = Field(default=False)
+    description: Union[str, None] = Field(default=None)
     display_amount: str = Field(default="free")
     display_period: Union[str, None] = Field(default=None)
-    description: Union[str, None] = Field(default=None)
-    card_issuer: Union[str, None] = Field(default=None)
-    card_expiry: Union[str, None] = Field(default=None)
     next_due: Union[int, None] = Field(default=None)
 
 class MemberAccount(AccountRegistration, DAL):
@@ -291,6 +289,7 @@ class MemberAccount(AccountRegistration, DAL):
             product_name=services.stripe.PRODUCTS.get(services.stripe.Product.COMMUNITY_EDITION).get("name")
         )
         if sub := Subscription().load(self.name):
+            self.billing.is_trial = sub.status == SubscriptionStatus.TRIALING
             self.billing.product_name = services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")
             currency = sub.subscription_item.price.currency
             amount = sub.subscription_item.price.unit_amount_decimal
@@ -299,17 +298,7 @@ class MemberAccount(AccountRegistration, DAL):
             if not sub.cancel_at_period_end:
                 self.billing.next_due = sub.current_period_end
             if sub.default_payment_method and sub.collection_method == SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY:
-                if payment_method := services.stripe.get_payment_method(sub.default_payment_method):
-                    if payment_method.get('type') in ["card", "card_present", "interac_present"]:
-                        self.billing.card_issuer = payment_method[payment_method.get("type")].get("brand")
-                        self.billing.card_expiry = f'{payment_method[payment_method.get("type")].get("exp_month")}/{payment_method[payment_method.get("type")].get("exp_year")}'
-                        self.billing.description = "Card ending with " + payment_method[payment_method.get("type")].get("last4")
-                    elif bank_name := payment_method.get(payment_method.get('type'), {}).get("bank_name"):
-                        self.billing.description = bank_name
-                    elif bank_name := payment_method.get(payment_method.get('type'), {}).get("bank"):
-                        self.billing.description = bank_name
-                    elif last4 := payment_method.get(payment_method.get('type'), {}).get("last4"):
-                        self.billing.description = f'Account ending in {last4}'
+                self.billing.description = "Stripe Payments"
             elif sub.collection_method == SubscriptionCollectionMethod.SEND_INVOICE:
                 self.billing.description = "Send Invoice"
 
