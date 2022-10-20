@@ -92,6 +92,8 @@ async def member_profile(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
+
+    authz.session.member.account.load_billing()
     return authz.session
 
 @router.get("/sessions",

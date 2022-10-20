@@ -191,7 +191,7 @@ class SubscriptionPlan(BaseModel):
     trial_period_days: Union[int, None] = Field(default=None)
     usage_type: RecurringType
 
-class Subscription(BaseModel, DAL):
+class SubscriptionBase(BaseModel):
     id: Optional[str]
     billing_cycle_anchor: Optional[int]
     cancel_at: Union[int, None] = Field(default=None)
@@ -220,11 +220,17 @@ class Subscription(BaseModel, DAL):
     trial_end: Optional[int]
     trial_start: Optional[int]
     subscription_item: Optional[SubscriptionItem]
-
     def exists(self, account_name: str) -> bool:
         return self.load(account_name) is not None
 
-    def load(self, account_name: str) -> Union['Subscription', None]:
+    def save(self) -> bool:
+        raise RuntimeWarning("This is not a supported method. Use the Stripe SDK/API to modify payments")
+
+    def delete(self) -> bool:
+        raise RuntimeWarning("This is not a supported method. Use the Stripe SDK/API to modify payments")
+
+class SubscriptionCE(SubscriptionBase, DAL):
+    def load(self, account_name: str) -> Union['SubscriptionCE', None]:
         """
         Derives a Stripe subscription based on having at least one active record
         and returns only the most recent. Any other requirements should load the
@@ -234,34 +240,126 @@ class Subscription(BaseModel, DAL):
             raise AttributeError('Subscription.load missing account_name')
 
         subs = []
-        for _, product_name in services.stripe.PRODUCT_MAP.items():
-            prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{product_name}/"
-            matches = services.aws.list_s3(prefix_key=prefix_key)
-            for match in matches:
-                raw = services.aws.get_s3(match)
-                if not raw:
-                    continue
-                try:
-                    data = json.loads(raw)
-                except json.decoder.JSONDecodeError as err:
-                    internals.logger.debug(err, exc_info=True)
-                    continue
-                if not data or not isinstance(data, dict):
-                    internals.logger.debug(f"not data {match}")
-                    continue
-                if data.get('livemode') and data.get('status') in [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]:
-                    subs.append(data)
+        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.COMMUNITY_EDITION}/"
+        matches = services.aws.list_s3(prefix_key=prefix_key)
+        for match in matches:
+            raw = services.aws.get_s3(match)
+            if not raw:
+                continue
+            try:
+                data = json.loads(raw)
+            except json.decoder.JSONDecodeError as err:
+                internals.logger.debug(err, exc_info=True)
+                continue
+            if not data or not isinstance(data, dict):
+                internals.logger.debug(f"not data {match}")
+                continue
+            if data.get('livemode') and data.get('status') in [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]:
+                subs.append(data)
 
         res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get('created')))
         if res:
             super().__init__(**res[-1])
             return self
 
-    def save(self) -> bool:
-        raise RuntimeWarning("This is not a supported method. Use the Stripe SDK/API to modify payments")
+class SubscriptionPro(SubscriptionBase, DAL):
+    def load(self, account_name: str) -> Union['SubscriptionPro', None]:
+        """
+        Derives a Stripe subscription based on having at least one active record
+        and returns only the most recent. Any other requirements should load the
+        data directly outside this class
+        """
+        if not account_name:
+            raise AttributeError('Subscription.load missing account_name')
 
-    def delete(self) -> bool:
-        raise RuntimeWarning("This is not a supported method. Use the Stripe SDK/API to modify payments")
+        subs = []
+        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.PROFESSIONAL}/"
+        matches = services.aws.list_s3(prefix_key=prefix_key)
+        for match in matches:
+            raw = services.aws.get_s3(match)
+            if not raw:
+                continue
+            try:
+                data = json.loads(raw)
+            except json.decoder.JSONDecodeError as err:
+                internals.logger.debug(err, exc_info=True)
+                continue
+            if not data or not isinstance(data, dict):
+                internals.logger.debug(f"not data {match}")
+                continue
+            if data.get('livemode') and data.get('status') in [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]:
+                subs.append(data)
+
+        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get('created')))
+        if res:
+            super().__init__(**res[-1])
+            return self
+
+class SubscriptionEnterprise(SubscriptionBase, DAL):
+    def load(self, account_name: str) -> Union['SubscriptionEnterprise', None]:
+        """
+        Derives a Stripe subscription based on having at least one active record
+        and returns only the most recent. Any other requirements should load the
+        data directly outside this class
+        """
+        if not account_name:
+            raise AttributeError('Subscription.load missing account_name')
+
+        subs = []
+        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.ENTERPRISE}/"
+        matches = services.aws.list_s3(prefix_key=prefix_key)
+        for match in matches:
+            raw = services.aws.get_s3(match)
+            if not raw:
+                continue
+            try:
+                data = json.loads(raw)
+            except json.decoder.JSONDecodeError as err:
+                internals.logger.debug(err, exc_info=True)
+                continue
+            if not data or not isinstance(data, dict):
+                internals.logger.debug(f"not data {match}")
+                continue
+            if data.get('livemode') and data.get('status') in [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]:
+                subs.append(data)
+
+        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get('created')))
+        if res:
+            super().__init__(**res[-1])
+            return self
+
+class SubscriptionUnlimited(SubscriptionBase, DAL):
+    def load(self, account_name: str) -> Union['SubscriptionUnlimited', None]:
+        """
+        Derives a Stripe subscription based on having at least one active record
+        and returns only the most recent. Any other requirements should load the
+        data directly outside this class
+        """
+        if not account_name:
+            raise AttributeError('Subscription.load missing account_name')
+
+        subs = []
+        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.UNLIMITED}/"
+        matches = services.aws.list_s3(prefix_key=prefix_key)
+        for match in matches:
+            raw = services.aws.get_s3(match)
+            if not raw:
+                continue
+            try:
+                data = json.loads(raw)
+            except json.decoder.JSONDecodeError as err:
+                internals.logger.debug(err, exc_info=True)
+                continue
+            if not data or not isinstance(data, dict):
+                internals.logger.debug(f"not data {match}")
+                continue
+            if data.get('livemode') and data.get('status') in [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]:
+                subs.append(data)
+
+        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get('created')))
+        if res:
+            super().__init__(**res[-1])
+            return self
 
 class AccountRegistration(BaseModel):
     name: str
@@ -283,26 +381,35 @@ class MemberAccount(AccountRegistration, DAL):
     ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
     user_agent: Union[str, None] = Field(default=None)
     timestamp: Optional[int]
-    billing: Optional[Billing]
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    billing: Union[Billing, None] = Field(default=None)
+
+    def load_billing(self):
+        if sub := SubscriptionPro().load(self.name):
+            self._billing(sub)
+        elif sub := SubscriptionEnterprise().load(self.name):
+            self._billing(sub)
+        elif sub := SubscriptionUnlimited().load(self.name):
+            self._billing(sub)
         self.billing = Billing(
             product_name=services.stripe.PRODUCTS.get(services.stripe.Product.COMMUNITY_EDITION).get("name")
         )
-        if sub := Subscription().load(self.name):
-            self.billing.is_trial = sub.status == SubscriptionStatus.TRIALING
-            self.billing.has_invoice = isinstance(sub.latest_invoice, str) and sub.latest_invoice.startswith("in_")
-            self.billing.product_name = services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")
-            currency = sub.subscription_item.price.currency
-            amount = sub.subscription_item.price.unit_amount_decimal
-            self.billing.display_amount = f'{currency.upper()} ${amount}'
-            self.billing.display_period = sub.subscription_item.price.recurring.interval.capitalize()
-            if not sub.cancel_at_period_end:
-                self.billing.next_due = sub.current_period_end * 1000 # JavaScript compatibility
-            if sub.default_payment_method and sub.collection_method == SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY:
-                self.billing.description = "Stripe Payments"
-            elif sub.collection_method == SubscriptionCollectionMethod.SEND_INVOICE:
-                self.billing.description = "Send Invoice"
+    
+    def _billing(self, sub: SubscriptionBase):
+        self.billing = Billing(
+            product_name=services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")
+        )
+        self.billing.is_trial = sub.status == SubscriptionStatus.TRIALING
+        self.billing.has_invoice = isinstance(sub.latest_invoice, str) and sub.latest_invoice.startswith("in_")
+        currency = sub.subscription_item.price.currency
+        amount = sub.subscription_item.price.unit_amount_decimal
+        self.billing.display_amount = f'{currency.upper()} ${amount}'
+        self.billing.display_period = sub.subscription_item.price.recurring.interval.capitalize()
+        if not sub.cancel_at_period_end:
+            self.billing.next_due = sub.current_period_end * 1000 # JavaScript compatibility
+        if sub.default_payment_method and sub.collection_method == SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY:
+            self.billing.description = "Stripe Payments"
+        elif sub.collection_method == SubscriptionCollectionMethod.SEND_INVOICE:
+            self.billing.description = "Send Invoice"
 
     def exists(self, account_name: Union[str, None] = None) -> bool:
         return self.load(account_name) is not None
