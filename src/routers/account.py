@@ -229,7 +229,7 @@ async def retrieve_clients(
 
     if not object_keys:
         response.status_code = status.HTTP_204_NO_CONTENT
-        return []
+        return
 
     for object_key in object_keys:
         if not object_key.endswith(".json"):

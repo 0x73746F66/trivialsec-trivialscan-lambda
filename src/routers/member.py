@@ -139,7 +139,7 @@ async def member_sessions(
             sessions.append(models.MemberSession(**json.loads(raw)))
     if not sessions:
         response.status_code = status.HTTP_204_NO_CONTENT
-        return []
+        return
     for session in sessions:
         session.current = session.session_token == authz.session.session_token  # type: ignore
     return sessions
@@ -189,7 +189,7 @@ async def list_members(
             members.append(models.MemberProfile(**json.loads(raw)))
     if not members:
         response.status_code = status.HTTP_204_NO_CONTENT
-        return []
+        return
     for member in members:
         member.current = member.email == authz.member.email  # type: ignore
     return members

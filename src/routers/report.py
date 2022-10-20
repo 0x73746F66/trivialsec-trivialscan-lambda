@@ -128,7 +128,7 @@ async def retrieve_reports(
 
     if not summary_keys:
         response.status_code = status.HTTP_204_NO_CONTENT
-        return []
+        return
 
     for summary_key in summary_keys:
         if not summary_key.endswith("summary.json"):
