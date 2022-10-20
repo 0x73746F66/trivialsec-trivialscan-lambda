@@ -622,9 +622,6 @@ class ClientRedacted(Client):
     @validator("account")
     def set_account(cls, account):
         return None if not isinstance(account, MemberAccount) else MemberAccountRedacted(**account.dict())
-    @validator("access_token")
-    def set_access_token(cls, _):
-        return None
 
 class MagicLinkRequest(BaseModel):
     email: EmailStr
