@@ -220,6 +220,10 @@ class SubscriptionBase(BaseModel):
     trial_end: Optional[int]
     trial_start: Optional[int]
     subscription_item: Optional[SubscriptionItem]
+
+    def load(self, *args, **kwargs):
+        raise NotImplementedError
+
     def exists(self, account_name: str) -> bool:
         return self.load(account_name) is not None
 
@@ -229,8 +233,8 @@ class SubscriptionBase(BaseModel):
     def delete(self) -> bool:
         raise RuntimeWarning("This is not a supported method. Use the Stripe SDK/API to modify payments")
 
-class SubscriptionCE(SubscriptionBase, DAL):
-    def load(self, account_name: str) -> Union['SubscriptionCE', None]:
+class SubscriptionAddon(SubscriptionBase, DAL):
+    def load(self, account_name: str) -> Union['SubscriptionAddon', None]:
         """
         Derives a Stripe subscription based on having at least one active record
         and returns only the most recent. Any other requirements should load the
@@ -240,7 +244,7 @@ class SubscriptionCE(SubscriptionBase, DAL):
             raise AttributeError('Subscription.load missing account_name')
 
         subs = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.COMMUNITY_EDITION}/"
+        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.UNLIMITED_RESCANS}/"
         matches = services.aws.list_s3(prefix_key=prefix_key)
         for match in matches:
             raw = services.aws.get_s3(match)
@@ -384,16 +388,18 @@ class MemberAccount(AccountRegistration, DAL):
     billing: Union[Billing, None] = Field(default=None)
 
     def load_billing(self):
-        if sub := SubscriptionPro().load(self.name):
-            self._billing(sub)
+        if sub := SubscriptionAddon().load(self.name):
+            return self._billing(sub)
+        elif sub := SubscriptionPro().load(self.name):
+            return self._billing(sub)
         elif sub := SubscriptionEnterprise().load(self.name):
-            self._billing(sub)
+            return self._billing(sub)
         elif sub := SubscriptionUnlimited().load(self.name):
-            self._billing(sub)
+            return self._billing(sub)
         self.billing = Billing(
             product_name=services.stripe.PRODUCTS.get(services.stripe.Product.COMMUNITY_EDITION).get("name")
         )
-    
+
     def _billing(self, sub: SubscriptionBase):
         self.billing = Billing(
             product_name=services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")
