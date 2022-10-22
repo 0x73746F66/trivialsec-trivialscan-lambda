@@ -117,7 +117,7 @@ async def retrieve_reports(
 
     summary_keys = []
     data = []
-    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
+    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")
     try:
         summary_keys = services.aws.list_s3(prefix_key)
 

@@ -1167,7 +1167,7 @@ class FullReport(ReportSummary, DAL):
             self.report_id = report_id
         if account_name:
             self.account_name = account_name
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
         return services.aws.object_exists(object_key)
 
     def load(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> Union['FullReport', None]:
@@ -1176,32 +1176,14 @@ class FullReport(ReportSummary, DAL):
         if account_name:
             self.account_name = account_name
 
-        prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
-        prefix_matches = services.aws.list_s3(prefix_key)
-        if len(prefix_matches) == 0:
-            return []  # type: ignore
-        for object_path in prefix_matches:
-            if not object_path.endswith("summary.json"):
-                continue
-            raw = services.aws.get_s3(object_path)
-            if not raw:
-                internals.logger.warning(f"Missing ReportSummary {object_path}")
-                continue
-            data = json.loads(raw)
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
+        raw = services.aws.get_s3(object_key)
+        if not raw:
+            internals.logger.warning(f"Missing FullReport {object_key}")
+            return
+        data = json.loads(raw)
+        if data:
             super().__init__(**data)
-            internals.logger.info("Added ReportSummary")
-
-        for object_path in prefix_matches:
-            if object_path.endswith("summary.json"):
-                continue
-            raw = services.aws.get_s3(object_path)
-            if not raw:
-                internals.logger.warning(f"Missing EvaluationItem {object_path}")
-                continue
-            data = json.loads(raw)
-            internals.logger.info("Added EvaluationItem")
-            self.evaluations.append(EvaluationItem(**data))  # type: ignore
-
         return self
 
     def save(self) -> bool:
@@ -1215,7 +1197,17 @@ class FullReport(ReportSummary, DAL):
                 object_key,
                 json.dumps(item.dict(), default=str),
             ))
-
+        object_key = f"{prefix_key}summary.json"
+        report = ReportSummary(**self.dict())
+        results.append(services.aws.store_s3(
+            object_key,
+            json.dumps(report.dict(), default=str),
+        ))
+        object_key = f"{prefix_key}full-report.json"
+        results.append(services.aws.store_s3(
+            object_key,
+            json.dumps(self.dict(), default=str),
+        ))
         return all(results)
 
     def delete(self) -> bool:
@@ -1286,3 +1278,24 @@ class AcceptEdit(BaseModel, DAL):
     def delete(self) -> bool:
         object_key = f"{internals.APP_ENV}/accept-links/{self.accept_token}.json"
         return services.aws.delete_s3(object_key)
+
+class GraphLabelRanges(str, Enum):
+    WEEK = "week"
+    MONTH = "month"
+    YEAR = "year"
+
+class GraphLabel(str, Enum):
+    PCIDSS3 = "PCI DSS v3.2.1"
+    PCIDSS4 = "PCI DSS v4.0"
+    NISTSP800_131A_STRICT = "NIST SP800-131A (strict mode)"
+    NISTSP800_131A_TRANSITION = "NIST SP800-131A (transition mode)"
+    FIPS1402 = "FIPS 140-2 Annex A"
+
+class ComplianceChartItem(BaseModel):
+    name: str
+    num: int
+
+class DashboardCompliance(BaseModel):
+    label: GraphLabel
+    ranges: list[GraphLabelRanges]
+    data: dict[GraphLabelRanges, list[ComplianceChartItem]]

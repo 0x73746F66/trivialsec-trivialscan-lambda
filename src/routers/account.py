@@ -4,7 +4,7 @@ from os import path
 from time import time
 from random import random
 from secrets import token_urlsafe
-from typing import Union, List
+from typing import Union
 
 from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
@@ -187,7 +187,7 @@ async def claim_client(
     return
 
 @router.get("/clients",
-            response_model=List[models.ClientRedacted],
+            response_model=list[models.ClientRedacted],
             response_model_exclude_unset=True,
     response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,

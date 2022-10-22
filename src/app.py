@@ -8,7 +8,7 @@ from mangum import Mangum
 import boto3
 
 import internals
-from routers import account, member, report, stripe
+from routers import account, member, report, dashboard, stripe
 
 DEFAULT_LOG_LEVEL = "WARNING"
 LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
@@ -33,6 +33,7 @@ app.include_router(account.router)
 app.include_router(member.router)
 app.include_router(report.router)
 app.include_router(stripe.router)
+app.include_router(dashboard.router)
 
 @app.on_event("startup")
 async def startup_event():

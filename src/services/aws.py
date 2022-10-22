@@ -186,7 +186,7 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> list[
     backoff=1,
 )
 def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None, **kwargs) -> Any:
-    internals.logger.info(f"requesting bucket {bucket_name} object key {path_key}")
+    internals.logger.debug(f"requesting bucket {bucket_name} object key {path_key}")
     try:
         response = s3_client.get_object(
             Bucket=bucket_name, Key=path_key, **kwargs)
