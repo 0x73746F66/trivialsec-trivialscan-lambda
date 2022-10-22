@@ -823,62 +823,12 @@ class Config(BaseModel):
     targets: list[ConfigTarget]
 
 class Flags(BaseModel):
-    hide_progress_bars: bool
-    synchronous_only: bool
-    hide_banner: bool
-    track_changes: bool
+    hide_progress_bars: Optional[bool]
+    synchronous_only: Optional[bool]
+    hide_banner: Optional[bool]
+    track_changes: Optional[bool]
     previous_report: Union[str, None]
-    quiet: bool
-
-class ReportSummary(DefaultInfo, DAL):
-    report_id: str
-    project_name: Union[str, None]
-    targets: Optional[list[str]]
-    date: Optional[datetime]
-    execution_duration_seconds: Union[PositiveFloat, None] = Field(default=None)
-    score: int = Field(default=0)
-    results: Optional[dict[str, int]]
-    certificates: list[str] = Field(default=[])
-    results_uri: Optional[str]
-    flags: Union[Flags, None] = Field(default=None)
-    config: Union[Config, None] = Field(default=None)
-
-    def exists(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> bool:
-        return self.load(report_id, account_name) is not None
-
-    def load(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> Union['ReportSummary', None]:
-        if report_id:
-            self.report_id = report_id
-        if account_name:
-            self.account_name = account_name
-
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
-        raw = services.aws.get_s3(object_key)
-        if not raw:
-            internals.logger.warning(f"Missing ReportSummary {object_key}")
-            return
-        try:
-            data = json.loads(raw)
-        except json.decoder.JSONDecodeError as err:
-            internals.logger.debug(err, exc_info=True)
-            return
-        if not data or not isinstance(data, dict):
-            internals.logger.warning(
-                f"Missing ReportSummary {object_key}")
-            return
-        super().__init__(**data)
-        return self
-
-    def save(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
-        return services.aws.store_s3(
-            object_key,
-            json.dumps(self.dict(), default=str)
-        )
-
-    def delete(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
-        return services.aws.delete_s3(object_key)
+    quiet: Optional[bool]
 
 class HostTLSProtocol(BaseModel):
     negotiated: str
@@ -995,8 +945,8 @@ class Certificate(BaseModel, DAL):
     authority_key_identifier: Union[str, None] = Field(default=None)
     expired: Optional[bool]
     expiry_status: Optional[str]
-    extensions: list = Field(default=[])
-    external_refs: dict[str, Union[AnyHttpUrl, None]] = Field(default={})
+    extensions: Optional[list] = Field(default=[])
+    external_refs: Optional[dict[str, Union[AnyHttpUrl, None]]] = Field(default={})
     is_self_signed: Optional[bool]
     issuer: Optional[str]
     known_compromised: Optional[bool]
@@ -1008,8 +958,8 @@ class Certificate(BaseModel, DAL):
     public_key_modulus: Union[PositiveInt, None] = Field(default=None)
     public_key_size: Optional[PositiveInt]
     public_key_type: Optional[PublicKeyType]
-    revocation_crl_urls: list[AnyHttpUrl] = Field(default=[])
-    san: list[str] = Field(default=[])
+    revocation_crl_urls: Optional[list[AnyHttpUrl]] = Field(default=[])
+    san: Optional[list[str]] = Field(default=[])
     serial_number: Optional[str]
     serial_number_decimal: Optional[Any]
     serial_number_hex: Optional[str]
@@ -1021,7 +971,7 @@ class Certificate(BaseModel, DAL):
     subject_key_identifier: Optional[str]
     validation_level: Union[ValidationLevel, None] = Field(default=None)
     validation_oid: Union[str, None] = Field(default=None)
-    version: Optional[PositiveInt]
+    version: Optional[Any] = Field(default=None)
     type: Optional[CertificateType]
 
     def exists(self, sha1_fingerprint: Union[str, None] = None) -> bool:
@@ -1088,6 +1038,56 @@ class ReferenceItem(BaseModel):
     name: str
     url: Union[AnyHttpUrl, None]
 
+class ReportSummary(DefaultInfo, DAL):
+    report_id: str
+    project_name: Union[str, None]
+    targets: Optional[list[str]]
+    date: Optional[datetime]
+    execution_duration_seconds: Union[PositiveFloat, None] = Field(default=None)
+    score: int = Field(default=0)
+    results: Optional[dict[str, int]]
+    certificates: list[str] = Field(default=[])
+    results_uri: Optional[str]
+    flags: Union[Flags, None] = Field(default=None)
+    config: Union[Config, None] = Field(default=None)
+
+    def exists(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> bool:
+        return self.load(report_id, account_name) is not None
+
+    def load(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> Union['ReportSummary', None]:
+        if report_id:
+            self.report_id = report_id
+        if account_name:
+            self.account_name = account_name
+
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
+        raw = services.aws.get_s3(object_key)
+        if not raw:
+            internals.logger.warning(f"Missing ReportSummary {object_key}")
+            return
+        try:
+            data = json.loads(raw)
+        except json.decoder.JSONDecodeError as err:
+            internals.logger.debug(err, exc_info=True)
+            return
+        if not data or not isinstance(data, dict):
+            internals.logger.warning(
+                f"Missing ReportSummary {object_key}")
+            return
+        super().__init__(**data)
+        return self
+
+    def save(self) -> bool:
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
+        return services.aws.store_s3(
+            object_key,
+            json.dumps(self.dict(), default=str)
+        )
+
+    def delete(self) -> bool:
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
+        return services.aws.delete_s3(object_key)
+
 class EvaluationItem(DefaultInfo, DAL):
     class Config:
         validate_assignment = True
@@ -1111,6 +1111,8 @@ class EvaluationItem(DefaultInfo, DAL):
     references: Union[list[ReferenceItem], None] = Field(default=[])
     compliance: Union[list[ComplianceItem], None] = Field(default=[])
     threats: Union[list[ThreatItem], None] = Field(default=[])
+    transport: Optional[HostTransport]
+    certificate: Optional[Certificate]
     @validator("cvss2")
     def set_cvss2(cls, cvss2):
         return None if not isinstance(cvss2, str) else cvss2
@@ -1187,8 +1189,6 @@ class FullReport(ReportSummary, DAL):
         return self
 
     def save(self) -> bool:
-        if not self.exists():
-            return False
         results: list[bool] = []
         prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
         for item in self.evaluations:  # type: ignore
@@ -1197,12 +1197,6 @@ class FullReport(ReportSummary, DAL):
                 object_key,
                 json.dumps(item.dict(), default=str),
             ))
-        object_key = f"{prefix_key}summary.json"
-        report = ReportSummary(**self.dict())
-        results.append(services.aws.store_s3(
-            object_key,
-            json.dumps(report.dict(), default=str),
-        ))
         object_key = f"{prefix_key}full-report.json"
         results.append(services.aws.store_s3(
             object_key,

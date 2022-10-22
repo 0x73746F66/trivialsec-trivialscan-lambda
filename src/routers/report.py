@@ -2,6 +2,7 @@ import json
 from os import path
 from secrets import token_urlsafe
 from typing import Union
+from datetime import datetime, timedelta
 
 from fastapi import Header, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
@@ -117,7 +118,7 @@ async def retrieve_reports(
 
     summary_keys = []
     data = []
-    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")
+    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
     try:
         summary_keys = services.aws.list_s3(prefix_key)
 
@@ -281,7 +282,7 @@ async def store(
         return
 
     if file.filename.endswith(".json"):
-        data: Union[dict, list] = json.loads(contents.decode("utf8"))
+        data: dict = json.loads(contents.decode("utf8"))
     if isinstance(data, dict):
         data["version"] = x_trivialscan_version
         if data.get("config", {}).get("token"):
@@ -292,40 +293,42 @@ async def store(
     if report_type is models.ReportType.REPORT:
         report_id = token_urlsafe(56)
         results_uri = f"/result/{report_id}/summary"
-        report = models.ReportSummary(report_id=report_id, results_uri=results_uri, **data)  # type: ignore
+        report = models.ReportSummary(report_id=report_id, results_uri=results_uri, **data)
         if report.save():
             return {"results_uri": results_uri}
 
     if report_type is models.ReportType.EVALUATIONS:
         report_id = file.filename.replace(".json", "")
-        report = models.ReportSummary(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
-        if not report:
+        _report = models.ReportSummary(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
+        if not _report:
             response.status_code = status.HTTP_412_PRECONDITION_FAILED
             return
         items = []
-        for _item in data:
-            if item := models.EvaluationItem(
-                generator=report.generator,
-                version=report.version,
+        for _item in data['evaluations']:
+            item = models.EvaluationItem(
+                generator=_report.generator,
+                version=_report.version,
                 account_name=authz.account.name,  # type: ignore
-                client_name=report.client_name,
+                client_name=_report.client_name,
                 report_id=report_id,
+                transport=models.HostTransport(**data['transport']),
                 **_item,
-            ).save():
-                items.append(item)
-            else:
-                internals.logger.warning(f"Failed to store EvaluationItem {report_id}\n{_item}")
-
-        if len(items) == len(contents):
+            )
+            if item.group == "certificate" and item.metadata.get("sha1_fingerprint"):
+                item.certificate = models.Certificate(sha1_fingerprint=item.metadata.get("sha1_fingerprint")).load()  # type: ignore
+            items.append(item)
+        report = models.FullReport(**_report.dict())  # type: ignore
+        report.evaluations = items
+        if report.save():
             return {"results_uri": f"/result/{report_id}/details"}
 
     if report_type is models.ReportType.HOST:
-        report = models.Host(**contents)  # type: ignore
+        report = models.Host(**data)  # type: ignore
         if report.save():
             return {"results_uri": f"/host/{report.transport.hostname}/{report.transport.port}"}
 
     if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".json"):
-        report = models.Certificate(**contents)  # type: ignore
+        report = models.Certificate(**data)  # type: ignore
         if report.save():
             return {"results_uri": f"/certificate/{report.sha1_fingerprint}"}
 

@@ -14,9 +14,9 @@ router = APIRouter()
 
 
 @router.get("/dashboard/compliance",
-            # response_model=list[models.FullReport],
-            # response_model_exclude_unset=True,
-            # response_model_exclude_none=True,
+            response_model=list[models.DashboardCompliance],
+            response_model_exclude_unset=True,
+            response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Dashboard"],
             )
@@ -104,6 +104,8 @@ async def dashboard_compliance(
         for r in ['week', 'month', 'year']:
             agg_sums[c].setdefault(r, {})
             for _result in results:
+                if c not in _result or r not in _result[c]:
+                    continue
                 agg_sums[c][r].setdefault(_result['group_name'], [])
                 agg_sums[c][r][_result['group_name']].append(_result[c][r])
     for c, g in agg_sums.items():

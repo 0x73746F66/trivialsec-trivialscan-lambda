@@ -186,7 +186,7 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> list[
     backoff=1,
 )
 def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None, **kwargs) -> Any:
-    internals.logger.debug(f"requesting bucket {bucket_name} object key {path_key}")
+    internals.logger.info(f"requesting bucket {bucket_name} object key {path_key}")
     try:
         response = s3_client.get_object(
             Bucket=bucket_name, Key=path_key, **kwargs)
@@ -251,6 +251,7 @@ def delete_s3(path_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> bool:
     backoff=1,
 )
 def store_s3(path_key: str, value: str, bucket_name: str = STORE_BUCKET, storage_class: StorageClass = StorageClass.STANDARD_IA, **kwargs) -> bool:
+    internals.logger.info(f"store_s3 {path_key}")
     internals.logger.debug(f"store_s3 {value}")
     try:
         response = s3_client.put_object(
