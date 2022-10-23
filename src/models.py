@@ -1131,6 +1131,7 @@ class EvaluationItem(DefaultInfo, DAL):
     key: str
     name: str
     group: str
+    observed_at: Union[datetime, None] = Field(default=None)
     result_value: Union[bool, str, None]
     result_label: str
     result_text: str
