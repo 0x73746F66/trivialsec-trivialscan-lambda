@@ -133,3 +133,85 @@ async def dashboard_compliance(
         )
 
     return charts
+
+@router.get("/dashboard/quotas",
+            response_model=models.DashboardQuotas,
+            response_model_exclude_unset=True,
+            response_model_exclude_none=True,
+            status_code=status.HTTP_200_OK,
+            tags=["Dashboard"],
+            )
+async def dashboard_quotas(
+    request: Request,
+    response: Response,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Retrieves a collection of your clients
+    """
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get(
+            "http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get(
+            "http", {}).get("sourceIp"),
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
+
+    new_only = True
+    unlimited_monitoring = False
+    unlimited_scans = False
+    monitoring_total = 1
+    monitoring = 0
+    passive_total = 0
+    passive = 0
+    active_total = 0
+    active = 0
+    if sub := models.SubscriptionAddon().load(authz.account.name):  # type: ignore
+        unlimited_scans = True
+        new_only = False
+    if sub := models.SubscriptionBooster().load(authz.account.name):  # type: ignore
+        monitoring_total = 1 if sub.quantity is None else sub.quantity + 1
+    elif sub := models.SubscriptionPro().load(authz.account.name):  # type: ignore
+        monitoring_total = 10 if not sub.metadata else sub.metadata.get("monitoring", 10)
+        passive_total = 500 if not sub.metadata else sub.metadata.get("managed_passive", 500)
+        active_total = 50 if not sub.metadata else sub.metadata.get("managed_active", 50)
+        new_only = False
+    elif sub := models.SubscriptionEnterprise().load(authz.account.name):  # type: ignore
+        monitoring_total = 50 if not sub.metadata else sub.metadata.get("monitoring", 50)
+        passive_total = 1000 if not sub.metadata else sub.metadata.get("managed_passive", 1000)
+        active_total = 100 if not sub.metadata else sub.metadata.get("managed_active", 100)
+        new_only = False
+    elif sub := models.SubscriptionUnlimited().load(authz.account.name):  # type: ignore
+        monitoring_total = None
+        passive_total = None
+        active_total = None
+        new_only = False
+
+    return models.DashboardQuotas(
+        unlimited_monitoring=unlimited_monitoring,
+        unlimited_scans=unlimited_scans,
+        monitoring={
+            models.Quota.PERIOD: "Daily",
+            models.Quota.TOTAL: monitoring_total,
+            models.Quota.USED: monitoring,
+        },
+        passive={
+            models.Quota.PERIOD: "Only new hosts" if new_only else "Daily",
+            models.Quota.TOTAL: passive_total,
+            models.Quota.USED: passive,
+        },
+        active={
+            models.Quota.PERIOD: "Daily",
+            models.Quota.TOTAL: active_total,
+            models.Quota.USED: active,
+        },
+    )

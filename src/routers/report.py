@@ -129,25 +129,102 @@ async def retrieve_reports(
 
     if not summary_keys:
         response.status_code = status.HTTP_204_NO_CONTENT
+        internals.logger.warning(f"No reports for {prefix_key}")
         return
 
     for summary_key in summary_keys:
         if not summary_key.endswith("summary.json"):
             continue
-        try:
-            ret = services.aws.get_s3(summary_key)
-            if not ret:
-                continue
-            item = json.loads(ret)
-            if item.get("config"):
-                del item["config"]
-            if item.get("flags"):
-                del item["flags"]
-            item["results_uri"] = f'/result/{summary_key.split("/")[-2]}/summary'
-            data.append(item)
-        except RuntimeError as err:
-            internals.logger.exception(err)
+        ret = services.aws.get_s3(summary_key)
+        if not ret:
             continue
+        item = json.loads(ret)
+        if item.get("config"):
+            del item["config"]
+        if item.get("flags"):
+            del item["flags"]
+        item["results_uri"] = f'/result/{summary_key.split("/")[-2]}/summary'
+        data.append(item)
+
+    if not data:
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return
+
+    return data
+
+@router.get("/hosts",
+    response_model=list[models.Host],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    tags=["Scan Reports"],
+)
+async def retrieve_hosts(
+    request: Request,
+    response: Response,
+    return_details: bool = False,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Retrieves a collection of your own Trivial Scanner reports, providing
+    a distinct list of hosts and ports, optionally returning the latest host
+    full record
+    """
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        return
+
+    path_keys = []
+    data = []
+    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
+    try:
+        path_keys = services.aws.list_s3(prefix_key)
+
+    except RuntimeError as err:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        internals.logger.exception(err)
+        return []
+
+    if not path_keys:
+        response.status_code = status.HTTP_204_NO_CONTENT
+        internals.logger.warning(f"No reports for {prefix_key}")
+        return
+
+    seen = set()
+    for object_key in path_keys:
+        if not object_key.endswith("summary.json"):
+            continue
+        ret = services.aws.get_s3(object_key)
+        if not ret:
+            continue
+        item = json.loads(ret)
+        if not isinstance(item, dict):
+            continue
+        report = models.FullReport(**item)
+        for target in report.targets or []:
+            if target not in seen:
+                seen.add(target)
+                hostname, port = target.split(":")
+                tspt = models.HostTransport(hostname=hostname, port=port)  # type: ignore
+                host = models.Host(transport=tspt)  # type: ignore
+                if return_details:
+                    host.load()
+                data.append(host)
+
+    if not data:
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return
 
     return data
 

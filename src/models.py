@@ -266,6 +266,39 @@ class SubscriptionAddon(SubscriptionBase, DAL):
             super().__init__(**res[-1])
             return self
 
+class SubscriptionBooster(SubscriptionBase, DAL):
+    def load(self, account_name: str) -> Union['SubscriptionBooster', None]:
+        """
+        Derives a Stripe subscription based on having at least one active record
+        and returns only the most recent. Any other requirements should load the
+        data directly outside this class
+        """
+        if not account_name:
+            raise AttributeError('Subscription.load missing account_name')
+
+        subs = []
+        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.CONTINUOUS_MONITORING_BOOSTER}/"
+        matches = services.aws.list_s3(prefix_key=prefix_key)
+        for match in matches:
+            raw = services.aws.get_s3(match)
+            if not raw:
+                continue
+            try:
+                data = json.loads(raw)
+            except json.decoder.JSONDecodeError as err:
+                internals.logger.debug(err, exc_info=True)
+                continue
+            if not data or not isinstance(data, dict):
+                internals.logger.debug(f"not data {match}")
+                continue
+            if data.get('livemode') and data.get('status') in [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING]:
+                subs.append(data)
+
+        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get('created')))
+        if res:
+            super().__init__(**res[-1])
+            return self
+
 class SubscriptionPro(SubscriptionBase, DAL):
     def load(self, account_name: str) -> Union['SubscriptionPro', None]:
         """
@@ -388,30 +421,31 @@ class MemberAccount(AccountRegistration, DAL):
     billing: Union[Billing, None] = Field(default=None)
 
     def load_billing(self):
-        if sub := SubscriptionAddon().load(self.name):
+        if sub := SubscriptionAddon().load(self.name):  # type: ignore
             return self._billing(sub)
-        elif sub := SubscriptionPro().load(self.name):
+        elif sub := SubscriptionPro().load(self.name):  # type: ignore
             return self._billing(sub)
-        elif sub := SubscriptionEnterprise().load(self.name):
+        elif sub := SubscriptionEnterprise().load(self.name):  # type: ignore
             return self._billing(sub)
-        elif sub := SubscriptionUnlimited().load(self.name):
+        elif sub := SubscriptionUnlimited().load(self.name):  # type: ignore
             return self._billing(sub)
         self.billing = Billing(
-            product_name=services.stripe.PRODUCTS.get(services.stripe.Product.COMMUNITY_EDITION).get("name")
+            product_name=services.stripe.PRODUCTS.get(services.stripe.Product.COMMUNITY_EDITION).get("name")  # type: ignore
         )
 
     def _billing(self, sub: SubscriptionBase):
         self.billing = Billing(
-            product_name=services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")
+            product_name=services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")  # type: ignore
         )
         self.billing.is_trial = sub.status == SubscriptionStatus.TRIALING
         self.billing.has_invoice = isinstance(sub.latest_invoice, str) and sub.latest_invoice.startswith("in_")
-        currency = sub.subscription_item.price.currency
-        amount = sub.subscription_item.price.unit_amount_decimal
+        currency = sub.subscription_item.price.currency  # type: ignore
+        amount = sub.subscription_item.price.unit_amount_decimal  # type: ignore
         self.billing.display_amount = f'{currency.upper()} ${amount}'
-        self.billing.display_period = sub.subscription_item.price.recurring.interval.capitalize()
+        self.billing.display_period = sub.subscription_item.price.recurring.interval.capitalize()  # type: ignore
         if not sub.cancel_at_period_end:
-            self.billing.next_due = sub.current_period_end * 1000 # JavaScript compatibility
+            # JavaScript compatibility
+            self.billing.next_due = sub.current_period_end * 1000  # type: ignore
         if sub.default_payment_method and sub.collection_method == SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY:
             self.billing.description = "Stripe Payments"
         elif sub.collection_method == SubscriptionCollectionMethod.SEND_INVOICE:
@@ -1293,3 +1327,15 @@ class DashboardCompliance(BaseModel):
     label: GraphLabel
     ranges: list[GraphLabelRanges]
     data: dict[GraphLabelRanges, list[ComplianceChartItem]]
+
+class Quota(str, Enum):
+    USED = "used"
+    TOTAL = "total"
+    PERIOD = "period"
+
+class DashboardQuotas(BaseModel):
+    unlimited_monitoring: bool
+    unlimited_scans: bool
+    monitoring: dict[Quota, Any]
+    passive: dict[Quota, Any]
+    active: dict[Quota, Any]
