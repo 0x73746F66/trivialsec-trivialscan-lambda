@@ -482,6 +482,13 @@ async def certificate_issues(
                 continue
             if not item.observed_at:
                 item.observed_at = report.date
+            if item.cvss2:
+                item.references.append(models.ReferenceItem(name=f"CVSSv2 {item.cvss2}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v2-calculator?vector=({item.cvss2})"))  # type: ignore
+            if item.cvss3:
+                item.references.append(models.ReferenceItem(name=f"CVSSv3.1 {item.cvss3}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?version=3.1&vector={item.cvss3}"))  # type: ignore
+            if item.cve:
+                for cve in item.cve:
+                    item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
             full_data.append(item)
 
     if not full_data:
@@ -570,6 +577,13 @@ async def latest_findings(
                 continue
             if not item.observed_at:
                 item.observed_at = report.date
+            if item.cvss2:
+                item.references.append(models.ReferenceItem(name=f"CVSSv2 {item.cvss2}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v2-calculator?vector=({item.cvss2})"))  # type: ignore
+            if item.cvss3:
+                item.references.append(models.ReferenceItem(name=f"CVSSv3.1 {item.cvss3}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?version=3.1&vector={item.cvss3}"))  # type: ignore
+            if item.cve:
+                for cve in item.cve:
+                    item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
             full_data.append(item)
 
     if not full_data:

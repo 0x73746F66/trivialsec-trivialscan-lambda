@@ -1148,6 +1148,9 @@ class EvaluationItem(DefaultInfo, DAL):
     threats: Union[list[ThreatItem], None] = Field(default=[])
     transport: Optional[HostTransport]
     certificate: Optional[Certificate]
+    @validator("references")
+    def set_references(cls, references):
+        return [] if not isinstance(references, list) else references
     @validator("cvss2")
     def set_cvss2(cls, cvss2):
         return None if not isinstance(cvss2, str) else cvss2
