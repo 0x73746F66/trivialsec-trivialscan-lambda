@@ -420,9 +420,9 @@ async def store(
     return
 
 @router.get("/findings/certificate",
-    # response_model=list[models.EvaluationItem],
-    # response_model_exclude_unset=True,
-    # response_model_exclude_none=True,
+    response_model=list[models.EvaluationItem],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
