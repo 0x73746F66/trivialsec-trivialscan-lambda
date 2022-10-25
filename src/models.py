@@ -1337,9 +1337,59 @@ class Quota(str, Enum):
     TOTAL = "total"
     PERIOD = "period"
 
-class DashboardQuotas(BaseModel):
+class AccountQuotas(BaseModel):
     unlimited_monitoring: bool
     unlimited_scans: bool
     monitoring: dict[Quota, Any]
     passive: dict[Quota, Any]
     active: dict[Quota, Any]
+
+class MonitorRecord(BaseModel):
+    port: int
+    date_checked: datetime
+    http_paths: list[str]
+    report_id: str
+
+class MonitorHostname(BaseModel):
+    hostname: str
+    timestamp: int
+    enabled: bool = Field(default=False)
+    history: list[MonitorRecord] = Field(default=[])
+
+class Monitor(BaseModel, DAL):
+    account: Optional[MemberAccount]
+    targets: list[MonitorHostname] = Field(default=[])
+
+    def exists(self, account_name: Union[str, None] = None) -> bool:
+        return self.load(account_name) is not None
+
+    def load(self, account_name: Union[str, None] = None) -> Union['Monitor', None]:
+        if account_name:
+            self.account = MemberAccount(name=account_name).load()  # type: ignore
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/monitor.json"  # type: ignore
+        raw = services.aws.get_s3(object_key)
+        if not raw:
+            internals.logger.warning(f"Missing Monitor {object_key}")
+            return
+        try:
+            data = json.loads(raw)
+        except json.decoder.JSONDecodeError as err:
+            internals.logger.debug(err, exc_info=True)
+            return
+        if not data or not isinstance(data, dict):
+            internals.logger.warning(
+                f"Missing Monitor {object_key}")
+            return
+        super().__init__(**data)
+        return self
+
+    def save(self) -> bool:
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/monitor.json"  # type: ignore
+        return services.aws.store_s3(
+            object_key,
+            json.dumps(self.dict(), default=str)
+        )
+
+    def delete(self) -> bool:
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/monitor.json"  # type: ignore
+        return services.aws.delete_s3(object_key)

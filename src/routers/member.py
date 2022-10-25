@@ -80,6 +80,7 @@ async def member_profile(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
+
     event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
@@ -93,7 +94,7 @@ async def member_profile(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
-    authz.session.member.account.load_billing()
+    authz.session.member.account.load_billing()  # type: ignore
     return authz.session
 
 @router.get("/sessions",
