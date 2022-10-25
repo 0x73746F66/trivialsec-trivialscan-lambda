@@ -31,7 +31,7 @@ dependencies = [
     "user-agents==2.2.0",
     "geocoder==1.38.1",
     "stripe==4.2.0",
-    "cachier-1.5.4",
+    "cachier==1.5.4",
 ]
 
 [tool.coverage.run]
