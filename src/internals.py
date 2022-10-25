@@ -236,7 +236,7 @@ class Authorization:
                 logger.critical(f"DENY missing MemberProfile {self._hmac.id}")
                 return
             self.account = self.member.account.load()  # type: ignore
-            session_token = hashlib.sha224(bytes(f'{self.member.email}{self.ip_addr}{self.user_agent}', 'ascii')).hexdigest()
+            session_token = hashlib.sha224(bytes(f'{self.member.email}{ua.get_browser()}{ua.get_os()}{ua.get_device()}', 'ascii')).hexdigest()
             logger.info(f"Session HMAC-based Authorization: session_token {session_token}")
             self.session = models.MemberSession(member=self.member, session_token=session_token).load()  # type: ignore
             if not self.session:

@@ -256,8 +256,7 @@ async def magic_link(
     if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
-    magic_token = hashlib.sha224(
-        bytes(f'{random()}{user_agent}{ip_addr}', 'ascii')).hexdigest()
+    magic_token = hashlib.sha224(bytes(str(random()), 'ascii')).hexdigest()
     login_url = f"{internals.DASHBOARD_URL}/login/{magic_token}"
     try:
         if member := models.MemberProfile(email=data.email).load():
@@ -348,8 +347,8 @@ async def login(
         if not user_agent:
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
-        session_token = hashlib.sha224(
-            bytes(f'{member.email}{ip_addr}{user_agent}', 'ascii')).hexdigest()
+        ua = ua_parser(user_agent)
+        session_token = hashlib.sha224(bytes(f'{member.email}{ua.get_browser()}{ua.get_os()}{ua.get_device()}', 'ascii')).hexdigest()
         session = models.MemberSession(
             member=member,
             session_token=session_token,
@@ -416,7 +415,7 @@ async def update_email(
         internals.logger.error("Invalid Authorization")
         return
     try:
-        token = hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest()
+        token = hashlib.sha224(bytes(str(random()), 'ascii')).hexdigest()
         sendgrid = services.sendgrid.send_email(
             subject="Request to Change Email Address",
             recipient=authz.member.account.primary_email,  # type: ignore
@@ -553,7 +552,7 @@ async def send_member_invitation(
             account=authz.account,
             email=data.email,
             confirmed=False,
-            confirmation_token=hashlib.sha224(bytes(f'{random()}', 'ascii')).hexdigest(),
+            confirmation_token=hashlib.sha224(bytes(str(random()), 'ascii')).hexdigest(),
             timestamp=round(time() * 1000),  # JavaScript support
         )
         if not member.save():

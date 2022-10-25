@@ -765,10 +765,10 @@ class MemberSessionRedacted(MemberSession):
 
 class CheckToken(BaseModel):
     version: Union[str, None] = Field(default=None)
-    session: Union[MemberSession, None] = Field(default=None)
-    client: Union[Client, None] = Field(default=None)
-    account: Union[MemberAccount, None] = Field(default=None)
-    member: Union[MemberProfile, None] = Field(default=None)
+    session: Union[MemberSessionRedacted, None] = Field(default=None)
+    client: Union[ClientRedacted, None] = Field(default=None)
+    account: Union[MemberAccountRedacted, None] = Field(default=None)
+    member: Union[MemberProfileRedacted, None] = Field(default=None)
     authorisation_valid: bool = Field(default=False, title="HMAC Signature validation", description="Provides verifiable proof the client has possession of the Registration Token (without exposing/transmitting the token), using SHA256 hashing of the pertinent request information")
     ip_addr: Union[str, None] = Field(default=None, description="Source IP Address")
     user_agent: Union[str, None] = Field(default=None, description="Source HTTP Client")
