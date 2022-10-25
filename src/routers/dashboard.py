@@ -1,7 +1,9 @@
 from typing import Union
+from datetime import timedelta
 
 from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
+from cachier import cachier
 
 import internals
 import models
@@ -20,7 +22,12 @@ router = APIRouter()
             status_code=status.HTTP_200_OK,
             tags=["Dashboard"],
             )
-async def dashboard_compliance(
+@cachier(
+    stale_after=timedelta(hours=1),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+)
+def dashboard_compliance(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),
@@ -134,6 +141,7 @@ async def dashboard_compliance(
 
     return charts
 
+
 @router.get("/dashboard/quotas",
             response_model=models.AccountQuotas,
             response_model_exclude_unset=True,
@@ -141,7 +149,12 @@ async def dashboard_compliance(
             status_code=status.HTTP_200_OK,
             tags=["Dashboard"],
             )
-async def dashboard_quotas(
+@cachier(
+    stale_after=timedelta(minutes=5),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+)
+def dashboard_quotas(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),

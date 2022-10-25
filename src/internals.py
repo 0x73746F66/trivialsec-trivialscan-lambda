@@ -13,6 +13,9 @@ from user_agents import parse as ua_parser
 from starlette.requests import Request
 from pydantic import IPvAnyAddress
 
+import services.helpers
+
+CACHE_DIR = getenv("CACHE_DIR", "/tmp")
 JITTER_SECONDS = int(getenv("JITTER_SECONDS", "30"))
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
@@ -29,9 +32,6 @@ DASHBOARD_URL = "https://www.trivialsec.com"
 logger = logging.getLogger()
 
 class HMAC:
-    auth_param_re = r'([a-zA-Z0-9_\-]+)=(([a-zA-Z0-9_\-]+)|("")|(".*[^\\]"))'
-    auth_param_re = re.compile(r"^\s*" + auth_param_re + r"\s*$")
-    unesc_quote_re = re.compile(r'(^")|([^\\]")')
     default_algorithm = 'sha512'
     supported_algorithms = {
         'sha256': hashlib.sha256,
@@ -99,29 +99,7 @@ class HMAC:
         self.algorithm = algorithm
         self._expire_after_seconds = expire_after_seconds
         self._not_before_seconds = not_before_seconds
-        self._parse_auth_header()
-
-    def _parse_auth_header(self) -> None:
-        scheme, pairs_str = self.authorization_header.split(None, 1)
-        self.parsed_header = {"scheme": scheme}
-        pairs = []
-        if pairs_str:
-            for pair in pairs_str.split(","):
-                if not pairs or self.auth_param_re.match(pairs[-1]):  # type: ignore
-                    pairs.append(pair)
-                else:
-                    pairs[-1] = pairs[-1] + "," + pair
-            if not self.auth_param_re.match(pairs[-1]):  # type: ignore
-                raise ValueError('Malformed auth parameters')
-        for pair in pairs:
-            (key, value) = pair.strip().split("=", 1)
-            # For quoted strings, remove quotes and backslash-escapes.
-            if value.startswith('"'):
-                value = value[1:-1]
-                if self.unesc_quote_re.search(value):
-                    raise ValueError("Unescaped quote in quoted-string")
-                value = re.compile(r"\\.").sub(lambda m: m.group(0)[1], value)
-            self.parsed_header[key] = value
+        self.parsed_header = services.helpers.parse_authorization_header(authorization_header)
 
     def is_valid_scheme(self) -> bool:
         return self.authorization_header.startswith('HMAC')

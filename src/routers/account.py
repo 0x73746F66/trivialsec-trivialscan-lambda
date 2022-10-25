@@ -2,6 +2,7 @@ import hashlib
 import json
 from os import path
 from time import time
+from datetime import timedelta
 from random import random
 from secrets import token_urlsafe
 from typing import Union
@@ -9,12 +10,14 @@ from typing import Union
 from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
 import validators
+from cachier import cachier
 
 import internals
 import models
 import services.sendgrid
 import services.stripe
 import services.aws
+import services.helpers
 
 router = APIRouter()
 
@@ -186,14 +189,20 @@ async def claim_client(
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
+
 @router.get("/clients",
             response_model=list[models.ClientRedacted],
             response_model_exclude_unset=True,
-    response_model_exclude_none=True,
+            response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Member Account"],
             )
-async def retrieve_clients(
+@cachier(
+    stale_after=timedelta(seconds=30),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+)
+def retrieve_clients(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),
@@ -318,7 +327,7 @@ async def support_request(
 @router.get("/activate/{client_name}",
             response_model=models.ClientRedacted,
             response_model_exclude_unset=True,
-    response_model_exclude_none=True,
+            response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Member Account"],
             )
@@ -360,7 +369,7 @@ async def activate_client(
 @router.get("/deactived/{client_name}",
             response_model=models.ClientRedacted,
             response_model_exclude_unset=True,
-    response_model_exclude_none=True,
+            response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Member Account"],
             )
@@ -409,7 +418,7 @@ async def deactived_client(
 async def update_billing_email(
     request: Request,
     response: Response,
-data: models.EmailEditRequest,
+    data: models.EmailEditRequest,
     authorization: Union[str, None] = Header(default=None),
 ):
     """

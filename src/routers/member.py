@@ -1,6 +1,7 @@
 import hashlib
 import json
 from time import time
+from datetime import timedelta
 from random import random
 from typing import Union
 from secrets import token_urlsafe
@@ -11,12 +12,14 @@ from user_agents import parse as ua_parser
 from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
 from pydantic import EmailStr
+from cachier import cachier
 
 import internals
 import models
 import services.aws
 import services.sendgrid
 import services.stripe
+import services.helpers
 
 router = APIRouter()
 
@@ -68,7 +71,12 @@ async def validate_authorization(
             status_code=status.HTTP_200_OK,
             tags=["Member Profile"],
             )
-async def member_profile(
+@cachier(
+    stale_after=timedelta(seconds=30),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+)
+def member_profile(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),
@@ -145,6 +153,7 @@ async def member_sessions(
         session.current = session.session_token == authz.session.session_token  # type: ignore
     return sessions
 
+
 @router.get("/members",
             response_model=list[models.MemberProfileRedacted],
             response_model_exclude_unset=True,
@@ -152,7 +161,12 @@ async def member_sessions(
             status_code=status.HTTP_200_OK,
             tags=["Member Profile"],
             )
-async def list_members(
+@cachier(
+    stale_after=timedelta(seconds=30),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+)
+def list_members(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),

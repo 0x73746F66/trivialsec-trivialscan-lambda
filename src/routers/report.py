@@ -2,16 +2,19 @@ import json
 from os import path
 from secrets import token_urlsafe
 from typing import Union
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from fastapi import Header, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
+from cachier import cachier
 
 import internals
 import models
 import services.aws
+import services.helpers
 
 router = APIRouter()
+
 
 @router.get("/summary/{report_id}",
     response_model=models.ReportSummary,
@@ -20,7 +23,12 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
-async def retrieve_summary(
+@cachier(
+    stale_after=timedelta(hours=1),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+)
+def retrieve_summary(
     request: Request,
     response: Response,
     report_id: str,
@@ -49,6 +57,7 @@ async def retrieve_summary(
         return
     return summary
 
+
 @router.get("/report/{report_id}",
     response_model=models.FullReport,
     response_model_exclude_unset=True,
@@ -56,7 +65,12 @@ async def retrieve_summary(
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
-async def retrieve_report(
+@cachier(
+    stale_after=timedelta(hours=1),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+)
+def retrieve_report(
     request: Request,
     response: Response,
     report_id: str,
@@ -86,6 +100,7 @@ async def retrieve_report(
 
     return report
 
+
 @router.get("/reports",
     response_model=list[models.ReportSummary],
     response_model_exclude_unset=True,
@@ -93,7 +108,12 @@ async def retrieve_report(
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
-async def retrieve_reports(
+@cachier(
+    stale_after=timedelta(seconds=30),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+)
+def retrieve_reports(
     request: Request,
     response: Response,
     authorization: Union[str, None] = Header(default=None),
@@ -152,6 +172,7 @@ async def retrieve_reports(
 
     return data
 
+
 @router.get("/hosts",
     response_model=list[models.Host],
     response_model_exclude_unset=True,
@@ -159,7 +180,12 @@ async def retrieve_reports(
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
-async def retrieve_hosts(
+@cachier(
+    stale_after=timedelta(seconds=30),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    )
+def retrieve_hosts(
     request: Request,
     response: Response,
     return_details: bool = False,
@@ -228,6 +254,7 @@ async def retrieve_hosts(
 
     return data
 
+
 @router.get("/host/{hostname}",
     response_model=models.Host,
     response_model_exclude_unset=True,
@@ -235,7 +262,12 @@ async def retrieve_hosts(
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
-async def retrieve_host(
+@cachier(
+    stale_after=timedelta(seconds=30),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    )
+def retrieve_host(
     request: Request,
     response: Response,
     hostname: str,
@@ -274,6 +306,7 @@ async def retrieve_host(
         internals.logger.exception(err)
         return err
 
+
 @router.get("/certificate/{sha1_fingerprint}",
     response_model=models.Certificate,
     response_model_exclude_unset=True,
@@ -281,7 +314,12 @@ async def retrieve_host(
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
-async def retrieve_certificate(
+@cachier(
+    stale_after=timedelta(seconds=30),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    )
+def retrieve_certificate(
     request: Request,
     response: Response,
     sha1_fingerprint: str,
@@ -419,6 +457,7 @@ async def store(
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
+
 @router.get("/findings/certificate",
     response_model=list[models.EvaluationItem],
     response_model_exclude_unset=True,
@@ -426,7 +465,12 @@ async def store(
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
-async def certificate_issues(
+@cachier(
+    stale_after=timedelta(minutes=5),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    )
+def certificate_issues(
     request: Request,
     response: Response,
     limit: int = 20,
@@ -513,6 +557,7 @@ async def certificate_issues(
 
     return sorted_data
 
+
 @router.get("/findings/latest",
     response_model=list[models.EvaluationItem],
     response_model_exclude_unset=True,
@@ -520,7 +565,12 @@ async def certificate_issues(
     status_code=status.HTTP_200_OK,
     tags=["Scan Reports"],
 )
-async def latest_findings(
+@cachier(
+    stale_after=timedelta(minutes=5),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw["limit"])
+)
+def latest_findings(
     request: Request,
     response: Response,
     limit: int = 20,
