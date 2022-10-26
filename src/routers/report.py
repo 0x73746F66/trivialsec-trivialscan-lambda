@@ -2,9 +2,9 @@ import json
 from os import path
 from secrets import token_urlsafe
 from typing import Union
-from datetime import timedelta
+from datetime import datetime, timedelta
 
-from fastapi import Header, APIRouter, Response, File, UploadFile, status
+from fastapi import Header, Query, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
 from cachier import cachier
 
@@ -272,6 +272,7 @@ def retrieve_host(
     response: Response,
     hostname: str,
     port: int = 443,
+    last_updated: Union[datetime, None] = Query(default=None, description="Return the result for specific date rather than the latest (default) Host information"),
     authorization: Union[str, None] = Header(default=None),
 ):
     """
@@ -292,6 +293,25 @@ def retrieve_host(
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
 
+    # prefix_key = path.join(internals.APP_ENV, "hosts", hostname, str(port))
+    # if last_updated:
+    #     path_keys = services.aws.list_s3(prefix_key)
+    #     if not path_keys:
+    #         response.status_code = status.HTTP_204_NO_CONTENT
+    #         internals.logger.warning(f"No reports for {prefix_key}")
+    #         return
+
+    #     for object_key in path_keys:
+    #         if not object_key.endswith("latest.json"):
+    #             continue
+    #         ret = services.aws.get_s3(object_key)
+    #         if not ret:
+    #             continue
+    #         d = json.loads(ret)
+    #         if not isinstance(d, dict):
+    #             continue
+
+    #     scan_date = last_updated.strftime("%Y%m%d")  # type: ignore
     host_key = path.join(internals.APP_ENV, "hosts", hostname, str(port), "latest.json")
     try:
         ret = services.aws.get_s3(host_key)
@@ -409,6 +429,7 @@ async def store(
         report_id = token_urlsafe(56)
         results_uri = f"/result/{report_id}/summary"
         report = models.ReportSummary(report_id=report_id, results_uri=results_uri, **data)
+        # report.date = datetime.utcnow() - timedelta(days=27)
         if report.save():
             return {"results_uri": results_uri}
 
@@ -419,6 +440,7 @@ async def store(
             response.status_code = status.HTTP_412_PRECONDITION_FAILED
             return
         items = []
+        certs = {}
         for _item in data['evaluations']:
             item = models.EvaluationItem(
                 generator=_report.generator,
@@ -431,7 +453,9 @@ async def store(
                 **_item,
             )
             if item.group == "certificate" and item.metadata.get("sha1_fingerprint"):
-                item.certificate = models.Certificate(sha1_fingerprint=item.metadata.get("sha1_fingerprint")).load()  # type: ignore
+                if item.metadata.get("sha1_fingerprint") in certs:
+                    certs[item.metadata.get("sha1_fingerprint")] = models.Certificate(sha1_fingerprint=item.metadata.get("sha1_fingerprint")).load()  # type: ignore
+                item.certificate = certs[item.metadata.get("sha1_fingerprint")]
             items.append(item)
         report = models.FullReport(**_report.dict())  # type: ignore
         report.evaluations = items

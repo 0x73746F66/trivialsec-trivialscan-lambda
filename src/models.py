@@ -831,10 +831,10 @@ class DefaultInfo(BaseModel):
 
 class ConfigDefaults(BaseModel):
     use_sni: bool
-    cafiles: Union[str, None]
+    cafiles: Union[str, None] = Field(default=None)
     tmp_path_prefix: str = Field(default="/tmp")
     http_path: str = Field(default="/")
-    checkpoint: bool
+    checkpoint: Optional[bool]
 
 class ConfigOutput(BaseModel):
     type: OutputType
@@ -866,17 +866,16 @@ class Flags(BaseModel):
 
 class HostTLSProtocol(BaseModel):
     negotiated: str
-    negotiated_rfc: str
     preferred: str
-    preferred_rfc: str
     offered: list[str]
-    offered_rfc: list[str]
 
 class HostTLSCipher(BaseModel):
     forward_anonymity: Union[bool, None] = Field(default=False)
     offered: list[str]
+    offered_rfc: list[str]
     negotiated: str
     negotiated_bits: PositiveInt
+    negotiated_rfc: str
 
 class HostTLSClient(BaseModel):
     certificate_mtls_expected: Union[bool, None] = Field(default=False)
@@ -1122,7 +1121,7 @@ class ReportSummary(DefaultInfo, DAL):
         object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
         return services.aws.delete_s3(object_key)
 
-class EvaluationItem(DefaultInfo, DAL):
+class EvaluationItem(DefaultInfo):
     class Config:
         validate_assignment = True
     report_id: str
@@ -1158,47 +1157,6 @@ class EvaluationItem(DefaultInfo, DAL):
     def set_cvss3(cls, cvss3):
         return None if not isinstance(cvss3, str) else cvss3
 
-    def exists(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None, group_id: Union[str, None] = None, rule_id: Union[str, None] = None) -> bool:
-        return self.load(report_id, account_name, group_id, rule_id) is not None
-
-    def load(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None, group_id: Union[str, None] = None, rule_id: Union[str, None] = None) -> Union['EvaluationItem', None]:
-        if report_id:
-            self.report_id = report_id
-        if account_name:
-            self.account_name = account_name
-        if group_id:
-            self.group_id = group_id
-        if rule_id:
-            self.rule_id = rule_id
-
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/{self.group_id}/{self.rule_id}.json"
-        raw = services.aws.get_s3(object_key)
-        if not raw:
-            internals.logger.warning(f"Missing EvaluationItem {object_key}")
-            return
-        try:
-            data = json.loads(raw)
-        except json.decoder.JSONDecodeError as err:
-            internals.logger.debug(err, exc_info=True)
-            return
-        if not data or not isinstance(data, dict):
-            internals.logger.warning(
-                f"Missing EvaluationItem {object_key}")
-            return
-        super().__init__(**data)
-        return self
-
-    def save(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/{self.group_id}/{self.rule_id}.json"
-        return services.aws.store_s3(
-            object_key,
-            json.dumps(self.dict(), default=str)
-        )
-
-    def delete(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/{self.group_id}/{self.rule_id}.json"
-        return services.aws.delete_s3(object_key)
-
 class FullReport(ReportSummary, DAL):
     evaluations: Optional[list[EvaluationItem]] = Field(default=[])
 
@@ -1228,14 +1186,7 @@ class FullReport(ReportSummary, DAL):
 
     def save(self) -> bool:
         results: list[bool] = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
-        for item in self.evaluations:  # type: ignore
-            object_key = f"{prefix_key}{item.group_id}/{item.rule_id}.json"
-            results.append(services.aws.store_s3(
-                object_key,
-                json.dumps(item.dict(), default=str),
-            ))
-        object_key = f"{prefix_key}full-report.json"
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
         results.append(services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
