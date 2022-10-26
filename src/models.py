@@ -909,6 +909,7 @@ class HostTransport(BaseModel):
     certificate_mtls_expected: Union[bool, None] = Field(default=False)
 
 class Host(BaseModel, DAL):
+    error: Optional[tuple[str, str]]
     last_updated: Optional[datetime]
     transport: HostTransport
     tls: Optional[HostTLS]
