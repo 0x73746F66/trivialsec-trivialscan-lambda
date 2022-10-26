@@ -902,6 +902,7 @@ class HostHTTP(BaseModel):
     body_hash: str
 
 class HostTransport(BaseModel):
+    error: Optional[tuple[str, str]]
     hostname: str = Field(title="Domain Name")
     port: PositiveInt = Field(default=443)
     sni_support: Optional[bool]
@@ -909,7 +910,6 @@ class HostTransport(BaseModel):
     certificate_mtls_expected: Union[bool, None] = Field(default=False)
 
 class Host(BaseModel, DAL):
-    error: Optional[tuple[str, str]]
     last_updated: Optional[datetime]
     transport: HostTransport
     tls: Optional[HostTLS]

@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, time, timezone
 
 import models
 
@@ -32,7 +32,8 @@ def date_label(date: datetime) -> tuple[str, str, int]:
             label = "1 day ago"
         elif delta.days <= 30:
             label = f"{delta.days} days ago"
-    return label, group, round((now - delta).timestamp()*1000)
+    timestamp = datetime.combine(now - delta, time(0, 0, 0), tzinfo=timezone.utc).timestamp()
+    return label, group, round(timestamp)
 
 
 def get_quotas(
