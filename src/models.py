@@ -1326,6 +1326,7 @@ class GraphLabel(str, Enum):
 class ComplianceChartItem(BaseModel):
     name: str
     num: int
+    timestamp: int
 
 class DashboardCompliance(BaseModel):
     label: GraphLabel

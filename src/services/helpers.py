@@ -3,7 +3,7 @@ from datetime import datetime
 
 import models
 
-def date_label(date: datetime) -> tuple[str, str]:
+def date_label(date: datetime) -> tuple[str, str, int]:
     label = "a moment ago"
     group: str
     now = datetime.utcnow()
@@ -32,7 +32,7 @@ def date_label(date: datetime) -> tuple[str, str]:
             label = "1 day ago"
         elif delta.days <= 30:
             label = f"{delta.days} days ago"
-    return label, group
+    return label, group, round((now - delta).timestamp()*1000)
 
 
 def get_quotas(

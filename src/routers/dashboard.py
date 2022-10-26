@@ -80,8 +80,8 @@ def dashboard_compliance(
             report_id=summary_key.replace(
                 prefix_key, '').replace("/full-report.json", '')
         ).load()
-        group_name, range_group = services.helpers.date_label(report.date)  # type: ignore
-        cur_results = {"group_name": group_name}
+        group_name, range_group, timestamp = services.helpers.date_label(report.date)  # type: ignore
+        cur_results = {"group_name": group_name, "timestamp": timestamp}
         for item in report.evaluations:  # type: ignore
             if item.result_level == "pass":
                 continue
@@ -113,16 +113,19 @@ def dashboard_compliance(
             for _result in results:
                 if c not in _result or r not in _result[c]:
                     continue
-                agg_sums[c][r].setdefault(_result['group_name'], [])
-                agg_sums[c][r][_result['group_name']].append(_result[c][r])
+                key = (_result['group_name'], _result['timestamp'])
+                agg_sums[c][r].setdefault(key, [])
+                agg_sums[c][r][key].append(_result[c][r])
     for c, g in agg_sums.items():
         for r, d in g.items():
-            for group_name, sum_arr in d.items():
+            for group_key, sum_arr in d.items():
+                group_name, timestamp = group_key
                 if sum(sum_arr) > 0:
                     chart_data[c][r].append(
                         models.ComplianceChartItem(
                             name=group_name,
-                            num=sum(sum_arr)
+                            num=sum(sum_arr),
+                            timestamp=timestamp,
                         )
                     )
     for c, d in chart_data.items():

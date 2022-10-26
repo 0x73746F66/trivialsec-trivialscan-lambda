@@ -1,5 +1,4 @@
 import logging
-import re
 import hmac
 import hashlib
 from base64 import b64encode
