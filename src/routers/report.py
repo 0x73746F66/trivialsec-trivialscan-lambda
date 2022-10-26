@@ -453,7 +453,7 @@ async def store(
                 **_item,
             )
             if item.group == "certificate" and item.metadata.get("sha1_fingerprint"):
-                if item.metadata.get("sha1_fingerprint") in certs:
+                if item.metadata.get("sha1_fingerprint") not in certs:
                     certs[item.metadata.get("sha1_fingerprint")] = models.Certificate(sha1_fingerprint=item.metadata.get("sha1_fingerprint")).load()  # type: ignore
                 item.certificate = certs[item.metadata.get("sha1_fingerprint")]
             items.append(item)
