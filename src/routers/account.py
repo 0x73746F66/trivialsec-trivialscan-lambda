@@ -159,7 +159,6 @@ async def claim_client(
             ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
             account_name=x_trivialscan_account,
         )
-        internals.logger.warning(f"Validating Authorization {authz.is_valid}")
         if not authz.is_valid:
             response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
             response.status_code = status.HTTP_401_UNAUTHORIZED
@@ -181,6 +180,65 @@ async def claim_client(
         )
         if client.save():
             return client
+    except RuntimeError as err:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        internals.logger.exception(err)
+        return
+
+    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return
+
+
+@router.post("/auth/{client_name}",
+             response_model=models.CheckToken,
+             response_model_exclude_unset=True,
+             response_model_exclude_none=True,
+             status_code=status.HTTP_201_CREATED,
+             tags=["Member Account"],
+             )
+async def auth_client(
+    request: Request,
+    response: Response,
+    client_name: str,
+    client_info: models.ClientInfo,
+    authorization: Union[str, None] = Header(default=None),
+    x_trivialscan_account: Union[str, None] = Header(default=None),
+    x_trivialscan_version: Union[str, None] = Header(default=None),
+):
+    """
+    Authenticates the generated access token and client
+    """
+    try:
+        if not authorization:
+            response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+            response.status_code = status.HTTP_403_FORBIDDEN
+            return
+        if validators.email(client_name) is True:  # type: ignore
+            print(f"Email {client_name} can not be used for client name")
+            internals.logger.warning(f"Email {client_name} can not be used for client name")
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return
+        event = request.scope.get("aws.event", {})
+        authz = internals.Authorization(
+            request=request,
+            user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+            ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+            account_name=x_trivialscan_account,
+        )
+        if not authz.is_valid:
+            response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            internals.logger.error("Invalid Authorization")
+            return
+        authz.client.client_info = client_info  # type: ignore
+        authz.client.cli_version = x_trivialscan_version  # type: ignore
+        authz.client.ip_addr = authz.ip_addr  # type: ignore
+        authz.client.user_agent = authz.user_agent  # type: ignore
+        if authz.client.save():  # type: ignore
+            return {
+                "client": authz.client,
+                "authorisation_valid": authz.is_valid,
+            }
     except RuntimeError as err:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
