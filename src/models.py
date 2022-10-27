@@ -1346,3 +1346,15 @@ class Monitor(BaseModel, DAL):
     def delete(self) -> bool:
         object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/monitor.json"  # type: ignore
         return services.aws.delete_s3(object_key)
+
+class SearchHostname(BaseModel):
+    hostname: str
+    monitoring: bool = Field(default=False)
+
+class SearchIP(BaseModel):
+    last_scanned: int
+    ip_addr: str
+    hostname: str
+    monitoring: bool = Field(default=False)
+    ports: list[int]
+    reports: list[str]
