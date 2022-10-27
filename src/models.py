@@ -1347,14 +1347,10 @@ class Monitor(BaseModel, DAL):
         object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/monitor.json"  # type: ignore
         return services.aws.delete_s3(object_key)
 
-class SearchHostname(BaseModel):
+class SearchResult(BaseModel):
+    last_scanned: Union[int, None]
     hostname: str
     monitoring: bool = Field(default=False)
-
-class SearchIP(BaseModel):
-    last_scanned: int
-    ip_addr: str
-    hostname: str
-    monitoring: bool = Field(default=False)
+    ip_addr: list[str]
     ports: list[int]
     reports: list[str]

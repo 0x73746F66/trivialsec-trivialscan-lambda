@@ -2,7 +2,7 @@ from typing import Union
 from datetime import datetime
 import json
 
-from dns import rdatatype
+from dns import rdatatype, resolver
 from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
 from tldextract.tldextract import TLDExtract
@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 @router.get("/host/{hostname}",
-            response_model=list[models.SearchHostname],
+            response_model=list[models.SearchResult],
             response_model_exclude_unset=True,
             response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
@@ -52,47 +52,82 @@ async def search_hostname(
             break
     if not answer:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    targets = []
+    scans_map = {}
+    resolved_ip: list[str] = [ip.split(' ').pop() for ip in answer.rrset.to_rdataset().to_text().splitlines()]
     tldext = TLDExtract(cache_dir="/tmp")(f"http://{hostname}")
-    found = False
-    apex_found = hostname == tldext.registered_domain
+    history_raw = services.aws.get_s3(f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json")  # type: ignore
+    if history_raw:
+        scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
+    domain_map = {}
+    domain_map[hostname] = {
+        'timestamps': set(),
+        'ip_addr': set(resolved_ip),
+        "monitoring": False,
+        'ports': set(),
+        'reports': set(),
+    }
+    if tldext.registered_domain != hostname:
+        domain_map[tldext.registered_domain] = {
+            'timestamps': set(),
+            'ip_addr': set(),
+            "monitoring": False,
+            'ports': set(),
+            'reports': set(),
+        }
+    prefix_key = f"{internals.APP_ENV}/hosts/"
+    matches = services.aws.list_s3(prefix_key=prefix_key)
+    for match in matches:
+        if match.endswith("latest.json"):
+            continue
+        _, _, host, port, peer_address, scan_date = match.split("/")
+        fq_target = f"{hostname}:{port}"
+        if hostname == host:
+            timestamp = datetime.strptime(scan_date.replace('.json', ''), "%Y%m%d").timestamp()*1000
+            domain_map[hostname]['timestamps'].add(timestamp)
+            domain_map[hostname]['ip_addr'].add(peer_address)
+            domain_map[hostname]['ports'].add(port)
+            if fq_target in scans_map:
+                domain_map[hostname]['reports'].update(scans_map[fq_target]['reports'])
+        fq_target = f"{tldext.registered_domain}:{port}"
+        if tldext.registered_domain == host:
+            timestamp = datetime.strptime(scan_date.replace('.json', ''), "%Y%m%d").timestamp()*1000
+            domain_map[tldext.registered_domain]['timestamps'].add(timestamp)
+            domain_map[tldext.registered_domain]['ip_addr'].add(peer_address)
+            domain_map[tldext.registered_domain]['ports'].add(port)
+            if fq_target in scans_map:
+                domain_map[tldext.registered_domain]['reports'].update(scans_map[fq_target]['reports'])
+
     if monitor := models.Monitor(account=authz.account).load():  # type: ignore
         for target in monitor.targets:
-            if target.hostname == hostname:
-                found = True
-                targets.append({
-                    "hostname": hostname,
-                    "monitoring": target.enabled,
-                })
-                continue
-            if target.hostname == tldext.registered_domain:
-                apex_found = True
-                targets.append({
-                    "hostname": hostname,
-                    "monitoring": target.enabled,
-                })
-                continue
-            if target.hostname.endswith(tldext.registered_domain):
-                targets.append({
-                    "hostname": target.hostname,
-                    "monitoring": target.enabled,
-                })
-    if not found:
-        targets.append({
-            "hostname": hostname,
-            "monitoring": False,
-        })
-    if not apex_found:
-        targets.append({
-            "hostname": tldext.registered_domain,
-            "monitoring": False,
-        })
-    return targets
+            if target.hostname in domain_map or target.hostname.endswith(tldext.registered_domain):
+                domain_map.setdefault(target.hostname, {'timestamps': set(), 'ip_addr': set(), 'ports': set(), 'reports': set(), "monitoring": False})
+                domain_map[target.hostname]["monitoring"] = target.enabled
+                fq_target = f"{target.hostname}:443"
+                if fq_target in scans_map:
+                    domain_map[target.hostname]['ports'].add(443)
+                    domain_map[target.hostname]['reports'].update(scans_map[fq_target]['reports'])
+                for record in target.history:
+                    fq_target = f"{target.hostname}:{record.port}"
+                    if fq_target in scans_map:
+                        domain_map[target.hostname]['timestamps'].add(record.date_checked.timestamp()*1000)
+                        domain_map[target.hostname]['ports'].add(record.port)
+                        domain_map[target.hostname]['reports'].update(scans_map[fq_target]['reports'])
 
+    results: list[models.SearchResult] = []
+    for host, data in domain_map.items():
+        results.append(models.SearchResult(
+            ip_addr=data['ip_addr'],
+            hostname=host,
+            ports=data.get('ports', []),
+            reports=data.get('reports', []),
+            last_scanned=None if not data.get('timestamps') else max(data['timestamps']),
+            monitoring=data["monitoring"],
+        ))
+
+    return results
 
 @router.get("/ip/{ip_addr}",
-            response_model=list[models.SearchIP],
+            response_model=list[models.SearchResult],
             response_model_exclude_unset=True,
             response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
@@ -163,10 +198,10 @@ async def search_ipaddr(
             if target.hostname in domain_map:
                 domain_map[target.hostname]["monitoring"] = target.enabled
 
-    results: list[models.SearchIP] = []
+    results: list[models.SearchResult] = []
     for host, data in domain_map.items():
-        results.append(models.SearchIP(
-            ip_addr=ip_addr,
+        results.append(models.SearchResult(
+            ip_addr=[ip_addr],
             hostname=host,
             ports=data['ports'],
             reports=data['reports'],
