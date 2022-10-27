@@ -1,7 +1,13 @@
 import re
+from typing import Union
 from datetime import datetime, time, timezone
 
+from dns import resolver, rdatatype
+from dns.exception import DNSException, Timeout as DNSTimeoutError
+from tldextract.tldextract import TLDExtract
+
 import models
+import internals
 
 def date_label(date: datetime) -> tuple[str, str, int]:
     label = "a moment ago"
@@ -126,3 +132,29 @@ def parse_authorization_header(authorization_header: str) -> dict[str, str]:
             value = re.compile(r"\\.").sub(lambda m: m.group(0)[1], value)
         parsed_header[key] = value
     return parsed_header
+
+
+def dns_query(domain_name: str, try_apex: bool = False, resolve_type: rdatatype.RdataType = rdatatype.A) -> Union[resolver.Answer, None]:
+    answer = None
+    dns_resolver = resolver.Resolver(configure=True)
+    internals.logger.info(f"Trying to resolve {resolve_type} for {domain_name}")
+
+    try:
+        answer = dns_resolver.resolve(domain_name, resolve_type)
+    except (resolver.NoAnswer, resolver.NXDOMAIN):
+        internals.logger.warning(f"get_dns {resolve_type} for {domain_name} DNS NoAnswer")
+    except DNSTimeoutError:
+        internals.logger.warning(f"get_dns {resolve_type} for {domain_name} DNS Timeout")
+    except DNSException as ex:
+        internals.logger.warning(ex, exc_info=True)
+    except ConnectionResetError:
+        internals.logger.warning(f"get_dns {resolve_type} for {domain_name} Connection reset by peer")
+    except ConnectionError:
+        internals.logger.warning(f"get_dns {resolve_type} for {domain_name} Name or service not known")
+
+    tldext = TLDExtract(cache_dir="/tmp")(f"http://{domain_name}")
+    if not answer and try_apex and tldext.registered_domain != domain_name:
+        return dns_query(tldext.registered_domain, try_apex=try_apex, resolve_type=resolve_type)
+    if not answer:
+        return None
+    return answer
