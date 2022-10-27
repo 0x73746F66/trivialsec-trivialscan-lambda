@@ -147,8 +147,7 @@ async def member_sessions(
         if raw:
             sessions.append(models.MemberSession(**json.loads(raw)))
     if not sessions:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     for session in sessions:
         session.current = session.session_token == authz.session.session_token  # type: ignore
     return sessions
@@ -203,8 +202,7 @@ def list_members(
         if raw:
             members.append(models.MemberProfile(**json.loads(raw)))
     if not members:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     for member in members:
         member.current = member.email == authz.member.email  # type: ignore
     return members
@@ -240,8 +238,7 @@ async def revoke_session(
         return
     session = models.MemberSession(member=authz.member, session_token=session_token).load()  # type: ignore
     if not session:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     if not session.delete():
         response.status_code = status.HTTP_424_FAILED_DEPENDENCY
 
@@ -344,11 +341,10 @@ async def login(
             return
         link = models.MagicLink(**json.loads(ret))
         if not link:
-            response.status_code = status.HTTP_204_NO_CONTENT
             internals.logger.info(
                 f'"","","{ip_addr}","{user_agent}",""'
             )
-            return
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
         member = models.MemberProfile(email=link.email).load()
         if not member:
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -497,11 +493,10 @@ async def accept_token(
     try:
         link = models.AcceptEdit(accept_token=token).load()  # type: ignore
         if not link:
-            response.status_code = status.HTTP_204_NO_CONTENT
             internals.logger.info(
                 f'"","","{ip_addr}","{user_agent}",""'
             )
-            return
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
         _cls: models.DAL = getattr(models, link.change_model, None)  # type: ignore
         if not _cls:
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -637,8 +632,7 @@ async def delete_member(
         return
     member = models.MemberProfile(email=email).load()
     if not member:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     if authz.account.name != member.account.name:  # type: ignore
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return

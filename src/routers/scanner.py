@@ -12,9 +12,9 @@ router = APIRouter()
 
 
 @router.get("/monitor/{hostname}",
-            # response_model=models.Monitor,
-            # response_model_exclude_unset=True,
-            # response_model_exclude_none=True,
+            response_model=models.Monitor,
+            response_model_exclude_unset=True,
+            response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Scanner"],
             )

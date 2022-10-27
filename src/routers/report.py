@@ -53,8 +53,7 @@ def retrieve_summary(
         return
     summary = models.ReportSummary(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
     if not summary:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     return summary
 
 
@@ -95,8 +94,7 @@ def retrieve_report(
         return
     report = models.FullReport(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
     if not report:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return report
 
@@ -148,9 +146,8 @@ def retrieve_reports(
         return []
 
     if not summary_keys:
-        response.status_code = status.HTTP_204_NO_CONTENT
         internals.logger.warning(f"No reports for {prefix_key}")
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     for summary_key in summary_keys:
         if not summary_key.endswith("summary.json"):
@@ -167,8 +164,7 @@ def retrieve_reports(
         data.append(item)
 
     if not data:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return data
 
@@ -223,9 +219,8 @@ def retrieve_hosts(
         return []
 
     if not path_keys:
-        response.status_code = status.HTTP_204_NO_CONTENT
         internals.logger.warning(f"No reports for {prefix_key}")
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     seen = set()
     for object_key in path_keys:
@@ -249,8 +244,7 @@ def retrieve_hosts(
                 data.append(host)
 
     if not data:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return data
 
@@ -297,9 +291,8 @@ def retrieve_host(
     # if last_updated:
     #     path_keys = services.aws.list_s3(prefix_key)
     #     if not path_keys:
-    #         response.status_code = status.HTTP_204_NO_CONTENT
     #         internals.logger.warning(f"No reports for {prefix_key}")
-    #         return
+    #         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     #     for object_key in path_keys:
     #         if not object_key.endswith("latest.json"):
@@ -316,8 +309,7 @@ def retrieve_host(
     try:
         ret = services.aws.get_s3(host_key)
         if not ret:
-            response.status_code = status.HTTP_204_NO_CONTENT
-            return
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
 
         return json.loads(ret)
 
@@ -369,8 +361,7 @@ def retrieve_certificate(
     try:
         ret = services.aws.get_s3(cert_key)
         if not ret:
-            response.status_code = status.HTTP_204_NO_CONTENT
-            return
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
         if include_pem:
             ret["pem"] = services.aws.get_s3(pem_key)
 
@@ -531,9 +522,8 @@ def certificate_issues(
         internals.logger.exception(err)
         return []
     if not path_keys:
-        response.status_code = status.HTTP_204_NO_CONTENT
         internals.logger.warning(f"No reports for {prefix_key}")
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     for object_key in path_keys:
         if not object_key.endswith("full-report.json"):
@@ -560,8 +550,7 @@ def certificate_issues(
             full_data.append(item)
 
     if not full_data:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     priority_data: list[models.EvaluationItem] = sorted(full_data, key=lambda x: x.score)  # type: ignore
     uniq_data: list[models.EvaluationItem] = []
@@ -632,9 +621,8 @@ def latest_findings(
         return []
 
     if not path_keys:
-        response.status_code = status.HTTP_204_NO_CONTENT
         internals.logger.warning(f"No reports for {prefix_key}")
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     for object_key in path_keys:
         if not object_key.endswith("full-report.json"):
@@ -661,8 +649,7 @@ def latest_findings(
             full_data.append(item)
 
     if not full_data:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     priority_data: list[models.EvaluationItem] = sorted(full_data, key=lambda x: x.score)  # type: ignore
     uniq_data: list[models.EvaluationItem] = []

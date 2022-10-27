@@ -295,8 +295,7 @@ def retrieve_clients(
         return []
 
     if not object_keys:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     for object_key in object_keys:
         if not object_key.endswith(".json"):
@@ -414,8 +413,7 @@ async def activate_client(
         return
     client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
     if not client:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     if client.active is not True:
         client.active = True
         if not client.save():
@@ -456,8 +454,7 @@ async def deactived_client(
         return
     client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
     if not client:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     if client.active is not False:
         client.active = False
         if not client.save():
