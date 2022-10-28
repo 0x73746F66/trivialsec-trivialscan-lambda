@@ -33,6 +33,9 @@ class DAL(metaclass=ABCMeta):
     def delete(self, **kwargs) -> bool:
         raise NotImplementedError
 
+class Message(BaseModel):
+    message: str
+
 class OutputType(str, Enum):
     JSON = "json"
     CONSOLE = "console"

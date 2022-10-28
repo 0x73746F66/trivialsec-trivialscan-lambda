@@ -21,6 +21,12 @@ router = APIRouter()
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
     tags=["Scan Reports"],
 )
 @cachier(
@@ -38,7 +44,7 @@ def retrieve_summary(
     Retrieves a summary of a Trivial Scanner report for the provided report identiffier
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -49,7 +55,7 @@ def retrieve_summary(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
     summary = models.ReportSummary(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
     if not summary:
@@ -62,6 +68,12 @@ def retrieve_summary(
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
     tags=["Scan Reports"],
 )
 @cachier(
@@ -79,7 +91,7 @@ def retrieve_report(
     Retrieves a full Trivial Scanner report for the provided report identiffier
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -90,7 +102,7 @@ def retrieve_report(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
     report = models.FullReport(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
     if not report:
@@ -104,6 +116,12 @@ def retrieve_report(
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
     tags=["Scan Reports"],
 )
 @cachier(
@@ -120,7 +138,7 @@ def retrieve_reports(
     Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -131,7 +149,7 @@ def retrieve_reports(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     summary_keys = []
@@ -174,6 +192,12 @@ def retrieve_reports(
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
     tags=["Scan Reports"],
 )
 @cachier(
@@ -192,7 +216,7 @@ def retrieve_certificate(
     Retrieves TLS Certificate data by SHA1 fingerprint, optionally provides the PEM encoded certificate
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -203,7 +227,7 @@ def retrieve_certificate(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     pem_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
@@ -222,9 +246,16 @@ def retrieve_certificate(
         internals.logger.exception(err)
 
 @router.post("/store/{report_type}",
-             status_code=status.HTTP_201_CREATED,
-             tags=["Scan Reports"],
-             )
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        412: {"description": "When uploading a detailed report, the summary must first be sent"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Scan Reports"],
+)
 async def store(
     request: Request,
     response: Response,
@@ -241,7 +272,7 @@ async def store(
     data = {}
     contents = await file.read()
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -254,7 +285,7 @@ async def store(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     if file.filename.endswith(".json"):
@@ -336,6 +367,12 @@ async def store(
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
     tags=["Scan Reports"],
 )
 @cachier(
@@ -355,7 +392,7 @@ def certificate_issues(
     and ordered by last seen
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -366,7 +403,7 @@ def certificate_issues(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     path_keys = []
@@ -434,6 +471,12 @@ def certificate_issues(
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
     tags=["Scan Reports"],
 )
 @cachier(
@@ -453,7 +496,7 @@ def latest_findings(
     and ordered by last seen
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -464,7 +507,7 @@ def latest_findings(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     path_keys = []

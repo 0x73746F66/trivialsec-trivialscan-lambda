@@ -25,12 +25,15 @@ router = APIRouter()
 
 
 @router.get("/validate",
-            response_model=models.CheckToken,
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_202_ACCEPTED,
-            tags=["Debug"],
-            )
+    response_model=models.CheckToken,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+    },
+    tags=["Debug"],
+)
 async def validate_authorization(
     request: Request,
     response: Response,
@@ -42,7 +45,7 @@ async def validate_authorization(
     Checks registration status of the provided account name, client name, and access token (or API key)
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -65,12 +68,17 @@ async def validate_authorization(
 
 
 @router.get("/me",
-            response_model=models.MemberSessionRedacted,
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Member Profile"],
-            )
+    response_model=models.MemberSessionRedacted,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
@@ -85,7 +93,7 @@ def member_profile(
     Return Member Profile for authorized user
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
 
@@ -99,19 +107,25 @@ def member_profile(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     authz.session.member.account.load_billing()  # type: ignore
     return authz.session
 
 @router.get("/sessions",
-            response_model=list[models.MemberSessionRedacted],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Member Profile"],
-            )
+    response_model=list[models.MemberSessionRedacted],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No sesson data available, this is probably an error"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 async def member_sessions(
     request: Request,
     response: Response,
@@ -121,7 +135,7 @@ async def member_sessions(
     Return active sessions for the current authorized user
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -134,7 +148,7 @@ async def member_sessions(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"  # type: ignore
@@ -154,12 +168,18 @@ async def member_sessions(
 
 
 @router.get("/members",
-            response_model=list[models.MemberProfileRedacted],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Member Profile"],
-            )
+    response_model=list[models.MemberProfileRedacted],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No members, this is probably an error"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
@@ -174,7 +194,7 @@ def list_members(
     Return registered members
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -187,7 +207,7 @@ def list_members(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/"  # type: ignore
@@ -208,9 +228,16 @@ def list_members(
     return members
 
 @router.delete("/revoke/{session_token}",
-               status_code=status.HTTP_202_ACCEPTED,
-               tags=["Member Profile"],
-               )
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        204: {"description": "No matching session, was it already revoked?"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        424: {"description": "Everything appeared to be correct until actually attempting to revoke the session, proably a race condition with simultaneous revoke attempts"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 async def revoke_session(
     request: Request,
     response: Response,
@@ -221,7 +248,7 @@ async def revoke_session(
     Revoke an active login session
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -234,7 +261,7 @@ async def revoke_session(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
     session = models.MemberSession(member=authz.member, session_token=session_token).load()  # type: ignore
     if not session:
@@ -244,9 +271,14 @@ async def revoke_session(
 
 
 @router.post("/magic-link",
-             status_code=status.HTTP_202_ACCEPTED,
-             tags=["Member Profile"],
-             )
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        400: {"description": "Not a valid email address"},
+        424: {"description": "The email address is not registered"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 async def magic_link(
     request: Request,
     response: Response,
@@ -254,17 +286,10 @@ async def magic_link(
 ):
     """
     Creates an email with the magic link for login
-
-    Return codes:
-        422 The prodided values are not acceptable or not sent
-        424 The email address is not registered
-        503 An exception was encountered and logged
     """
     event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get(
-        "sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
-    user_agent = event.get("requestContext", {}).get("http", {}).get(
-        "userAgent", request.headers.get("User-Agent"))
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent", request.headers.get("User-Agent"))
     if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
@@ -299,18 +324,24 @@ async def magic_link(
         return
 
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
         return
 
 
 @router.get("/magic-link/{magic_token}",
-            response_model=models.MemberSession,
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Member Profile"],
-            )
+    response_model=models.MemberSession,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "The one-time use magic link no longer exists, probably not a bug if it is already used"},
+        400: {"description": "The email address is not registered"},
+        424: {"description": "The User-Agent was invalid"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 async def login(
     request: Request,
     response: Response,
@@ -318,27 +349,18 @@ async def login(
 ):
     """
     Login for members with magic link emailed to them
-
-    Return codes:
-        204 The one-time use magic link no longer exists, probably not a bug if it is already used
-        406 The prodided values are not acceptable or not sent
-        424 The email address is not registered
-        500 An unexpected and unhandled request path occurred
     """
     event = request.scope.get("aws.event", {})
-    ip_addr = event.get("requestContext", {}).get("http", {}).get(
-        "sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
-    user_agent = event.get("requestContext", {}).get("http", {}).get(
-        "userAgent", request.headers.get("User-Agent"))
+    ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
+    user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent", request.headers.get("User-Agent"))
     try:
         object_key = f"{internals.APP_ENV}/magic-links/{magic_token}.json"
         ret = services.aws.get_s3(object_key)
         if not ret:
-            response.status_code = status.HTTP_406_NOT_ACCEPTABLE
             internals.logger.info(
                 f'"","","{ip_addr}","{user_agent}",""'
             )
-            return
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
         link = models.MagicLink(**json.loads(ret))
         if not link:
             internals.logger.info(
@@ -347,7 +369,7 @@ async def login(
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         member = models.MemberProfile(email=link.email).load()
         if not member:
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            response.status_code = status.HTTP_400_BAD_REQUEST
             internals.logger.info(
                 f'"","{link.email}","{ip_addr}","{user_agent}",""'
             )
@@ -376,7 +398,7 @@ async def login(
             session.lat = geo_ip.latlng[0]
             session.lon = geo_ip.latlng[1]
         if not session.save():
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         if member.confirmation_token == magic_token:
             member.confirmed = True
@@ -389,12 +411,20 @@ async def login(
 
 
 @router.post("/member/email",
-             response_model=models.AcceptEdit,
-             response_model_exclude_unset=True,
-             response_model_exclude_none=True,
-             status_code=status.HTTP_202_ACCEPTED,
-             tags=["Member Profile"],
-             )
+    response_model=models.AcceptEdit,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        400: {"description": "The email address is not valid"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        409: {"description": "Member already exists with the desired email address"},
+        424: {"description": "Email sending errors were logged"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 async def update_email(
     request: Request,
     response: Response,
@@ -405,7 +435,7 @@ async def update_email(
     Updates the login email address for the current logged in member.
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     if validators.email(data.email) is not True:  # type: ignore
@@ -421,9 +451,8 @@ async def update_email(
         ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
-        internals.logger.error("Invalid Authorization")
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_401_UNAUTHORIZED
         return
     try:
         token = hashlib.sha224(bytes(str(random()), 'ascii')).hexdigest()
@@ -462,7 +491,6 @@ async def update_email(
         if link.save():
             return link
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -470,9 +498,16 @@ async def update_email(
 
 
 @router.get("/accept/{token}",
-            status_code=status.HTTP_202_ACCEPTED,
-            tags=["Member Profile"],
-            )
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        204: {"description": "The one-time use accept link no longer exists, probably not a bug if it is already used"},
+        208: {"description": "This request has already been accepted"},
+        424: {"description": "Malformed AcceptEdit, this was an issue when the request was originally generated"},
+        400: {"description": "Unable to save the requested change, check the log"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 async def accept_token(
     request: Request,
     response: Response,
@@ -480,12 +515,6 @@ async def accept_token(
 ):
     """
     Login for members with magic link emailed to them
-
-    Return codes:
-        204 The one-time use accept link no longer exists, probably not a bug if it is already used
-        406 The prodided values are not acceptable or not sent
-        424 The email address is not registered
-        500 An unexpected and unhandled request path occurred
     """
     event = request.scope.get("aws.event", {})
     ip_addr = event.get("requestContext", {}).get("http", {}).get("sourceIp", request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")))
@@ -508,7 +537,7 @@ async def accept_token(
             return
         setattr(model, link.change_prop, link.new_value)  # type: ignore
         if not model.save():
-            response.status_code = status.HTTP_412_PRECONDITION_FAILED
+            response.status_code = status.HTTP_400_BAD_REQUEST
             return
         if link.change_model == 'MemberProfile' and link.model_key == 'email':
             if old_memebr := models.MemberProfile(email=link.old_value).load():
@@ -521,12 +550,20 @@ async def accept_token(
 
 
 @router.post("/member/invite",
-             response_model=models.MemberProfileRedacted,
-             response_model_exclude_unset=True,
-             response_model_exclude_none=True,
-             status_code=status.HTTP_202_ACCEPTED,
-             tags=["Member Profile"],
-             )
+    response_model=models.MemberProfileRedacted,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        400: {"description": "The email address is not valid"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        409: {"description": "Member already exists with the desired email address"},
+        424: {"description": "Email sending errors were logged"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 async def send_member_invitation(
     request: Request,
     response: Response,
@@ -537,7 +574,7 @@ async def send_member_invitation(
     Invites a member to join the organisation
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     if validators.email(data.email) is not True:  # type: ignore
@@ -550,7 +587,7 @@ async def send_member_invitation(
         ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_401_UNAUTHORIZED
         internals.logger.error("Invalid Authorization")
         return
@@ -566,7 +603,7 @@ async def send_member_invitation(
             timestamp=round(time() * 1000),  # JavaScript support
         )
         if not member.save():
-            response.status_code = status.HTTP_400_BAD_REQUEST
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         services.sendgrid.upsert_contact(recipient_email=member.email, list_name="members")
         activation_url = f"{internals.DASHBOARD_URL}/login/{member.confirmation_token}"
@@ -596,7 +633,6 @@ async def send_member_invitation(
         if link.save():
             return member
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -604,9 +640,15 @@ async def send_member_invitation(
 
 
 @router.delete("/member/{email}",
-               status_code=status.HTTP_202_ACCEPTED,
-               tags=["Member Profile"],
-               )
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        400: {"description": "The email address is not valid"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Profile"],
+)
 async def delete_member(
     request: Request,
     response: Response,
@@ -616,8 +658,11 @@ async def delete_member(
     """
     Deletes a spcific MemebrProfile within the same account as teh authorized requester
     """
+    if validators.email(email) is not True:  # type: ignore
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -628,11 +673,11 @@ async def delete_member(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
     member = models.MemberProfile(email=email).load()
     if not member:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     if authz.account.name != member.account.name:  # type: ignore
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return

@@ -17,12 +17,18 @@ router = APIRouter()
 
 
 @router.get("/host/{hostname}",
-            response_model=list[models.SearchResult],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Search"],
-            )
+    response_model=list[models.SearchResult],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No search results matching this query"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Search"],
+)
 async def search_hostname(
     request: Request,
     response: Response,
@@ -33,7 +39,7 @@ async def search_hostname(
     Search matching hostname, returning exact matches and knowm (scanned, if any) subdomains
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -44,7 +50,7 @@ async def search_hostname(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     resolved_ip = services.helpers.retrieve_ip_for_host(hostname)
@@ -128,12 +134,18 @@ async def search_hostname(
     return results
 
 @router.get("/ip/{ip_addr}",
-            response_model=list[models.SearchResult],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Search"],
-            )
+    response_model=list[models.SearchResult],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No search results matching this query"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Search"],
+)
 async def search_ipaddr(
     request: Request,
     response: Response,
@@ -144,7 +156,7 @@ async def search_ipaddr(
     Search matching hostname, returning exact matches and knowm (scanned, if any) subdomains
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -155,7 +167,7 @@ async def search_ipaddr(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     scans_map = {}

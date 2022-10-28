@@ -12,12 +12,18 @@ router = APIRouter()
 
 
 @router.get("/monitor/{hostname}",
-            response_model=models.Monitor,
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Scanner"],
-            )
+    response_model=models.Monitor,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        402: {"description": "Quota has been exhausted, no more monitoring is possible. Upgrade the account or stop monitoring another host"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Scanner"],
+)
 async def enable_monitoring(
     request: Request,
     response: Response,
@@ -28,20 +34,18 @@ async def enable_monitoring(
     Adds and enables host monitoring
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=event.get("requestContext", {}).get(
-            "http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get(
-            "http", {}).get("sourceIp"),
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
     changed = False
     if monitor := models.Monitor(account=authz.account).load():  # type: ignore
@@ -82,12 +86,17 @@ async def enable_monitoring(
 
 
 @router.get("/deactivate/{hostname}",
-            response_model=models.Monitor,
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Scanner"],
-            )
+    response_model=models.Monitor,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Scanner"],
+)
 async def deactivate_monitoring(
     request: Request,
     response: Response,
@@ -98,7 +107,7 @@ async def deactivate_monitoring(
     Adds and enables host monitoring
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -111,7 +120,7 @@ async def deactivate_monitoring(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
     changed = False
     if monitor := models.Monitor(account=authz.account).load():  # type: ignore

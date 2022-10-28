@@ -20,7 +20,13 @@ router = APIRouter()
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
-    tags=["Scan Reports"],
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Hostname"],
 )
 @cachier(
     stale_after=timedelta(seconds=30),
@@ -39,7 +45,7 @@ def retrieve_hosts(
     full record
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -50,7 +56,7 @@ def retrieve_hosts(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     path_keys = []
@@ -100,7 +106,13 @@ def retrieve_hosts(
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
-    tags=["Scan Reports"],
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Hostname"],
 )
 @cachier(
     stale_after=timedelta(seconds=30),
@@ -119,7 +131,7 @@ def retrieve_host(
     Retrieves TLS data on any hostname, providing an optional port number
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -130,7 +142,7 @@ def retrieve_host(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     prefix_key = path.join(internals.APP_ENV, "hosts", hostname)

@@ -27,6 +27,13 @@ router = APIRouter()
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_201_CREATED,
+    responses={
+        208: {"description": "The account is already registered"},
+        400: {"description": "The display name was not provided or email address is not valid"},
+        409: {"description": "The email address has already been registered"},
+        424: {"description": "Email sending errors were logged"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
     tags=["Member Account"],
 )
 async def account_register(
@@ -36,14 +43,6 @@ async def account_register(
 ):
     """
     Registers an new account
-
-    Return codes:
-        400 The prodided values are not acceptable or not sent
-        409 The email address has already been registered
-        424 Issue with internal data structures, likely caused by manual data manipulation
-        208 The account is already registered
-        503 An exception was encountered and logged
-        500 An unexpected and unhandled request path occurred
     """
     event = request.scope.get("aws.event", {})
     if not data.display:
@@ -68,7 +67,7 @@ async def account_register(
         timestamp=round(time() * 1000),  # JavaScript support
     )
     if not account.name:
-        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+        response.status_code = status.HTTP_400_BAD_REQUEST
         return
     if not ip_addr or not user_agent:
         internals.logger.warning(f"ip_addr {ip_addr} user_agent {user_agent}")
@@ -84,10 +83,10 @@ async def account_register(
             response.status_code = status.HTTP_208_ALREADY_REPORTED
             return
         if not member.save():
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         if not account.save():
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         try:
             services.stripe.create_customer(email=account.billing_email)  # type: ignore
@@ -103,6 +102,12 @@ async def account_register(
             },
             bcc="support@trivialsec.com",
         )
+        if sendgrid._content:  # pylint: disable=protected-access
+            res = json.loads(sendgrid._content.decode())  # pylint: disable=protected-access
+            if isinstance(res, dict) and res.get('errors'):
+                internals.logger.error(res.get('errors'))
+                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+                return
         link = models.MagicLink(
             email=member.email,
             magic_token=member.confirmation_token,  # type: ignore
@@ -114,20 +119,25 @@ async def account_register(
         if link.save():
             return member
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
-        return
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
 @router.post("/claim/{client_name}",
-             response_model=models.Client,
-             response_model_exclude_unset=True,
-             response_model_exclude_none=True,
-             status_code=status.HTTP_201_CREATED,
-             tags=["Member Account"],
-             )
+    response_model=models.Client,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"description": "The client name must not be an email address"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        409: {"description": "This client name has already been registered"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Account"],
+)
 async def claim_client(
     request: Request,
     response: Response,
@@ -141,29 +151,28 @@ async def claim_client(
     Generates an access token for provided *NEW* client name.
     Client names must be unique, if the coresponding registration token was lost a new client and token must be created.
     """
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    if validators.email(client_name) is True:  # type: ignore
+        internals.logger.warning(f"Email {client_name} can not be used for client name")
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return
+    event = request.scope.get("aws.event", {})
+    # api_key Auth
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+        account_name=x_trivialscan_account,
+    )
+    if not authz.is_valid:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        internals.logger.error("Invalid Authorization")
+        return
     try:
-        if not authorization:
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
-            response.status_code = status.HTTP_403_FORBIDDEN
-            return
-        if validators.email(client_name) is True:  # type: ignore
-            print(f"Email {client_name} can not be used for client name")
-            internals.logger.warning(f"Email {client_name} can not be used for client name")
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return
-        # api_key Auth
-        event = request.scope.get("aws.event", {})
-        authz = internals.Authorization(
-            request=request,
-            user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-            ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-            account_name=x_trivialscan_account,
-        )
-        if not authz.is_valid:
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-            response.status_code = status.HTTP_401_UNAUTHORIZED
-            internals.logger.error("Invalid Authorization")
-            return
         if models.Client(account=authz.account, name=client_name).exists():  # type: ignore
             response.status_code = status.HTTP_409_CONFLICT
             return
@@ -181,21 +190,25 @@ async def claim_client(
         if client.save():
             return client
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
-        return
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
 
 @router.post("/auth/{client_name}",
-             response_model=models.CheckToken,
-             response_model_exclude_unset=True,
-             response_model_exclude_none=True,
-             status_code=status.HTTP_201_CREATED,
-             tags=["Member Account"],
-             )
+    response_model=models.CheckToken,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"description": "The client name must not be an email address"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Account"],
+)
 async def auth_client(
     request: Request,
     response: Response,
@@ -208,28 +221,28 @@ async def auth_client(
     """
     Authenticates the generated access token and client
     """
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    if validators.email(client_name) is True:  # type: ignore
+        print(f"Email {client_name} can not be used for client name")
+        internals.logger.warning(f"Email {client_name} can not be used for client name")
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+        account_name=x_trivialscan_account,
+    )
+    if not authz.is_valid:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        internals.logger.error("Invalid Authorization")
+        return
     try:
-        if not authorization:
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
-            response.status_code = status.HTTP_403_FORBIDDEN
-            return
-        if validators.email(client_name) is True:  # type: ignore
-            print(f"Email {client_name} can not be used for client name")
-            internals.logger.warning(f"Email {client_name} can not be used for client name")
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return
-        event = request.scope.get("aws.event", {})
-        authz = internals.Authorization(
-            request=request,
-            user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-            ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-            account_name=x_trivialscan_account,
-        )
-        if not authz.is_valid:
-            response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-            response.status_code = status.HTTP_401_UNAUTHORIZED
-            internals.logger.error("Invalid Authorization")
-            return
         authz.client.client_info = client_info  # type: ignore
         authz.client.cli_version = x_trivialscan_version  # type: ignore
         authz.client.ip_addr = authz.ip_addr  # type: ignore
@@ -240,21 +253,25 @@ async def auth_client(
                 "authorisation_valid": authz.is_valid,
             }
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
-        return
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
 
 @router.get("/clients",
-            response_model=list[models.ClientRedacted],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Member Account"],
-            )
+    response_model=list[models.ClientRedacted],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No client name exists for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Account"],
+)
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
@@ -269,7 +286,7 @@ def retrieve_clients(
     Retrieves a collection of your clients
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -280,7 +297,7 @@ def retrieve_clients(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
     object_keys = []
@@ -318,6 +335,12 @@ def retrieve_clients(
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        424: {"description": "Email sending errors were logged"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
     tags=["Member Account"],
 )
 async def support_request(
@@ -330,7 +353,7 @@ async def support_request(
     Generates a support request for the logged in member.
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -340,8 +363,8 @@ async def support_request(
         ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_401_UNAUTHORIZED
         internals.logger.error("Invalid Authorization")
         return
     try:
@@ -375,19 +398,24 @@ async def support_request(
         if support.save():
             return support
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
 @router.get("/activate/{client_name}",
-            response_model=models.ClientRedacted,
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Member Account"],
-            )
+    response_model=models.ClientRedacted,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "Client name does not exists for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Account"],
+)
 async def activate_client(
     request: Request,
     response: Response,
@@ -398,7 +426,7 @@ async def activate_client(
     Activate a deactived client
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -409,7 +437,7 @@ async def activate_client(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
     client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
     if not client:
@@ -417,18 +445,24 @@ async def activate_client(
     if client.active is not True:
         client.active = True
         if not client.save():
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
 
     return client
 
 @router.get("/deactived/{client_name}",
-            response_model=models.ClientRedacted,
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            tags=["Member Account"],
-            )
+    response_model=models.ClientRedacted,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "Client name does not exists for this account"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Account"],
+    )
 async def deactived_client(
     request: Request,
     response: Response,
@@ -439,7 +473,7 @@ async def deactived_client(
     Deactived a client
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -450,7 +484,7 @@ async def deactived_client(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
     client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
     if not client:
@@ -458,7 +492,7 @@ async def deactived_client(
     if client.active is not False:
         client.active = False
         if not client.save():
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
 
     return client
@@ -468,6 +502,13 @@ async def deactived_client(
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        400: {"description": "The email address is not valid"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        424: {"description": "Email sending errors were logged"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
     tags=["Member Account"],
 )
 async def update_billing_email(
@@ -480,7 +521,7 @@ async def update_billing_email(
     Updates the billing email address for the logged in members account.
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     if validators.email(data.email) is not True:  # type: ignore
@@ -493,7 +534,7 @@ async def update_billing_email(
         ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_401_UNAUTHORIZED
         internals.logger.error("Invalid Authorization")
         return
@@ -519,7 +560,7 @@ async def update_billing_email(
         internals.logger.info(f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
         authz.account.billing_email = data.email  # type: ignore
         if not authz.account.save():  # type: ignore
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         try:
             services.stripe.create_customer(email=authz.account.billing_email)  # type: ignore
@@ -527,19 +568,25 @@ async def update_billing_email(
         return authz.account
 
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
 @router.post("/account/email",
-             response_model=models.MemberAccountRedacted,
-             response_model_exclude_unset=True,
-             response_model_exclude_none=True,
-             status_code=status.HTTP_202_ACCEPTED,
-             tags=["Member Account"],
-             )
+    response_model=models.MemberAccountRedacted,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        400: {"description": "The email address is not valid"},
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        424: {"description": "Email sending errors were logged"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Account"],
+)
 async def update_primary_email(
     request: Request,
     response: Response,
@@ -550,7 +597,7 @@ async def update_primary_email(
     Updates the primary contact email address for the account.
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     if validators.email(data.email) is not True:  # type: ignore
@@ -565,8 +612,8 @@ async def update_primary_email(
             "http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_401_UNAUTHORIZED
         internals.logger.error("Invalid Authorization")
         return
     try:
@@ -591,24 +638,28 @@ async def update_primary_email(
         internals.logger.info(f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
         authz.account.primary_email = data.email  # type: ignore
         if not authz.account.save():  # type: ignore
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         return authz.account
 
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
 @router.post("/account/display",
-             response_model=models.MemberAccountRedacted,
-             response_model_exclude_unset=True,
-             response_model_exclude_none=True,
-             status_code=status.HTTP_202_ACCEPTED,
-             tags=["Member Account"],
-             )
+    response_model=models.MemberAccountRedacted,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Member Account"],
+)
 async def update_account_display_name(
     request: Request,
     response: Response,
@@ -619,7 +670,7 @@ async def update_account_display_name(
     Updates the display name for the account.
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -629,19 +680,18 @@ async def update_account_display_name(
         ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_401_UNAUTHORIZED
         internals.logger.error("Invalid Authorization")
         return
     try:
         authz.account.display = data.name  # type: ignore
         if not authz.account.save() or not authz.account.update_members():  # type: ignore
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         return authz.account
 
     except RuntimeError as err:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
