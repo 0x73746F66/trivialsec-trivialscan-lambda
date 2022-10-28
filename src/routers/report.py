@@ -2,9 +2,9 @@ import json
 from os import path
 from secrets import token_urlsafe
 from typing import Union
-from datetime import datetime, timedelta
+from datetime import timedelta
 
-from fastapi import Header, Query, APIRouter, Response, File, UploadFile, status
+from fastapi import Header, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
 from cachier import cachier
 
@@ -26,7 +26,7 @@ router = APIRouter()
 @cachier(
     stale_after=timedelta(hours=1),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+kw.get("report_id")
 )
 def retrieve_summary(
     request: Request,
@@ -67,7 +67,7 @@ def retrieve_summary(
 @cachier(
     stale_after=timedelta(hours=1),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+kw.get("report_id")
 )
 def retrieve_report(
     request: Request,
@@ -169,156 +169,6 @@ def retrieve_reports(
     return data
 
 
-@router.get("/hosts",
-    response_model=list[models.Host],
-    response_model_exclude_unset=True,
-    response_model_exclude_none=True,
-    status_code=status.HTTP_200_OK,
-    tags=["Scan Reports"],
-)
-@cachier(
-    stale_after=timedelta(seconds=30),
-    cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
-    )
-def retrieve_hosts(
-    request: Request,
-    response: Response,
-    return_details: bool = False,
-    authorization: Union[str, None] = Header(default=None),
-):
-    """
-    Retrieves a collection of your own Trivial Scanner reports, providing
-    a distinct list of hosts and ports, optionally returning the latest host
-    full record
-    """
-    if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-        return
-
-    path_keys = []
-    data = []
-    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
-    try:
-        path_keys = services.aws.list_s3(prefix_key)
-
-    except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        internals.logger.exception(err)
-        return []
-
-    if not path_keys:
-        internals.logger.warning(f"No reports for {prefix_key}")
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    seen = set()
-    for object_key in path_keys:
-        if not object_key.endswith("summary.json"):
-            continue
-        ret = services.aws.get_s3(object_key)
-        if not ret:
-            continue
-        item = json.loads(ret)
-        if not isinstance(item, dict):
-            continue
-        report = models.FullReport(**item)
-        for target in report.targets or []:
-            if target not in seen:
-                seen.add(target)
-                hostname, port = target.split(":")
-                tspt = models.HostTransport(hostname=hostname, port=port)  # type: ignore
-                host = models.Host(transport=tspt)  # type: ignore
-                if return_details:
-                    host.load()
-                data.append(host)
-
-    if not data:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    return data
-
-
-@router.get("/host/{hostname}",
-    response_model=models.Host,
-    response_model_exclude_unset=True,
-    response_model_exclude_none=True,
-    status_code=status.HTTP_200_OK,
-    tags=["Scan Reports"],
-)
-@cachier(
-    stale_after=timedelta(seconds=30),
-    cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
-    )
-def retrieve_host(
-    request: Request,
-    response: Response,
-    hostname: str,
-    port: int = 443,
-    last_updated: Union[datetime, None] = Query(default=None, description="Return the result for specific date rather than the latest (default) Host information"),
-    authorization: Union[str, None] = Header(default=None),
-):
-    """
-    Retrieves TLS data on any hostname, providing an optional port number
-    """
-    if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Authorization Required"'
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
-        return
-
-    # prefix_key = path.join(internals.APP_ENV, "hosts", hostname, str(port))
-    # if last_updated:
-    #     path_keys = services.aws.list_s3(prefix_key)
-    #     if not path_keys:
-    #         internals.logger.warning(f"No reports for {prefix_key}")
-    #         return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    #     for object_key in path_keys:
-    #         if not object_key.endswith("latest.json"):
-    #             continue
-    #         ret = services.aws.get_s3(object_key)
-    #         if not ret:
-    #             continue
-    #         d = json.loads(ret)
-    #         if not isinstance(d, dict):
-    #             continue
-
-    #     scan_date = last_updated.strftime("%Y%m%d")  # type: ignore
-    host_key = path.join(internals.APP_ENV, "hosts", hostname, str(port), "latest.json")
-    try:
-        ret = services.aws.get_s3(host_key)
-        if not ret:
-            return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-        return json.loads(ret)
-
-    except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        internals.logger.exception(err)
-        return err
-
-
 @router.get("/certificate/{sha1_fingerprint}",
     response_model=models.Certificate,
     response_model_exclude_unset=True,
@@ -329,7 +179,7 @@ def retrieve_host(
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+kw.get("sha1_fingerprint")+str(kw.get("include_pem"))
     )
 def retrieve_certificate(
     request: Request,
@@ -491,7 +341,7 @@ async def store(
 @cachier(
     stale_after=timedelta(minutes=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("limit"))
     )
 def certificate_issues(
     request: Request,
@@ -589,7 +439,7 @@ def certificate_issues(
 @cachier(
     stale_after=timedelta(minutes=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw["limit"])
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("limit"))
 )
 def latest_findings(
     request: Request,
