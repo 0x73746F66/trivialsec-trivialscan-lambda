@@ -151,3 +151,66 @@ async def deactivate_monitoring(
         monitor.save()
 
     return monitor
+
+
+@router.get("/queue/{hostname}",
+    response_model=models.Queue,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
+        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
+        500: {"description": "An unhandled error occured during an AWS request for data access"},
+    },
+    tags=["Scanner"],
+)
+async def queue_hostname(
+    request: Request,
+    response: Response,
+    hostname: str,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Adds a host for on-demand scanning
+    """
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        return
+    changed = False
+    if queue := models.Queue(account=authz.account).load():  # type: ignore
+        found = False
+        for _host in queue.targets:
+            if _host.hostname == hostname:
+                found = True
+                break
+        if not found:
+            changed = True
+            queue.targets.append(models.QueueHostname(
+                hostname=hostname,
+                timestamp=round(time() * 1000),  # JavaScript support
+                http_paths=["/"]
+            ))
+    else:
+        changed = True
+        queue = models.Queue(account=authz.account)
+        queue.targets.append(models.QueueHostname(
+            hostname=hostname,
+            http_paths=["/"],
+            timestamp=round(time() * 1000),  # JavaScript support
+        ))
+    if changed:
+        queue.save()
+
+    return queue
