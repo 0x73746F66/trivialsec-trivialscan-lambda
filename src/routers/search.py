@@ -207,7 +207,7 @@ async def search_ipaddr(
     for host, data in domain_map.items():
         results.append(models.SearchResult(
             ip_addr=[] if data.get('resolved_ip') else [ip_addr],
-            resolved_ip=data.get('resolved_ip', []),
+            resolved_ip=data.get('resolved_ip', services.helpers.retrieve_ip_for_host(host)),
             hostname=host,
             ports=data['ports'],
             reports=data['reports'],
