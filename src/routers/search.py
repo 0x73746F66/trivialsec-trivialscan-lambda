@@ -1,8 +1,8 @@
+import json
+import socket
 from typing import Union
 from datetime import datetime
-import json
 
-from dns import rdatatype
 from fastapi import Header, APIRouter, Response, status
 from pydantic import IPvAnyAddress
 from starlette.requests import Request
@@ -17,9 +17,9 @@ router = APIRouter()
 
 
 @router.get("/host/{hostname}",
-            response_model=list[models.SearchResult],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
+            # response_model=list[models.SearchResult],
+            # response_model_exclude_unset=True,
+            # response_model_exclude_none=True,
             status_code=status.HTTP_200_OK,
             tags=["Search"],
             )
@@ -46,15 +46,11 @@ async def search_hostname(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="Login Required"'
         return
-    answer = None
-    for resolve_type in [rdatatype.A, rdatatype.AAAA, rdatatype.CNAME]:
-        answer = services.helpers.dns_query(hostname, resolve_type=resolve_type)
-        if answer:
-            break
-    if not answer:
+
+    resolved_ip = services.helpers.retrieve_ip_for_host(hostname)
+    if len(resolved_ip) == 0:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     scans_map = {}
-    resolved_ip: list[str] = [ip.split(' ').pop() for ip in answer.rrset.to_rdataset().to_text().splitlines()]
     tldext = TLDExtract(cache_dir="/tmp")(f"http://{hostname}")
     if history_raw := services.aws.get_s3(f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"):  # type: ignore
         scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
@@ -121,7 +117,7 @@ async def search_hostname(
     for host, data in domain_map.items():
         results.append(models.SearchResult(
             ip_addr=data['ip_addr'],
-            resolved_ip=data.get('resolved_ip', []),
+            resolved_ip=data.get('resolved_ip', services.helpers.retrieve_ip_for_host(host)),
             hostname=host,
             ports=data.get('ports', []),
             reports=data.get('reports', []),
@@ -177,7 +173,13 @@ async def search_ipaddr(
     if history_raw := services.aws.get_s3(f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"):  # type: ignore
         scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
 
+    rdns = None
+    try:
+        rdns = socket.getnameinfo((str(ip_addr), 0), 0)[0]
+    except: pass  # pylint: disable=bare-except
     domain_map = {}
+    if rdns:
+        domain_map.setdefault(rdns, {'timestamps': set(), 'resolved_ip': services.helpers.retrieve_ip_for_host(rdns), 'ports': set(), 'reports': set(), "monitoring": False})
     prefix_key = f"{internals.APP_ENV}/hosts/"
     matches = services.aws.list_s3(prefix_key=prefix_key)
     for match in matches:
@@ -204,12 +206,12 @@ async def search_ipaddr(
     results: list[models.SearchResult] = []
     for host, data in domain_map.items():
         results.append(models.SearchResult(
-            ip_addr=[ip_addr],
+            ip_addr=[] if data.get('resolved_ip') else [ip_addr],
             resolved_ip=data.get('resolved_ip', []),
             hostname=host,
             ports=data['ports'],
             reports=data['reports'],
-            last_scanned=max(data['timestamps']),
+            last_scanned=None if not data.get('timestamps') else max(data['timestamps']),
             monitoring=data["monitoring"],
         ))  # type: ignore
 

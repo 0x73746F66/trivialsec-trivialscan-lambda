@@ -5,6 +5,7 @@ from datetime import datetime, time, timezone
 from dns import resolver, rdatatype
 from dns.exception import DNSException, Timeout as DNSTimeoutError
 from tldextract.tldextract import TLDExtract
+from pydantic import IPvAnyAddress
 
 import models
 import internals
@@ -158,3 +159,17 @@ def dns_query(domain_name: str, try_apex: bool = False, resolve_type: rdatatype.
     if not answer:
         return None
     return answer
+
+def retrieve_ip_for_host(hostname: str) -> list[IPvAnyAddress]:
+    results = set()
+    domains_to_check = set()
+    domains_to_check.add(hostname)
+    if answer := dns_query(hostname, resolve_type=rdatatype.CNAME):
+        try:
+            domains_to_check.add(answer.rrset.to_rdataset().to_text().split(' ').pop()[:-1])  # type: ignore
+        except: pass  # pylint: disable=bare-except
+    for domain in domains_to_check:
+        for resolve_type in [rdatatype.A, rdatatype.AAAA]:
+            if answer := dns_query(domain, resolve_type=resolve_type):
+                results.update(ip.split(' ').pop() for ip in answer.rrset.to_rdataset().to_text().splitlines())  # type: ignore
+    return list(results)
