@@ -422,6 +422,14 @@ async def store(
         report = models.ReportSummary(report_id=report_id, results_uri=results_uri, **data)
         # report.date = datetime.utcnow() - timedelta(days=27)
         if report.save():
+            scans_map: dict[str, dict[str, list[str]]] = {}
+            object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"  # type: ignore
+            if history_raw := services.aws.get_s3(object_key):
+                scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
+            for target in report.targets or []:
+                scans_map.setdefault(target, {'reports': []})
+                scans_map[target]['reports'].append(report.report_id)
+            services.aws.store_s3(object_key, json.dumps(scans_map, default=str))
             return {"results_uri": results_uri}
 
     if report_type is models.ReportType.EVALUATIONS:

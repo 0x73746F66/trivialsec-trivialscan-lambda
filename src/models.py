@@ -1349,8 +1349,9 @@ class Monitor(BaseModel, DAL):
 
 class SearchResult(BaseModel):
     last_scanned: Union[int, None]
-    hostname: str
+    hostname: Optional[str]
     monitoring: bool = Field(default=False)
-    ip_addr: list[str]
-    ports: list[int]
-    reports: list[str]
+    ip_addr: list[IPvAnyAddress]
+    resolved_ip: Optional[list[IPvAnyAddress]]
+    ports: Optional[list[int]]
+    reports: Optional[list[str]]

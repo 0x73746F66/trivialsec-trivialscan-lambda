@@ -2,8 +2,9 @@ from typing import Union
 from datetime import datetime
 import json
 
-from dns import rdatatype, resolver
+from dns import rdatatype
 from fastapi import Header, APIRouter, Response, status
+from pydantic import IPvAnyAddress
 from starlette.requests import Request
 from tldextract.tldextract import TLDExtract
 
@@ -55,13 +56,13 @@ async def search_hostname(
     scans_map = {}
     resolved_ip: list[str] = [ip.split(' ').pop() for ip in answer.rrset.to_rdataset().to_text().splitlines()]
     tldext = TLDExtract(cache_dir="/tmp")(f"http://{hostname}")
-    history_raw = services.aws.get_s3(f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json")  # type: ignore
-    if history_raw:
+    if history_raw := services.aws.get_s3(f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"):  # type: ignore
         scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
     domain_map = {}
     domain_map[hostname] = {
         'timestamps': set(),
-        'ip_addr': set(resolved_ip),
+        'resolved_ip': set(resolved_ip),
+        'ip_addr': set(),
         "monitoring": False,
         'ports': set(),
         'reports': set(),
@@ -113,16 +114,20 @@ async def search_hostname(
                         domain_map[target.hostname]['ports'].add(record.port)
                         domain_map[target.hostname]['reports'].update(scans_map[fq_target]['reports'])
 
+    if not domain_map:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
     results: list[models.SearchResult] = []
     for host, data in domain_map.items():
         results.append(models.SearchResult(
             ip_addr=data['ip_addr'],
+            resolved_ip=data.get('resolved_ip', []),
             hostname=host,
             ports=data.get('ports', []),
             reports=data.get('reports', []),
             last_scanned=None if not data.get('timestamps') else max(data['timestamps']),
             monitoring=data["monitoring"],
-        ))
+        ))  # type: ignore
 
     return results
 
@@ -136,7 +141,7 @@ async def search_hostname(
 async def search_ipaddr(
     request: Request,
     response: Response,
-    ip_addr: str,
+    ip_addr: IPvAnyAddress,
     authorization: Union[str, None] = Header(default=None),
 ):
     """
@@ -169,10 +174,8 @@ async def search_ipaddr(
                 scans_map.setdefault(hostname, {"reports": []})
                 scans_map[hostname]['reports'].append(report_id)
 
-    history_raw = services.aws.get_s3(f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json")  # type: ignore
-    if not history_raw:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-    scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
+    if history_raw := services.aws.get_s3(f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"):  # type: ignore
+        scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
 
     domain_map = {}
     prefix_key = f"{internals.APP_ENV}/hosts/"
@@ -182,7 +185,7 @@ async def search_ipaddr(
             continue
         _, _, hostname, port, peer_address, scan_date = match.split("/")
         target = f"{hostname}:{port}"
-        if peer_address == ip_addr:
+        if peer_address == str(ip_addr):
             domain_map.setdefault(hostname, {'timestamps': set(), 'ports': set(), 'reports': set(), "monitoring": False})
             timestamp = datetime.strptime(scan_date.replace('.json', ''), "%Y%m%d").timestamp()*1000
             domain_map[hostname]['timestamps'].add(timestamp)
@@ -190,23 +193,24 @@ async def search_ipaddr(
             if target in scans_map:
                 domain_map[hostname]['reports'].update(scans_map[target]['reports'])
 
-    if not domain_map:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
     if monitor := models.Monitor(account=authz.account).load():  # type: ignore
         for target in monitor.targets:
             if target.hostname in domain_map:
                 domain_map[target.hostname]["monitoring"] = target.enabled
 
+    if not domain_map:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
     results: list[models.SearchResult] = []
     for host, data in domain_map.items():
         results.append(models.SearchResult(
             ip_addr=[ip_addr],
+            resolved_ip=data.get('resolved_ip', []),
             hostname=host,
             ports=data['ports'],
             reports=data['reports'],
             last_scanned=max(data['timestamps']),
             monitoring=data["monitoring"],
-        ))
+        ))  # type: ignore
 
     return results
