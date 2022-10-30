@@ -73,7 +73,7 @@ async def enable_monitoring(
             ))
     else:
         changed = True
-        monitor = models.Monitor(account=authz.account)
+        monitor = models.Monitor(account=authz.account)  # type: ignore
         monitor.targets.append(models.MonitorHostname(
             hostname=hostname,
             enabled=True,
@@ -140,7 +140,7 @@ async def deactivate_monitoring(
             ))
     else:
         changed = True
-        monitor = models.Monitor(account=authz.account)
+        monitor = models.Monitor(account=authz.account)  # type: ignore
         monitor.targets.append(models.MonitorHostname(
             hostname=hostname,
             enabled=False,
@@ -204,7 +204,7 @@ async def queue_hostname(
             ))
     else:
         changed = True
-        queue = models.Queue(account=authz.account)
+        queue = models.Queue(account=authz.account)  # type: ignore
         queue.targets.append(models.QueueHostname(
             hostname=hostname,
             http_paths=["/"],

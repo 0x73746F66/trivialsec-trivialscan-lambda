@@ -91,6 +91,7 @@ async def search_hostname(
             domain_map[hostname]['ports'].add(port)
             if fq_target in scans_map:
                 domain_map[hostname]['reports'].update(scans_map[fq_target]['reports'])
+            continue
         fq_target = f"{tldext.registered_domain}:{port}"
         if tldext.registered_domain == host:
             timestamp = datetime.strptime(scan_date.replace('.json', ''), "%Y%m%d").timestamp()*1000
@@ -119,6 +120,14 @@ async def search_hostname(
     if not domain_map:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+    if queue := models.Queue(account=authz.account).load():  # type: ignore
+        for target in queue.targets:
+            if target.hostname in domain_map:
+                domain_map[target.hostname]["queued_timestamp"] = target.timestamp
+                domain_map[target.hostname]["queue_status"] = "Queued"
+                if target.scan_timestamp:
+                    domain_map[target.hostname]["queue_status"] = "Processing"
+
     results: list[models.SearchResult] = []
     for host, data in domain_map.items():
         results.append(models.SearchResult(
@@ -129,6 +138,8 @@ async def search_hostname(
             reports=data.get('reports', []),
             last_scanned=None if not data.get('timestamps') else max(data['timestamps']),
             monitoring=data["monitoring"],
+            queue_status=data.get("queue_status"),
+            queued_timestamp=data.get("queued_timestamp"),
         ))  # type: ignore
 
     return results

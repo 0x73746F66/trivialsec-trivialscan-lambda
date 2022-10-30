@@ -47,10 +47,8 @@ def dashboard_compliance(
     event = request.scope.get("aws.event", {})
     authz = internals.Authorization(
         request=request,
-        user_agent=event.get("requestContext", {}).get(
-            "http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get(
-            "http", {}).get("sourceIp"),
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED

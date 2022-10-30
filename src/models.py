@@ -781,7 +781,7 @@ class SupportRequest(BaseModel):
     message: str
 
 class Support(SupportRequest, DAL):
-    member: MemberProfile
+    member: MemberProfileRedacted
     ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
     user_agent: Union[str, None] = Field(default=None)
     timestamp: Union[int, None] = Field(default=None)
@@ -1218,8 +1218,8 @@ class MemberInvitationRequest(BaseModel):
     email: EmailStr
 
 class AcceptEdit(BaseModel, DAL):
-    account: Optional[MemberAccount]
-    requester: Optional[MemberProfile]
+    account: Optional[MemberAccountRedacted]
+    requester: Optional[MemberProfileRedacted]
     accept_token: str
     old_value: Optional[Any]
     new_value: Optional[Any]
@@ -1313,7 +1313,7 @@ class MonitorHostname(BaseModel):
     history: list[MonitorRecord] = Field(default=[])
 
 class Monitor(BaseModel, DAL):
-    account: Optional[MemberAccount]
+    account: MemberAccountRedacted
     targets: list[MonitorHostname] = Field(default=[])
 
     def exists(self, account_name: Union[str, None] = None) -> bool:
@@ -1354,6 +1354,8 @@ class SearchResult(BaseModel):
     last_scanned: Union[int, None]
     hostname: Optional[str]
     monitoring: bool = Field(default=False)
+    queued_timestamp: Union[int, None] = Field(default=None)
+    queue_status: Union[str, None] = Field(default=False)
     ip_addr: list[IPvAnyAddress]
     resolved_ip: Optional[list[IPvAnyAddress]]
     ports: Optional[list[int]]
@@ -1361,12 +1363,13 @@ class SearchResult(BaseModel):
 
 class QueueHostname(BaseModel):
     timestamp: int
+    scan_timestamp: Union[int, None] = Field(default=None)
     hostname: str
     port: int = Field(default=443)
     http_paths: list[str]
 
 class Queue(BaseModel, DAL):
-    account: Optional[MemberAccount]
+    account: MemberAccountRedacted
     targets: list[QueueHostname] = Field(default=[])
 
     def exists(self, account_name: Union[str, None] = None) -> bool:
