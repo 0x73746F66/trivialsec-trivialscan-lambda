@@ -36,7 +36,7 @@ router = APIRouter()
 def retrieve_hosts(
     request: Request,
     response: Response,
-    return_details: bool = False,
+    return_details: bool = Query(default=False, description="Returns the full record for this hostname"),
     authorization: Union[str, None] = Header(default=None),
 ):
     """
@@ -63,7 +63,7 @@ def retrieve_hosts(
     data = []
     prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
     try:
-        path_keys = services.aws.list_s3(prefix_key)
+        path_keys = services.aws.list_s3(prefix_key=prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -78,7 +78,7 @@ def retrieve_hosts(
     for object_key in path_keys:
         if not object_key.endswith("summary.json"):
             continue
-        ret = services.aws.get_s3(object_key)
+        ret = services.aws.get_s3(path_key=object_key)
         if not ret:
             continue
         item = json.loads(ret)

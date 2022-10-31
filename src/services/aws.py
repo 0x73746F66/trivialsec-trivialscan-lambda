@@ -1,6 +1,9 @@
 from os import getenv
 from enum import Enum
 from typing import Any
+from datetime import timedelta
+
+from cachier import cachier
 
 import boto3
 from retry.api import retry
@@ -133,7 +136,12 @@ def store_ssm(parameter: str, value: str, **kwargs) -> bool:
     delay=1.5,
     backoff=1,
 )
-def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> list[str]:
+@cachier(
+    stale_after=timedelta(minutes=15),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda args, _: ''.join([str(a) for a in args])
+)
+def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET) -> list[str]:
     """
     params:
     - bucket_name: s3 bucket with target contents
@@ -146,7 +154,7 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> list[
         'Bucket': bucket_name,
         'Prefix': prefix_key,
     }
-    base_kwargs.update(kwargs)
+    base_kwargs.update()
     while next_token is not None:
         args = base_kwargs.copy()
         if next_token != '':
@@ -184,6 +192,11 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> list[
     tries=3,
     delay=1.5,
     backoff=1,
+)
+@cachier(
+    stale_after=timedelta(minutes=15),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda args, _: ''.join([str(a) for a in args])
 )
 def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None, **kwargs) -> Any:
     internals.logger.info(f"requesting bucket {bucket_name} object key {path_key}")

@@ -304,7 +304,7 @@ def retrieve_clients(
     data = []
     try:
         prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "client-tokens")  # type: ignore
-        object_keys = services.aws.list_s3(prefix_key)
+        object_keys = services.aws.list_s3(prefix_key=prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -318,7 +318,7 @@ def retrieve_clients(
         if not object_key.endswith(".json"):
             continue
         try:
-            ret = services.aws.get_s3(object_key)
+            ret = services.aws.get_s3(path_key=object_key)
             if not ret:
                 continue
             item = json.loads(ret)

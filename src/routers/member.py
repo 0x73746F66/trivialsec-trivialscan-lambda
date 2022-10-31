@@ -153,11 +153,11 @@ async def member_sessions(
 
     prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"  # type: ignore
     sessions: list[models.MemberSession] = []
-    prefix_matches = services.aws.list_s3(prefix_key)
+    prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
     if len(prefix_matches) == 0:
         return []
     for object_path in prefix_matches:
-        raw = services.aws.get_s3(object_path)
+        raw = services.aws.get_s3(path_key=object_path)
         if raw:
             sessions.append(models.MemberSession(**json.loads(raw)))
     if not sessions:
@@ -212,13 +212,13 @@ def list_members(
 
     prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/"  # type: ignore
     members: list[models.MemberProfile] = []
-    prefix_matches = services.aws.list_s3(prefix_key)
+    prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
     if len(prefix_matches) == 0:
         return []
     for object_path in prefix_matches:
         if not object_path.endswith("profile.json"):
             continue
-        raw = services.aws.get_s3(object_path)
+        raw = services.aws.get_s3(path_key=object_path)
         if raw:
             members.append(models.MemberProfile(**json.loads(raw)))
     if not members:
@@ -355,7 +355,7 @@ async def login(
     user_agent = event.get("requestContext", {}).get("http", {}).get("userAgent", request.headers.get("User-Agent"))
     try:
         object_key = f"{internals.APP_ENV}/magic-links/{magic_token}.json"
-        ret = services.aws.get_s3(object_key)
+        ret = services.aws.get_s3(path_key=object_key)
         if not ret:
             internals.logger.info(
                 f'"","","{ip_addr}","{user_agent}",""'

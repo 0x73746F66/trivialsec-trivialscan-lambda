@@ -153,7 +153,7 @@ def dns_query(domain_name: str, try_apex: bool = False, resolve_type: rdatatype.
     except ConnectionError:
         internals.logger.warning(f"get_dns {resolve_type} for {domain_name} Name or service not known")
 
-    tldext = TLDExtract(cache_dir="/tmp")(f"http://{domain_name}")
+    tldext = TLDExtract(cache_dir=internals.CACHE_DIR)(f"http://{domain_name}")
     if not answer and try_apex and tldext.registered_domain != domain_name:
         return dns_query(tldext.registered_domain, try_apex=try_apex, resolve_type=resolve_type)
     if not answer:

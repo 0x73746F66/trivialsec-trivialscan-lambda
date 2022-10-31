@@ -12,8 +12,6 @@ from user_agents import parse as ua_parser
 from starlette.requests import Request
 from pydantic import IPvAnyAddress
 
-import services.helpers
-
 CACHE_DIR = getenv("CACHE_DIR", "/tmp")
 JITTER_SECONDS = int(getenv("JITTER_SECONDS", "30"))
 APP_ENV = getenv("APP_ENV", "Dev")
@@ -98,7 +96,8 @@ class HMAC:
         self.algorithm = algorithm
         self._expire_after_seconds = expire_after_seconds
         self._not_before_seconds = not_before_seconds
-        self.parsed_header = services.helpers.parse_authorization_header(authorization_header)
+        from services.helpers import parse_authorization_header  # pylint: disable=import-outside-toplevel
+        self.parsed_header = parse_authorization_header(authorization_header)
 
     def is_valid_scheme(self) -> bool:
         return self.authorization_header.startswith('HMAC')

@@ -60,7 +60,7 @@ def dashboard_compliance(
     results = []
     prefix_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/results/"  # type: ignore
     try:
-        summary_keys = services.aws.list_s3(prefix_key)
+        summary_keys = services.aws.list_s3(prefix_key=prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR

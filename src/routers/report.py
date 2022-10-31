@@ -4,7 +4,7 @@ from secrets import token_urlsafe
 from typing import Union
 from datetime import timedelta
 
-from fastapi import Header, APIRouter, Response, File, UploadFile, status
+from fastapi import Header, Query, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
 from cachier import cachier
 
@@ -79,12 +79,14 @@ def retrieve_summary(
 @cachier(
     stale_after=timedelta(hours=1),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+kw.get("report_id")
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+kw.get("report_id")+str(kw.get("full_hosts"))+str(kw.get("full_certs"))
 )
-def retrieve_report(
+def retrieve_full_report(
     request: Request,
     response: Response,
     report_id: str,
+    full_hosts: bool = Query(default=False, description="Returns full hostname records instead of a reference list"),
+    full_certs: bool = Query(default=False, description="Returns full linked certificiate details instead of a reference list"),
     authorization: Union[str, None] = Header(default=None),
 ):
     """
@@ -107,6 +109,26 @@ def retrieve_report(
     report = models.FullReport(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
     if not report:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    if full_certs:
+        certs = []
+        for sha1_fingerprint in report.certificates:
+            if not isinstance(sha1_fingerprint, str):
+                continue
+            if cert := models.Certificate(sha1_fingerprint=sha1_fingerprint).load():  # type: ignore
+                certs.append(cert)
+        report.certificates = certs
+
+    if full_hosts:
+        hosts = []
+        for target in report.targets:
+            if not isinstance(target, str):
+                continue
+            hostname, port = target.split(':')  # type: ignore
+            transport = models.HostTransport(hostname=hostname, port=port)  # type: ignore
+            if host := models.Host(transport=transport).load():  # type: ignore
+                hosts.append(host)
+        report.targets = hosts
 
     return report
 
@@ -156,7 +178,7 @@ def retrieve_reports(
     data = []
     prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
     try:
-        summary_keys = services.aws.list_s3(prefix_key)
+        summary_keys = services.aws.list_s3(prefix_key=prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -170,7 +192,7 @@ def retrieve_reports(
     for summary_key in summary_keys:
         if not summary_key.endswith("summary.json"):
             continue
-        ret = services.aws.get_s3(summary_key)
+        ret = services.aws.get_s3(path_key=summary_key)
         if not ret:
             continue
         item = json.loads(ret)
@@ -233,11 +255,11 @@ def retrieve_certificate(
     pem_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
     cert_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.json")
     try:
-        ret = services.aws.get_s3(cert_key)
+        ret = services.aws.get_s3(path_key=cert_key)
         if not ret:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         if include_pem:
-            ret["pem"] = services.aws.get_s3(pem_key)
+            ret["pem"] = services.aws.get_s3(path_key=pem_key)
 
         return json.loads(ret)
 
@@ -305,7 +327,7 @@ async def store(
         if report.save():
             scans_map: dict[str, dict[str, list[str]]] = {}
             object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"  # type: ignore
-            if history_raw := services.aws.get_s3(object_key):
+            if history_raw := services.aws.get_s3(path_key=object_key):
                 scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
             for target in report.targets or []:
                 scans_map.setdefault(target, {'reports': []})
@@ -410,7 +432,7 @@ def certificate_issues(
     full_data: list[models.EvaluationItem] = []
     prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
     try:
-        path_keys = services.aws.list_s3(prefix_key)
+        path_keys = services.aws.list_s3(prefix_key=prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -423,7 +445,7 @@ def certificate_issues(
     for object_key in path_keys:
         if not object_key.endswith("full-report.json"):
             continue
-        ret = services.aws.get_s3(object_key)
+        ret = services.aws.get_s3(path_key=object_key)
         if not ret:
             continue
         d = json.loads(ret)
@@ -514,7 +536,7 @@ def latest_findings(
     full_data: list[models.EvaluationItem] = []
     prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
     try:
-        path_keys = services.aws.list_s3(prefix_key)
+        path_keys = services.aws.list_s3(prefix_key=prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -528,7 +550,7 @@ def latest_findings(
     for object_key in path_keys:
         if not object_key.endswith("full-report.json"):
             continue
-        ret = services.aws.get_s3(object_key)
+        ret = services.aws.get_s3(path_key=object_key)
         if not ret:
             continue
         d = json.loads(ret)

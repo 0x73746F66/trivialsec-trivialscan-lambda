@@ -153,11 +153,11 @@ def get_subscription(subscription_id: str) -> stripe.Subscription:
 def get_account_by_billing_email(billing_email: EmailStr):
     from models import MemberAccount  # pylint: disable=import-outside-toplevel
     prefix_key = f"{internals.APP_ENV}/accounts/"
-    matches = services.aws.list_s3(prefix_key)
+    matches = services.aws.list_s3(prefix_key=prefix_key)
     for object_path in matches:
         if not object_path.endswith("registration.json"):
             continue
-        raw = services.aws.get_s3(object_path)
+        raw = services.aws.get_s3(path_key=object_path)
         data = json.loads(raw)
         account = MemberAccount(**data)
         if account.billing_email == str(billing_email):

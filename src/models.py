@@ -250,7 +250,7 @@ class SubscriptionAddon(SubscriptionBase, DAL):
         prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.UNLIMITED_RESCANS}/"
         matches = services.aws.list_s3(prefix_key=prefix_key)
         for match in matches:
-            raw = services.aws.get_s3(match)
+            raw = services.aws.get_s3(path_key=match)
             if not raw:
                 continue
             try:
@@ -283,7 +283,7 @@ class SubscriptionBooster(SubscriptionBase, DAL):
         prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.CONTINUOUS_MONITORING_BOOSTER}/"
         matches = services.aws.list_s3(prefix_key=prefix_key)
         for match in matches:
-            raw = services.aws.get_s3(match)
+            raw = services.aws.get_s3(path_key=match)
             if not raw:
                 continue
             try:
@@ -316,7 +316,7 @@ class SubscriptionPro(SubscriptionBase, DAL):
         prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.PROFESSIONAL}/"
         matches = services.aws.list_s3(prefix_key=prefix_key)
         for match in matches:
-            raw = services.aws.get_s3(match)
+            raw = services.aws.get_s3(path_key=match)
             if not raw:
                 continue
             try:
@@ -349,7 +349,7 @@ class SubscriptionEnterprise(SubscriptionBase, DAL):
         prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.ENTERPRISE}/"
         matches = services.aws.list_s3(prefix_key=prefix_key)
         for match in matches:
-            raw = services.aws.get_s3(match)
+            raw = services.aws.get_s3(path_key=match)
             if not raw:
                 continue
             try:
@@ -382,7 +382,7 @@ class SubscriptionUnlimited(SubscriptionBase, DAL):
         prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.UNLIMITED}/"
         matches = services.aws.list_s3(prefix_key=prefix_key)
         for match in matches:
-            raw = services.aws.get_s3(match)
+            raw = services.aws.get_s3(path_key=match)
             if not raw:
                 continue
             try:
@@ -463,7 +463,7 @@ class MemberAccount(AccountRegistration, DAL):
         if not self.name:
             return
         object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing account object: {object_key}")
             return
@@ -494,12 +494,12 @@ class MemberAccount(AccountRegistration, DAL):
     def update_members(self) -> bool:
         prefix_key = f"{internals.APP_ENV}/accounts/{self.name}/"
         members: list['MemberProfile'] = []
-        member_matches = services.aws.list_s3(f"{prefix_key}members/")
+        member_matches = services.aws.list_s3(prefix_key=f"{prefix_key}members/")
         results: list[bool] = []
         for object_path in member_matches:
             if not object_path.endswith("profile.json"):
                 continue
-            raw = services.aws.get_s3(object_path)
+            raw = services.aws.get_s3(path_key=object_path)
             if raw:
                 try:
                     member = MemberProfile(**json.loads(raw))
@@ -511,9 +511,9 @@ class MemberAccount(AccountRegistration, DAL):
                 results.append(member.save())
                 members.append(member)
         for member in members:
-            session_matches = services.aws.list_s3(f"{prefix_key}members/{member.email}/sessions/")
+            session_matches = services.aws.list_s3(prefix_key=f"{prefix_key}members/{member.email}/sessions/")
             for object_path in session_matches:
-                raw = services.aws.get_s3(object_path)
+                raw = services.aws.get_s3(path_key=object_path)
                 if raw:
                     session = MemberSession(**json.loads(raw))
                     session.member = member
@@ -557,7 +557,7 @@ class MemberProfile(BaseModel, DAL):
         if len(matches) == 0:
             internals.logger.warning(f"Missing member for: {member_email}")
             return
-        raw = services.aws.get_s3(matches[0])
+        raw = services.aws.get_s3(path_key=matches[0])
         if not raw:
             internals.logger.warning(f"Missing member for: {member_email}")
             return
@@ -582,7 +582,7 @@ class MemberProfile(BaseModel, DAL):
 
     def delete(self) -> bool:
         prefix_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/"  # type: ignore
-        prefix_matches = services.aws.list_s3(prefix_key)
+        prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
         if len(prefix_matches) == 0:
             return False
         results: list[bool] = []
@@ -626,7 +626,7 @@ class Client(BaseModel, DAL):
         if account_name:
             self.account = MemberAccount(name=account_name).load()  # type: ignore
         object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"  # type: ignore
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing account object: {object_key}")
             return
@@ -677,7 +677,7 @@ class MagicLink(MagicLinkRequest, DAL):
         if magic_token:
             self.magic_token = magic_token
         object_key = f"{internals.APP_ENV}/magic-links/{self.magic_token}.json"
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing MagicLink {object_key}")
             return
@@ -729,7 +729,7 @@ class MemberSession(BaseModel, DAL):
         if not self.session_token or validators.email(self.member.email) is False:  # type: ignore
             return
         object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/sessions/{self.session_token}.json"  # type: ignore
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing session object: {object_key}")
             return
@@ -797,7 +797,7 @@ class Support(SupportRequest, DAL):
             self.member = MemberProfile(email=member_email).load()  # type: ignore
         clean_subject = ''.join(e for e in '-'.join(self.subject.split()).replace('/', '-').lower() if e.isalnum() or e == '-')
         object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing Support {object_key}")
             return
@@ -943,7 +943,7 @@ class Host(BaseModel, DAL):
             object_key = f"{prefix_key}/{self.transport.peer_address}/{scan_date}.json"
         else:
             object_key = f"{prefix_key}/latest.json"
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing Host {object_key}")
             return
@@ -1019,7 +1019,7 @@ class Certificate(BaseModel, DAL):
             self.sha1_fingerprint = sha1_fingerprint
 
         object_key = f"{internals.APP_ENV}/certificates/{self.sha1_fingerprint}.json"
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing Certificate {object_key}")
             return
@@ -1078,12 +1078,12 @@ class ReferenceItem(BaseModel):
 class ReportSummary(DefaultInfo, DAL):
     report_id: str
     project_name: Union[str, None]
-    targets: Optional[list[str]]
+    targets: Union[list[str], list[Host]] = Field(default=[])
     date: Optional[datetime]
     execution_duration_seconds: Union[PositiveFloat, None] = Field(default=None)
     score: int = Field(default=0)
     results: Optional[dict[str, int]]
-    certificates: list[str] = Field(default=[])
+    certificates: Union[list[str], list[Certificate]] = Field(default=[])
     results_uri: Optional[str]
     flags: Union[Flags, None] = Field(default=None)
     config: Union[Config, None] = Field(default=None)
@@ -1098,7 +1098,7 @@ class ReportSummary(DefaultInfo, DAL):
             self.account_name = account_name
 
         object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/summary.json"
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing ReportSummary {object_key}")
             return
@@ -1179,7 +1179,7 @@ class FullReport(ReportSummary, DAL):
             self.account_name = account_name
 
         object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing FullReport {object_key}")
             return
@@ -1239,7 +1239,7 @@ class AcceptEdit(BaseModel, DAL):
         if accept_token:
             self.accept_token = accept_token
         object_key = f"{internals.APP_ENV}/accept-links/{self.accept_token}.json"
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing AcceptEdit {object_key}")
             return
@@ -1323,7 +1323,7 @@ class Monitor(BaseModel, DAL):
         if account_name:
             self.account = MemberAccount(name=account_name).load()  # type: ignore
         object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/monitor.json"  # type: ignore
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing Monitor {object_key}")
             return
@@ -1379,7 +1379,7 @@ class Queue(BaseModel, DAL):
         if account_name:
             self.account = MemberAccount(name=account_name).load()  # type: ignore
         object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/on-demand-queue.json"  # type: ignore
-        raw = services.aws.get_s3(object_key)
+        raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing Queue {object_key}")
             return
