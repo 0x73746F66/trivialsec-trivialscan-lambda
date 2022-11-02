@@ -1,6 +1,4 @@
 # pylint: disable=no-self-argument, arguments-differ
-from binascii import a2b_qp
-from http.client import CONTINUE
 import json
 import hashlib
 from abc import ABCMeta, abstractmethod
@@ -1198,10 +1196,7 @@ class FullReport(ReportSummary, DAL):
             return
         data = json.loads(raw)
         if data:
-            try:
-                super().__init__(**data)
-            except ValidationError:
-                return data
+            super().__init__(**data)
         return self
 
     def save(self) -> bool:
