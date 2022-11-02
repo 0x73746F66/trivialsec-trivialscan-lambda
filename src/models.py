@@ -1,4 +1,6 @@
 # pylint: disable=no-self-argument, arguments-differ
+from binascii import a2b_qp
+from http.client import CONTINUE
 import json
 import hashlib
 from abc import ABCMeta, abstractmethod
@@ -269,8 +271,8 @@ class SubscriptionAddon(SubscriptionBase, DAL):
             super().__init__(**res[-1])
             return self
 
-class SubscriptionBooster(SubscriptionBase, DAL):
-    def load(self, account_name: str) -> Union['SubscriptionBooster', None]:
+class SubscriptionBasics(SubscriptionBase, DAL):
+    def load(self, account_name: str) -> Union['SubscriptionBasics', None]:
         """
         Derives a Stripe subscription based on having at least one active record
         and returns only the most recent. Any other requirements should load the
@@ -280,7 +282,7 @@ class SubscriptionBooster(SubscriptionBase, DAL):
             raise AttributeError('Subscription.load missing account_name')
 
         subs = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.CONTINUOUS_MONITORING_BOOSTER}/"
+        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.BASICS}/"
         matches = services.aws.list_s3(prefix_key=prefix_key)
         for match in matches:
             raw = services.aws.get_s3(path_key=match)
@@ -1047,10 +1049,14 @@ class Certificate(BaseModel, DAL):
         return services.aws.delete_s3(object_key)
 
 class ComplianceItem(BaseModel):
-    compliance: str
-    version: str
     requirement: Union[str, None] = Field(default=None)
+    title: Union[str, None] = Field(default=None)
     description: Union[str, None] = Field(default=None)
+
+class ComplianceGroup(BaseModel):
+    compliance: Optional[str]
+    version: Optional[str]
+    items: Union[list[ComplianceItem], None] = Field(default=[])
 
 class ThreatItem(BaseModel):
     standard: str
@@ -1139,7 +1145,6 @@ class EvaluationItem(DefaultInfo):
     result_label: str
     result_text: str
     result_level: Union[str, None] = Field(default=None)
-    result_color: Union[str, None] = Field(default=None)
     score: int = Field(default=0)
     description: str
     metadata: dict[str, Any] = Field(default={})
@@ -1147,10 +1152,11 @@ class EvaluationItem(DefaultInfo):
     cvss2: Union[str, Any] = Field(default=None)
     cvss3: Union[str, Any] = Field(default=None)
     references: Union[list[ReferenceItem], None] = Field(default=[])
-    compliance: Union[list[ComplianceItem], None] = Field(default=[])
+    compliance: Union[list[ComplianceGroup], None] = Field(default=[])
     threats: Union[list[ThreatItem], None] = Field(default=[])
     transport: Optional[HostTransport]
     certificate: Optional[Certificate]
+
     @validator("references")
     def set_references(cls, references):
         return [] if not isinstance(references, list) else references
@@ -1185,7 +1191,10 @@ class FullReport(ReportSummary, DAL):
             return
         data = json.loads(raw)
         if data:
-            super().__init__(**data)
+            try:
+                super().__init__(**data)
+            except ValidationError:
+                return data
         return self
 
     def save(self) -> bool:

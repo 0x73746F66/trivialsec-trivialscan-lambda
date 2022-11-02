@@ -137,7 +137,7 @@ def store_ssm(parameter: str, value: str, **kwargs) -> bool:
     backoff=1,
 )
 @cachier(
-    stale_after=timedelta(minutes=15),
+    stale_after=timedelta(seconds=15),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda args, _: ''.join([str(a) for a in args])
 )
@@ -194,15 +194,15 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET) -> list[str]:
     backoff=1,
 )
 @cachier(
-    stale_after=timedelta(minutes=15),
+    stale_after=timedelta(seconds=15),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda args, _: ''.join([str(a) for a in args])
 )
-def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None, **kwargs) -> Any:
+def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None) -> Any:
     internals.logger.info(f"requesting bucket {bucket_name} object key {path_key}")
     try:
         response = s3_client.get_object(
-            Bucket=bucket_name, Key=path_key, **kwargs)
+            Bucket=bucket_name, Key=path_key)
         return response["Body"].read().decode("utf8")
 
     except ClientError as err:

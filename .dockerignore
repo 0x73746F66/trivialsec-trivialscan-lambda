@@ -1,7 +1,5 @@
 .repo/
-bin/
 plans/
-.env-example
 .gitignore
 .gitlab-ci.yml
 LICENSE.md
@@ -9,6 +7,7 @@ LICENSE.md
 .vscode*
 .git/
 .venv/
+.venv*/
 .cache
 .terraform/
 .tfplan
@@ -18,18 +17,14 @@ terraform.*
 **.tfstate
 .dockerignore
 **/__pycache__/
-.in
-.out
+.autoenv.zsh
+.autoenv_leave.zsh
 .pylintrc
 Makefile
 README.md
 **/build/
-assets/
-deploy/
 *.tgz
 *.zip
-trivialsec-common/
 .lh/
 .ci/
 .development/
-src_old/

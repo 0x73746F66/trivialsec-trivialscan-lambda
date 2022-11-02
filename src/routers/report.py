@@ -77,9 +77,9 @@ def retrieve_summary(
     tags=["Scan Reports"],
 )
 @cachier(
-    stale_after=timedelta(hours=1),
+    stale_after=timedelta(minutes=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+kw.get("report_id")+str(kw.get("full_hosts"))+str(kw.get("full_certs"))
+    hash_params=lambda args, _: ''.join([str(a) for a in args])
 )
 def retrieve_full_report(
     request: Request,
@@ -330,8 +330,8 @@ async def store(
             if history_raw := services.aws.get_s3(path_key=object_key):
                 scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
             for target in report.targets or []:
-                scans_map.setdefault(target, {'reports': []})
-                scans_map[target]['reports'].append(report.report_id)
+                scans_map.setdefault(target, {'reports': []})  # type: ignore
+                scans_map[target]['reports'].append(report.report_id)  # type: ignore
             services.aws.store_s3(object_key, json.dumps(scans_map, default=str))
             return {"results_uri": results_uri}
 
@@ -351,8 +351,28 @@ async def store(
                 client_name=_report.client_name,
                 report_id=report_id,
                 observed_at=_report.date,
+                rule_id=_item['rule_id'],
+                group=_item['group'],
+                group_id=_item['group_id'],
+                key=_item['key'],
+                name=_item['name'],
+                result_value=_item['result_value'],
+                result_label=_item['result_label'],
+                result_text=_item['result_text'],
+                result_level=_item['result_level'],
+                score=_item['score'],
+                description=_item['description'],
+                metadata=_item.get('metadata', {}),
+                cve=_item.get('cve', []),
+                cvss2=_item.get('cvss2'),
+                cvss3=_item.get('cvss3'),
+                references=[models.ReferenceItem(name=ref['name'], url=ref['url']) for ref in _item.get('references', []) or []],
+                compliance=[models.ComplianceGroup(compliance=comp['compliance'], version=comp['version'], items=[
+                    models.ComplianceItem(**item) for item in comp.get('items', [])
+                ]) for comp in _item['compliance']],
+                threats=[models.ThreatItem(**threat) for threat in _item.get('threats', [])],
                 transport=models.HostTransport(**data['transport']),
-                **_item,
+                certificate=None if not _item.get('certificate') else models.Certificate(**_item['certificate']),
             )
             if item.group == "certificate" and item.metadata.get("sha1_fingerprint"):
                 if item.metadata.get("sha1_fingerprint") not in certs:
@@ -587,3 +607,76 @@ def latest_findings(
     sorted_data = list(reversed(sorted(latest_data, key=lambda x: x.observed_at)))  # type: ignore
 
     return sorted_data
+
+
+@router.get("/generic",
+    status_code=status.HTTP_200_OK,
+    tags=["Debug"],
+)
+def generic(
+    request: Request,
+    response: Response,
+    authorization: Union[str, None] = Header(default=None),
+):
+    if not authorization:
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        return
+
+    summary_keys = []
+    prefix_key = path.join(internals.APP_ENV, "accounts")  # type: ignore
+    try:
+        summary_keys = services.aws.list_s3(prefix_key=prefix_key)
+
+    except RuntimeError as err:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        internals.logger.exception(err)
+        return []
+
+    if not summary_keys:
+        internals.logger.warning(f"No reports for {prefix_key}")
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    for summary_key in summary_keys:
+        if not summary_key.endswith("full-report.json"):
+            continue
+        raw = services.aws.get_s3(path_key=summary_key)
+        if not raw:
+            continue
+        _data = json.loads(raw)
+        if not _data:
+            continue
+        if 'compliance' in _data:
+            del _data['compliance']
+        for evaluation in _data['evaluations']:
+            groups = set([(data['compliance'], data['version']) for data in evaluation['compliance'] if isinstance(data, dict)])
+            results = []
+            for uniq_group in groups:
+                name, ver = uniq_group
+                group = models.ComplianceGroup(compliance=name, version=ver)
+                for data in _data:
+                    if not isinstance(data, dict):
+                        break
+                    if data['compliance'] != group.compliance or data['version'] != group.version:
+                        continue
+                    group.items.append(models.ComplianceItem(
+                        requirement=data.get('requirement'),
+                        title=data.get('title'),
+                        description=data.get('description')
+                    ))
+                results.append(group)
+            evaluation['compliance'] = results
+        services.aws.store_s3(
+            path_key=summary_key,
+            value=json.dumps(_data, default=str)
+        )

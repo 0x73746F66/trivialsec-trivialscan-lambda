@@ -64,13 +64,14 @@ def get_quotas(
     unlimited_monitoring = False
     unlimited_scans = False
     monitoring_total = 1
-    passive_total = 0
+    passive_total = 1
     active_total = 0
     if sub := models.SubscriptionAddon().load(account.name):  # type: ignore
         unlimited_scans = True
-        new_only = False
-    if sub := models.SubscriptionBooster().load(account.name):  # type: ignore
-        monitoring_total = 1 if sub.quantity is None else sub.quantity + 1
+    if sub := models.SubscriptionBasics().load(account.name):  # type: ignore
+        monitoring_total = 1 if not sub.metadata else sub.metadata.get("monitoring", 1)
+        passive_total = 1 if not sub.metadata else sub.metadata.get("managed_passive", 1)
+        active_total = 0 if not sub.metadata else sub.metadata.get("managed_active", 0)
     elif sub := models.SubscriptionPro().load(account.name):  # type: ignore
         monitoring_total = 10 if not sub.metadata else sub.metadata.get("monitoring", 10)
         passive_total = 500 if not sub.metadata else sub.metadata.get("managed_passive", 500)
@@ -82,7 +83,12 @@ def get_quotas(
         active_total = 100 if not sub.metadata else sub.metadata.get("managed_active", 100)
         new_only = False
     elif sub := models.SubscriptionUnlimited().load(account.name):  # type: ignore
+        unlimited_scans = True
+        unlimited_monitoring = True
+
+    if unlimited_monitoring:
         monitoring_total = None
+    if unlimited_scans:
         passive_total = None
         active_total = None
         new_only = False

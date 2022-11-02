@@ -15,27 +15,27 @@ class Product(str, Enum):
     PROFESSIONAL = "professional"
     COMMUNITY_EDITION = "community_edition"
     ENTERPRISE = "enterprise"
-    CONTINUOUS_MONITORING_BOOSTER = "continuous_monitoring_booster"
+    BASICS = "basics"
     UNLIMITED_RESCANS = "unlimited_rescans"
 
 PRODUCT_MAP = {
     'prod_McksvyXK7BHj0d': Product.UNLIMITED,
-    'prod_MckkLWvtbYeTdh': Product.PROFESSIONAL,
+    'prod_MijyeF6r4yiPzf': Product.PROFESSIONAL,
     'prod_MckImIfrJUilft': Product.COMMUNITY_EDITION,
     'prod_KreCNP6tT8FWp3': Product.ENTERPRISE,
-    'prod_Mcl2wa3xDNSTlx': Product.CONTINUOUS_MONITORING_BOOSTER,
+    'prod_Mik7Wj5HL2d6LJ': Product.BASICS,
     'prod_MckynJ669YGSzx': Product.UNLIMITED_RESCANS,
 }
 PRODUCTS = {
     Product.UNLIMITED: {
         'id': "prod_McksvyXK7BHj0d",
-        'name': "Unlimited Plan",
+        'name': "Unlimited Forever",
         'prices': ["price_1LtVMOGZtHTgMn6lbqoePJui"],
     },
     Product.PROFESSIONAL: {
-        'id': "prod_MckkLWvtbYeTdh",
+        'id': "prod_MijyeF6r4yiPzf",
         'name': "Professional",
-        'prices': ["price_1LtVF1GZtHTgMn6lO8JH0vFl", "price_1LtVF1GZtHTgMn6lJuTUrr7M"],
+        'prices': ["price_1LzIiqGZtHTgMn6l2ii4Iwr9", "price_1LzIlsGZtHTgMn6lJ8Qe251R"],
     },
     Product.COMMUNITY_EDITION: {
         'id': "prod_MckImIfrJUilft",
@@ -47,10 +47,10 @@ PRODUCTS = {
         'name': "Enterprise",
         'prices': [],
     },
-    Product.CONTINUOUS_MONITORING_BOOSTER: {
-        'id': "prod_Mcl2wa3xDNSTlx",
-        'name': "Continuous Monitoring Booster",
-        'prices': ["price_1LtVWiGZtHTgMn6l7bu4g4kd"],
+    Product.BASICS: {
+        'id': "prod_Mik7Wj5HL2d6LJ",
+        'name': "Basics",
+        'prices': ["price_1LzIcxGZtHTgMn6lPfxCXL9d"],
     },
     Product.UNLIMITED_RESCANS: {
         'id': "prod_MckynJ669YGSzx",

@@ -273,7 +273,7 @@ async def auth_client(
     tags=["Member Account"],
 )
 @cachier(
-    stale_after=timedelta(seconds=30),
+    stale_after=timedelta(seconds=5),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
 )
