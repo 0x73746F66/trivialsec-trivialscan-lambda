@@ -161,7 +161,7 @@ def dashboard_compliance(
     tags=["Dashboard"],
 )
 @cachier(
-    stale_after=timedelta(minutes=15),
+    stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
 )

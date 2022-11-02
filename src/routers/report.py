@@ -200,7 +200,11 @@ def retrieve_reports(
             del item["config"]
         if item.get("flags"):
             del item["flags"]
-        item["results_uri"] = f'/result/{summary_key.split("/")[-2]}/summary'
+        item["results_uri"] = f'/result/{summary_key.split("/")[-2]}/detail'
+        if item.get('client_name'):
+            if client := models.Client(account=authz.account, name=item.get('client_name')).load():  # type: ignore
+                item['client'] = client.client_info
+
         data.append(item)
 
     if not data:
@@ -321,9 +325,9 @@ async def store(
 
     if report_type is models.ReportType.REPORT:
         report_id = token_urlsafe(56)
-        results_uri = f"/result/{report_id}/summary"
+        results_uri = f"/result/{report_id}/detail"
         report = models.ReportSummary(report_id=report_id, results_uri=results_uri, **data)
-        # report.date = datetime.utcnow() - timedelta(days=27)
+        # report.date = datetime.utcnow() - timedelta(days=13)
         if report.save():
             scans_map: dict[str, dict[str, list[str]]] = {}
             object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"  # type: ignore

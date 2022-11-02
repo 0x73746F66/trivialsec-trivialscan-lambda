@@ -1093,6 +1093,7 @@ class ReportSummary(DefaultInfo, DAL):
     results_uri: Optional[str]
     flags: Union[Flags, None] = Field(default=None)
     config: Union[Config, None] = Field(default=None)
+    client: Optional[Union[ClientInfo, None]] = Field(default=None)
 
     def exists(self, report_id: Union[str, None] = None, account_name: Union[str, None] = None) -> bool:
         return self.load(report_id, account_name) is not None
