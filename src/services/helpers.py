@@ -12,32 +12,25 @@ import internals
 
 def date_label(date: datetime) -> tuple[str, str, int]:
     label = "a moment ago"
-    group: str
+    group = "week"
     now = datetime.utcnow()
-    cur_year = now.strftime("%Y")
-    cur_month = now.strftime("%b")
-    year = date.strftime("%Y")
-    month = date.strftime("%b")
     delta = now - date
-    if year != cur_year:
+    if delta.days >= 365:
         group = "year"
-        if delta.days < 730:
-            label = "1 year ago"
-        else:
+        label = "1 year ago"
+        if delta.days <= 730:
             label = f"{round(delta.days/365, 0)} years ago"
-    if month != cur_month:
+    elif delta.days >= 31:
         group = "month"
+        label = "1 month ago"
         if delta.days <= 60:
-            label = "1 month ago"
-        else:
             label = f"{round(delta.days/30, 0)} months ago"
     else:
-        group = "week"
         if delta.days == 0:
             label = "today"
         elif delta.days == 1:
             label = "1 day ago"
-        elif delta.days <= 30:
+        elif delta.days >= 2:
             label = f"{delta.days} days ago"
     timestamp = datetime.combine(now - delta, time(0, 0, 0), tzinfo=timezone.utc).timestamp()
     return label, group, round(timestamp)

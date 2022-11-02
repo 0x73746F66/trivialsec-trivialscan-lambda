@@ -80,30 +80,28 @@ def dashboard_compliance(
             continue
         report = models.FullReport(
             account_name=authz.account.name,  # type: ignore
-            report_id=summary_key.replace(
-                prefix_key, '').replace("/full-report.json", '')
-        ).load()
+            report_id=summary_key.replace(prefix_key, '').replace("/full-report.json", '')).load()
         group_name, range_group, timestamp = services.helpers.date_label(report.date)  # type: ignore
         cur_results = {"group_name": group_name, "timestamp": timestamp}
         for item in report.evaluations:  # type: ignore
             if item.result_level == "pass":
                 continue
             for compliance in item.compliance:  # type: ignore
-                if compliance.compliance == "PCI DSS":
+                if compliance.compliance == models.ComplianceName.PCI_DSS:
                     if compliance.version == "3.2.1":
                         cur_results.setdefault(models.GraphLabel.PCIDSS3, _data.copy())  # type: ignore
                         cur_results[models.GraphLabel.PCIDSS3][range_group] += 1  # type: ignore
                     if compliance.version == "4.0":
                         cur_results.setdefault(models.GraphLabel.PCIDSS4, _data.copy())  # type: ignore
                         cur_results[models.GraphLabel.PCIDSS4][range_group] += 1  # type: ignore
-                if compliance.compliance == "NIST SP800-131A":
+                if compliance.compliance == models.ComplianceName.NIST_SP800_131A:
                     if compliance.version == "strict mode":
                         cur_results.setdefault(models.GraphLabel.NISTSP800_131A_STRICT, _data.copy())  # type: ignore
                         cur_results[models.GraphLabel.NISTSP800_131A_STRICT][range_group] += 1  # type: ignore
                     if compliance.version == "transition mode":
                         cur_results.setdefault(models.GraphLabel.NISTSP800_131A_TRANSITION, _data.copy())  # type: ignore
                         cur_results[models.GraphLabel.NISTSP800_131A_TRANSITION][range_group] += 1  # type: ignore
-                if compliance.compliance == "FIPS 140-2" and compliance.version == "Annex A":
+                if compliance.compliance == models.ComplianceName.FIPS_140_2 and compliance.version == "Annex A":
                     cur_results.setdefault(models.GraphLabel.FIPS1402, _data.copy())  # type: ignore
                     cur_results[models.GraphLabel.FIPS1402][range_group] += 1  # type: ignore
         results.append(cur_results)

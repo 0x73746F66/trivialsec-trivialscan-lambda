@@ -1053,8 +1053,14 @@ class ComplianceItem(BaseModel):
     title: Union[str, None] = Field(default=None)
     description: Union[str, None] = Field(default=None)
 
+
+class ComplianceName(str, Enum):
+    PCI_DSS = "PCI DSS"
+    NIST_SP800_131A = "NIST SP800-131A"
+    FIPS_140_2 = "FIPS 140-2"
+
 class ComplianceGroup(BaseModel):
-    compliance: Optional[str]
+    compliance: Optional[ComplianceName]
     version: Optional[str]
     items: Union[list[ComplianceItem], None] = Field(default=[])
 

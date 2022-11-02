@@ -327,7 +327,6 @@ async def store(
         report_id = token_urlsafe(56)
         results_uri = f"/result/{report_id}/detail"
         report = models.ReportSummary(report_id=report_id, results_uri=results_uri, **data)
-        # report.date = datetime.utcnow() - timedelta(days=13)
         if report.save():
             scans_map: dict[str, dict[str, list[str]]] = {}
             object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"  # type: ignore
