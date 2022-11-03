@@ -61,7 +61,11 @@ def dashboard_compliance(
         raw = services.aws.get_s3(path_key=object_key)
         data = json.loads(raw)
         for item in data:
-            item['label'] = getattr(models.GraphLabel, item['label'])
+            try:
+                item['label'] = getattr(models.GraphLabel, item['label'])
+            except AttributeError:
+                pass  # Label should already be the correct value
+
         return data
 
 

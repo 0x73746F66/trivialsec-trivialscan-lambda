@@ -79,7 +79,7 @@ def retrieve_summary(
 @cachier(
     stale_after=timedelta(minutes=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda args, _: ''.join([str(a) for a in args])
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("report_id"))+str(kw.get("full_certs"))+str(kw.get("full_hosts"))
 )
 def retrieve_full_report(
     request: Request,
@@ -174,38 +174,34 @@ def retrieve_reports(
         response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
-    summary_keys = []
+    summaries = []
     data = []
-    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
+    raw = None
+    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/summaries.json"  # type: ignore
     try:
-        summary_keys = services.aws.list_s3(prefix_key=prefix_key)
+        raw = services.aws.get_s3(path_key=object_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
         return []
 
-    if not summary_keys:
-        internals.logger.warning(f"No reports for {prefix_key}")
+    if not raw:
+        internals.logger.warning(f"No reports for {object_key}")
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    for summary_key in summary_keys:
-        if not summary_key.endswith("summary.json"):
+    cache_data = {}
+    summaries = json.loads(raw)
+    for item in summaries:
+        report = models.ReportSummary(**item)
+        if report.client_name in cache_data:
+            report.client = cache_data[report.client_name]
+            data.append(report)
             continue
-        ret = services.aws.get_s3(path_key=summary_key)
-        if not ret:
-            continue
-        item = json.loads(ret)
-        if item.get("config"):
-            del item["config"]
-        if item.get("flags"):
-            del item["flags"]
-        item["results_uri"] = f'/result/{summary_key.split("/")[-2]}/detail'
-        if item.get('client_name'):
-            if client := models.Client(account=authz.account, name=item.get('client_name')).load():  # type: ignore
-                item['client'] = client.client_info
-
-        data.append(item)
+        if client := models.Client(account=authz.account, name=report.client_name).load():  # type: ignore
+            report.client = client.client_info
+            cache_data[report.client_name] = client
+        data.append(report)
 
     if not data:
         return Response(status_code=status.HTTP_204_NO_CONTENT)

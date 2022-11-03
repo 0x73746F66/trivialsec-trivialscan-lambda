@@ -59,32 +59,24 @@ def retrieve_hosts(
         response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
-    path_keys = []
-    data = []
-    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
+    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/summaries.json"  # type: ignore
     try:
-        path_keys = services.aws.list_s3(prefix_key=prefix_key)
+        raw = services.aws.get_s3(path_key=object_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
         return []
 
-    if not path_keys:
-        internals.logger.warning(f"No reports for {prefix_key}")
+    if not raw:
+        internals.logger.warning(f"No reports for {object_key}")
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     seen = set()
-    for object_key in path_keys:
-        if not object_key.endswith("summary.json"):
-            continue
-        ret = services.aws.get_s3(path_key=object_key)
-        if not ret:
-            continue
-        item = json.loads(ret)
-        if not isinstance(item, dict):
-            continue
-        report = models.FullReport(**item)
+    data = []
+    summaries = json.loads(raw)
+    for item in summaries:
+        report = models.ReportSummary(**item)
         for target in report.targets or []:
             if target not in seen:
                 seen.add(target)

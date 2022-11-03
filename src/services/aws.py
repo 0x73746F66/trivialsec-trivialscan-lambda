@@ -136,11 +136,6 @@ def store_ssm(parameter: str, value: str, **kwargs) -> bool:
     delay=1.5,
     backoff=1,
 )
-@cachier(
-    stale_after=timedelta(seconds=15),
-    cache_dir=internals.CACHE_DIR,
-    hash_params=lambda args, _: ''.join([str(a) for a in args])
-)
 def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET) -> list[str]:
     """
     params:
@@ -192,11 +187,6 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET) -> list[str]:
     tries=3,
     delay=1.5,
     backoff=1,
-)
-@cachier(
-    stale_after=timedelta(seconds=15),
-    cache_dir=internals.CACHE_DIR,
-    hash_params=lambda args, _: ''.join([str(a) for a in args])
 )
 def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None) -> Any:
     internals.logger.info(f"requesting bucket {bucket_name} object key {path_key}")
