@@ -1,5 +1,5 @@
 import re
-from typing import Union
+from typing import Union, Any
 
 from dns import resolver, rdatatype
 from dns.exception import DNSException, Timeout as DNSTimeoutError
@@ -146,3 +146,26 @@ def retrieve_ip_for_host(hostname: str) -> list[IPvAnyAddress]:
             if answer := dns_query(domain, resolve_type=resolve_type):
                 results.update(ip.split(' ').pop() for ip in answer.rrset.to_rdataset().to_text().splitlines())  # type: ignore
     return list(results)
+
+def host_scanning_status(
+        account: models.MemberAccount,
+        hostname: str
+    ) -> Union[dict[str, Any], None]:
+    response = {
+        'monitoring': False,
+        'queued_timestamp': None,
+        'queue_status': None,
+    }
+    if monitor := models.Monitor(account=account).load():  # type: ignore
+        for target in monitor.targets:
+            if target.hostname == hostname:
+                response['monitoring'] = target.enabled
+    if queue := models.Queue(account=account).load():  # type: ignore
+        for target in queue.targets:
+            if target.hostname == hostname:
+                response[hostname]["queued_timestamp"] = target.timestamp
+                response[hostname]["queue_status"] = "Queued"
+                if target.scan_timestamp:
+                    response[hostname]["queue_status"] = "Processing"
+
+    return response

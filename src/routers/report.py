@@ -119,16 +119,21 @@ def retrieve_full_report(
                 certs.append(cert)
         report.certificates = certs
 
-    if full_hosts:
-        hosts = []
-        for target in report.targets:
-            if not isinstance(target, str):
-                continue
-            hostname, port = target.split(':')  # type: ignore
-            transport = models.HostTransport(hostname=hostname, port=port)  # type: ignore
+    hosts = []
+    for target in report.targets:
+        if not isinstance(target, str):
+            continue
+        hostname, port = target.split(':')  # type: ignore
+        transport = models.HostTransport(hostname=hostname, port=port)  # type: ignore
+        if full_hosts:
             if host := models.Host(transport=transport).load():  # type: ignore
+                host.scanning_status = services.helpers.host_scanning_status(authz.account, hostname)  # type: ignore
                 hosts.append(host)
-        report.targets = hosts
+        else:
+            host = models.Host(transport=transport)  # type: ignore
+            host.scanning_status = services.helpers.host_scanning_status(authz.account, hostname)  # type: ignore
+            hosts.append(host)
+    report.targets = hosts
 
     return report
 

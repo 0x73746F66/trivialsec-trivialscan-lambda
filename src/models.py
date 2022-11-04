@@ -917,6 +917,7 @@ class Host(BaseModel, DAL):
     transport: HostTransport
     tls: Optional[HostTLS]
     http: Optional[list[HostHTTP]]
+    scanning_status: Union[dict[str, Any], None] = Field(default=None)
 
     def exists(self,
             hostname: Union[str, None] = None,
