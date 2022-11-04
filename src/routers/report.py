@@ -205,7 +205,7 @@ def retrieve_reports(
             continue
         if client := models.Client(account=authz.account, name=report.client_name).load():  # type: ignore
             report.client = client.client_info
-            cache_data[report.client_name] = client
+            cache_data[report.client_name] = client.client_info
         data.append(report)
 
     if not data:
