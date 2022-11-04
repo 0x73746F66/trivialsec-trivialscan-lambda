@@ -19,11 +19,8 @@ APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
 ALLOWED_ORIGINS = [
     "https://www.trivialsec.com",
-    "http://jager:5173",
     "http://localhost:5173",
-    "http://127.0.0.1:5173",
     "http://100.73.142.90:5173",
-    "http://[fd7a:115c:a1e0:ab12:4843:cd96:6249:8e5a]:5173",
 ]
 DASHBOARD_URL = "https://www.trivialsec.com"
 logger = logging.getLogger()
@@ -205,7 +202,7 @@ class Authorization:
                 logger.critical("DENY Bot User-Agent")
                 return
             if not any([ua.is_mobile, ua.is_tablet, ua.is_pc]) and not postman_token:
-                logger.critical("DENY unrecognisable User-Agent")
+                logger.critical(f"DENY unrecognisable User-Agent {self.user_agent}")
                 return
             self.member = models.MemberProfile(email=self._hmac.id).load()
             if not self.member:

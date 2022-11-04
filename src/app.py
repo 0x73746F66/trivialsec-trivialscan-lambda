@@ -23,8 +23,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["POST", "GET", "DELETE"],
     allow_headers=[
+        "Origin",
+        "User-Agent",
         "X-Trivialscan-Account",
         "X-Trivialscan-Version",
+        "X-Forwarded-For",
+        "X-Real-IP",
         "Authorization",
     ],
     max_age=3600,
