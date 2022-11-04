@@ -163,9 +163,9 @@ def host_scanning_status(
     if queue := models.Queue(account=account).load():  # type: ignore
         for target in queue.targets:
             if target.hostname == hostname:
-                response[hostname]["queued_timestamp"] = target.timestamp
-                response[hostname]["queue_status"] = "Queued"
+                response["queued_timestamp"] = target.timestamp
+                response["queue_status"] = "Queued"
                 if target.scan_timestamp:
-                    response[hostname]["queue_status"] = "Processing"
+                    response["queue_status"] = "Processing"
 
     return response
