@@ -110,6 +110,20 @@ def retrieve_full_report(
     if not report:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+    evaluations = []
+    for item in report.evaluations or []:
+        if not item.observed_at:
+            item.observed_at = report.date
+        if item.cvss2:
+            item.references.append(models.ReferenceItem(name=f"CVSSv2 {item.cvss2}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v2-calculator?vector=({item.cvss2})"))  # type: ignore
+        if item.cvss3:
+            item.references.append(models.ReferenceItem(name=f"CVSSv3.1 {item.cvss3}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?version=3.1&vector={item.cvss3}"))  # type: ignore
+        if item.cve:
+            for cve in item.cve:
+                item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
+        evaluations.append(item)
+    report.evaluations = evaluations
+
     if full_certs:
         certs = []
         for sha1_fingerprint in report.certificates:
@@ -452,64 +466,19 @@ def certificate_issues(
         response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
-    path_keys = []
-    full_data: list[models.EvaluationItem] = []
-    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
+    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-certificates.json"  # type: ignore
     try:
-        path_keys = services.aws.list_s3(prefix_key=prefix_key)
+        raw = services.aws.get_s3(path_key=object_key)
+        data = json.loads(raw)
+        latest_data: list[models.EvaluationItem] = data[:limit]
+        sorted_data = list(reversed(sorted(latest_data, key=lambda x: x['observed_at'])))  # type: ignore
+
+        return sorted_data
 
     except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
-        return []
-    if not path_keys:
-        internals.logger.warning(f"No reports for {prefix_key}")
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    for object_key in path_keys:
-        if not object_key.endswith("full-report.json"):
-            continue
-        ret = services.aws.get_s3(path_key=object_key)
-        if not ret:
-            continue
-        d = json.loads(ret)
-        if not isinstance(d, dict):
-            continue
-        report = models.FullReport(**d)
-        for item in report.evaluations or []:
-            if item.result_level == 'pass' or not item.certificate or item.group != "certificate":
-                continue
-            if not item.observed_at:
-                item.observed_at = report.date
-            if item.cvss2:
-                item.references.append(models.ReferenceItem(name=f"CVSSv2 {item.cvss2}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v2-calculator?vector=({item.cvss2})"))  # type: ignore
-            if item.cvss3:
-                item.references.append(models.ReferenceItem(name=f"CVSSv3.1 {item.cvss3}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?version=3.1&vector={item.cvss3}"))  # type: ignore
-            if item.cve:
-                for cve in item.cve:
-                    item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
-            full_data.append(item)
-
-    if not full_data:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    priority_data: list[models.EvaluationItem] = sorted(full_data, key=lambda x: x.score)  # type: ignore
-    uniq_data: list[models.EvaluationItem] = []
-    seen = set()
-    for item in priority_data:
-        if item.key.startswith("trust_android_"):
-            continue
-        item: models.EvaluationItem
-        key = item.rule_id if not item.key.startswith("trust_") else "trust"
-        target = f"{item.certificate.sha1_fingerprint}{key}"  # type: ignore
-        if target not in seen:
-            uniq_data.append(item)
-        seen.add(target)
-
-    latest_data: list[models.EvaluationItem] = uniq_data[:limit]
-    sorted_data = list(reversed(sorted(latest_data, key=lambda x: x.observed_at)))  # type: ignore
-
-    return sorted_data
+    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return
 
 
 @router.get("/findings/latest",
@@ -556,61 +525,19 @@ def latest_findings(
         response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
 
-    path_keys = []
-    full_data: list[models.EvaluationItem] = []
-    prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "results")  # type: ignore
+    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-findings.json"  # type: ignore
     try:
-        path_keys = services.aws.list_s3(prefix_key=prefix_key)
+        raw = services.aws.get_s3(path_key=object_key)
+        data = json.loads(raw)
+        latest_data: list[models.EvaluationItem] = data[:limit]
+        sorted_data = list(reversed(sorted(latest_data, key=lambda x: x['observed_at'])))  # type: ignore
+
+        return sorted_data
 
     except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
-        return []
-
-    if not path_keys:
-        internals.logger.warning(f"No reports for {prefix_key}")
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    for object_key in path_keys:
-        if not object_key.endswith("full-report.json"):
-            continue
-        ret = services.aws.get_s3(path_key=object_key)
-        if not ret:
-            continue
-        d = json.loads(ret)
-        if not isinstance(d, dict):
-            continue
-        report = models.FullReport(**d)
-        for item in report.evaluations or []:
-            if item.result_level == 'pass' or not item.transport or item.group == "certificate":
-                continue
-            if not item.observed_at:
-                item.observed_at = report.date
-            if item.cvss2:
-                item.references.append(models.ReferenceItem(name=f"CVSSv2 {item.cvss2}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v2-calculator?vector=({item.cvss2})"))  # type: ignore
-            if item.cvss3:
-                item.references.append(models.ReferenceItem(name=f"CVSSv3.1 {item.cvss3}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?version=3.1&vector={item.cvss3}"))  # type: ignore
-            if item.cve:
-                for cve in item.cve:
-                    item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
-            full_data.append(item)
-
-    if not full_data:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    priority_data: list[models.EvaluationItem] = sorted(full_data, key=lambda x: x.score)  # type: ignore
-    uniq_data: list[models.EvaluationItem] = []
-    seen = set()
-    for item in priority_data:
-        target = f"{item.transport.hostname}{item.transport.port}{item.transport.peer_address}{item.rule_id}"  # type: ignore
-        if target not in seen:
-            uniq_data.append(item)
-        seen.add(target)
-
-    latest_data: list[models.EvaluationItem] = uniq_data[:limit]
-    sorted_data = list(reversed(sorted(latest_data, key=lambda x: x.observed_at)))  # type: ignore
-
-    return sorted_data
+    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return
 
 
 @router.get("/generic",
