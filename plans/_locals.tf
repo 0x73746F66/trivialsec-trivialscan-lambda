@@ -11,4 +11,6 @@ locals {
         SecurityTags = "credentials customer-data public-data"
         AutomationTool = "Terraform"
     }
+    hosted_zone           = "Z04169281YCJD2GS4F5ER"
+    domain_name           = "${lower(var.app_env)}-api.trivialsec.com"
 }
