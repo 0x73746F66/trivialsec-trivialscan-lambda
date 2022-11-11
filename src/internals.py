@@ -18,11 +18,13 @@ APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
 ALLOWED_ORIGINS = [
-    "https://www.trivialsec.com",
+    "https://dev.trivialsec.com",
     "http://localhost:5173",
     "http://100.73.142.90:5173",
+] if APP_ENV == "Dev" else [
+    "https://www.trivialsec.com",
 ]
-DASHBOARD_URL = "https://www.trivialsec.com"
+DASHBOARD_URL = "https://dev.trivialsec.com" if APP_ENV == "Dev" else "https://www.trivialsec.com"
 logger = logging.getLogger()
 
 class HMAC:

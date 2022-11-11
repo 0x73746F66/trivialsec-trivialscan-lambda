@@ -13,7 +13,7 @@ resource "aws_lambda_function" "trivialscan" {
       APP_ENV = var.app_env
       APP_NAME = var.app_name
       LOG_LEVEL = var.log_level
-      STORE_BUCKET = data.terraform_remote_state.trivialscan_s3.outputs.trivialscan_store_bucket
+      STORE_BUCKET = data.terraform_remote_state.trivialscan_s3.outputs.trivialscan_store_bucket[0]
     }
   }
   lifecycle {
