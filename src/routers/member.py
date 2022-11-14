@@ -652,7 +652,7 @@ async def send_member_invitation(
 async def delete_member(
     request: Request,
     response: Response,
-    email: EmailStr,
+    email: str,
     authorization: Union[str, None] = Header(default=None),
 ):
     """

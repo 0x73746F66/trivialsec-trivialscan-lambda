@@ -1152,7 +1152,7 @@ class EvaluationItem(DefaultInfo):
     result_text: str
     result_level: Union[str, None] = Field(default=None)
     score: int = Field(default=0)
-    description: str
+    description: Optional[str]
     metadata: dict[str, Any] = Field(default={})
     cve: Union[list[str], None] = Field(default=[])
     cvss2: Union[str, Any] = Field(default=None)
@@ -1201,24 +1201,15 @@ class FullReport(ReportSummary, DAL):
         return self
 
     def save(self) -> bool:
-        results: list[bool] = []
         object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
-        results.append(services.aws.store_s3(
+        return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
-        ))
-        return all(results)
+        )
 
     def delete(self) -> bool:
-        if not self.exists():
-            return False
-        results: list[bool] = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/"
-        for item in self.evaluations:  # type: ignore
-            object_key = f"{prefix_key}{item.group_id}/{item.rule_id}.json"
-            results.append(services.aws.delete_s3(object_key))
-
-        return all(results)
+        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
+        return services.aws.delete_s3(object_key)
 
 class EmailEditRequest(BaseModel):
     email: EmailStr

@@ -1,3 +1,4 @@
+# pylint: disable=line-too-long
 import logging
 import hmac
 import hashlib
@@ -257,3 +258,5 @@ class Authorization:
             logger.critical("Unhandled validation")
             return
         self.is_valid = self._hmac.validate(secret_key)
+
+RULE_DESCRIPTIONS = {}

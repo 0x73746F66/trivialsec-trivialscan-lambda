@@ -1,9 +1,6 @@
 from os import getenv
 from enum import Enum
 from typing import Any
-from datetime import timedelta
-
-from cachier import cachier
 
 import boto3
 from retry.api import retry

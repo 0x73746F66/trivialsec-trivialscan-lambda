@@ -206,7 +206,6 @@ def retrieve_reports(
         return []
 
     if not raw:
-        internals.logger.warning(f"No reports for {object_key}")
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     cache_data = {}
@@ -217,9 +216,10 @@ def retrieve_reports(
             report.client = cache_data[report.client_name]
             data.append(report)
             continue
-        if client := models.Client(account=authz.account, name=report.client_name).load():  # type: ignore
-            report.client = client.client_info
-            cache_data[report.client_name] = client.client_info
+        if report.client_name:
+            if client := models.Client(account=authz.account, name=report.client_name).load():  # type: ignore
+                report.client = client.client_info
+                cache_data[report.client_name] = client.client_info
         data.append(report)
 
     if not data:
@@ -369,8 +369,8 @@ async def store(
                 client_name=_report.client_name,
                 report_id=report_id,
                 observed_at=_report.date,
-                rule_id=_item['rule_id'],
-                group=_item['group'],
+                rule_id='%.3f' % _item['rule_id'],
+                group='%.3f' % _item['group'],
                 group_id=_item['group_id'],
                 key=_item['key'],
                 name=_item['name'],
@@ -379,7 +379,7 @@ async def store(
                 result_text=_item['result_text'],
                 result_level=_item['result_level'],
                 score=_item['score'],
-                description=_item['description'],
+                description=_item.get('description', internals.RULE_DESCRIPTIONS.get('%.3f' % _item['rule_id'], "No details available. See references.")),
                 metadata=_item.get('metadata', {}),
                 cve=_item.get('cve', []),
                 cvss2=_item.get('cvss2'),
@@ -469,6 +469,8 @@ def certificate_issues(
     object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-certificates.json"  # type: ignore
     try:
         raw = services.aws.get_s3(path_key=object_key)
+        if not raw:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
         data = json.loads(raw)
         latest_data: list[models.EvaluationItem] = data[:limit]
         sorted_data = list(reversed(sorted(latest_data, key=lambda x: x['observed_at'])))  # type: ignore
@@ -528,6 +530,8 @@ def latest_findings(
     object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-findings.json"  # type: ignore
     try:
         raw = services.aws.get_s3(path_key=object_key)
+        if not raw:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
         data = json.loads(raw)
         latest_data: list[models.EvaluationItem] = data[:limit]
         sorted_data = list(reversed(sorted(latest_data, key=lambda x: x['observed_at'])))  # type: ignore
@@ -538,76 +542,3 @@ def latest_findings(
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
-
-
-@router.get("/generic",
-    status_code=status.HTTP_200_OK,
-    tags=["Debug"],
-)
-def generic(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
-):
-    if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
-        return
-
-    summary_keys = []
-    prefix_key = path.join(internals.APP_ENV, "accounts")  # type: ignore
-    try:
-        summary_keys = services.aws.list_s3(prefix_key=prefix_key)
-
-    except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        internals.logger.exception(err)
-        return []
-
-    if not summary_keys:
-        internals.logger.warning(f"No reports for {prefix_key}")
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    for summary_key in summary_keys:
-        if not summary_key.endswith("full-report.json"):
-            continue
-        raw = services.aws.get_s3(path_key=summary_key)
-        if not raw:
-            continue
-        _data = json.loads(raw)
-        if not _data:
-            continue
-        if 'compliance' in _data:
-            del _data['compliance']
-        for evaluation in _data['evaluations']:
-            groups = set([(data['compliance'], data['version']) for data in evaluation['compliance'] if isinstance(data, dict)])
-            results = []
-            for uniq_group in groups:
-                name, ver = uniq_group
-                group = models.ComplianceGroup(compliance=name, version=ver)
-                for data in _data:
-                    if not isinstance(data, dict):
-                        break
-                    if data['compliance'] != group.compliance or data['version'] != group.version:
-                        continue
-                    group.items.append(models.ComplianceItem(
-                        requirement=data.get('requirement'),
-                        title=data.get('title'),
-                        description=data.get('description')
-                    ))
-                results.append(group)
-            evaluation['compliance'] = results
-        services.aws.store_s3(
-            path_key=summary_key,
-            value=json.dumps(_data, default=str)
-        )
