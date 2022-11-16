@@ -258,7 +258,3 @@ class Authorization:
             logger.critical("Unhandled validation")
             return
         self.is_valid = self._hmac.validate(secret_key)
-
-
-def get_rule_desc(rule_id: int, group_id: int) -> str:
-    return 'No additional information available, see the provided references.'

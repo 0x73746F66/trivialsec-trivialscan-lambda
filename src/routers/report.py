@@ -121,7 +121,7 @@ def retrieve_full_report(
             for cve in item.cve:
                 item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
         if not item.description:
-            item.description = internals.get_rule_desc(item.rule_id, item.group_id)
+            item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
 
         groups = []
         for group in item.compliance or []:
@@ -398,7 +398,7 @@ async def store(
                 result_text=_item['result_text'],
                 result_level=_item['result_level'],
                 score=_item['score'],
-                description=_item.get('description', internals.get_rule_desc(_item['rule_id'], _item['group_id'])),
+                description=_item.get('description', config.get_rule_desc(f"{_item['rule_id']}.{_item['group_id']}")),
                 metadata=_item.get('metadata', {}),
                 cve=_item.get('cve', []),
                 cvss2=_item.get('cvss2'),
@@ -495,7 +495,7 @@ def certificate_issues(
         enriched_data = []
         for item in latest_data:
             if not item.description:
-                item.description = internals.get_rule_desc(item.rule_id, item.group_id)
+                item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
             enriched_data.append(item)
         sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x['observed_at'])))  # type: ignore
 
@@ -561,7 +561,7 @@ def latest_findings(
         enriched_data = []
         for item in latest_data:
             if not item.description:
-                item.description = internals.get_rule_desc(item.rule_id, item.group_id)
+                item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
             enriched_data.append(item)
         sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x['observed_at'])))  # type: ignore
 

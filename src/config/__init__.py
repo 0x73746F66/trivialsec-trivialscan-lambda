@@ -61,6 +61,10 @@ class PCIDSS(BaseModel):
     version: str
     requirements: dict[str, str]
 
+class EvaluationDescription(BaseModel):
+    issue: str
+    recommendation: str
+
 def _load(file_path: str) -> Union[dict, None]:
     try:
         raw = yaml.safe_load(
@@ -71,19 +75,35 @@ def _load(file_path: str) -> Union[dict, None]:
         internals.logger.warning(f"Unable to read configuration file: {file_path}")
     return None
 
+# cache to optimise disk I/O
+_raw_mitre_attack = _load("mitre_attack_11.2.yaml")
+_raw_pci3 = _load("pci_dss_3.2.1.yaml")
+_raw_pci4 = _load("pci_dss_4.0.yaml")
+_rules = _load("rule_desc.yaml")
 
-def _mitre_attack() -> Union[MitreAttack, None]:
-    data = _load("mitre_attack_11.2.yaml")
-    if not data:
+def get_mitre_attack() -> Union[MitreAttack, None]:
+    if not _raw_mitre_attack:
         return None
-    return MitreAttack(**data)
+    return MitreAttack(**_raw_mitre_attack)
 
-def _pci_dss(version: str = '4.0') -> Union[PCIDSS, None]:
-    data = _load(f"pci_dss_{version}.yaml")
-    if not data:
-        return None
-    return PCIDSS(**data)
+def get_pci_dss(version: str = '4.0') -> Union[PCIDSS, None]:
+    if version == '4.0' and _raw_pci4:
+        return PCIDSS(**_raw_pci4)
+    if version == '3.2.1' and _raw_pci3:
+        return PCIDSS(**_raw_pci3)
+    return None
 
-mitre_attack = _mitre_attack()
-pcidss4 = _pci_dss('4.0')
-pcidss3 = _pci_dss('3.2.1')
+def get_rule_desc(evaluation_id: str, default: str = 'No additional information available, see the provided references.') -> str:
+    if not _rules:
+        return default
+    return _rules.get(evaluation_id, {}).get('issue', default)
+
+def get_rule_recommendation(evaluation_id: str, default: str = 'TBA') -> str:
+    if not _rules:
+        return default
+    return _rules.get(evaluation_id, {}).get('issue', default)
+
+# helper loaders
+mitre_attack = get_mitre_attack()
+pcidss4 = get_pci_dss('4.0')
+pcidss3 = get_pci_dss('3.2.1')
