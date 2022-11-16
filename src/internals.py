@@ -259,4 +259,6 @@ class Authorization:
             return
         self.is_valid = self._hmac.validate(secret_key)
 
-RULE_DESCRIPTIONS = {}
+
+def get_rule_desc(rule_id: int, group_id: int) -> str:
+    return 'No additional information available, see the provided references.'

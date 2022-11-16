@@ -33,6 +33,7 @@ dependencies = [
     "stripe==4.2.0",
     "cachier==1.5.4",
     "tldextract==3.4.0",
+    "pyyaml==22.3",
 ]
 
 [tool.coverage.run]

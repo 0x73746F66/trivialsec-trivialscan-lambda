@@ -1066,21 +1066,26 @@ class ComplianceGroup(BaseModel):
 class ThreatItem(BaseModel):
     standard: str
     version: str
+    tactic: Union[str, None] = Field(default=None)
     tactic_id: Union[str, None] = Field(default=None)
     tactic_url: Union[AnyHttpUrl, None] = Field(default=None)
-    tactic: Union[str, None] = Field(default=None)
-    description: Union[str, None] = Field(default=None)
+    tactic_description: Union[str, None] = Field(default=None)
+    technique: Union[str, None] = Field(default=None)
     technique_id: Union[str, None] = Field(default=None)
     technique_url: Union[AnyHttpUrl, None] = Field(default=None)
-    technique: Union[str, None] = Field(default=None)
     technique_description: Union[str, None] = Field(default=None)
+    mitigation: Union[str, None] = Field(default=None)
+    mitigation_id: Union[str, None] = Field(default=None)
+    mitigation_url: Union[AnyHttpUrl, None] = Field(default=None)
+    mitigation_description: Union[str, None] = Field(default=None)
+    sub_technique: Union[str, None] = Field(default=None)
     sub_technique_id: Union[str, None] = Field(default=None)
     sub_technique_url: Union[AnyHttpUrl, None] = Field(default=None)
-    sub_technique: Union[str, None] = Field(default=None)
     sub_technique_description: Union[str, None] = Field(default=None)
+    data_source: Union[str, None] = Field(default=None)
     data_source_id: Union[str, None] = Field(default=None)
     data_source_url: Union[AnyHttpUrl, None] = Field(default=None)
-    data_source: Union[str, None] = Field(default=None)
+    data_source_description: Union[str, None] = Field(default=None)
 
 class ReferenceItem(BaseModel):
     name: str
@@ -1141,8 +1146,8 @@ class EvaluationItem(DefaultInfo):
     class Config:
         validate_assignment = True
     report_id: str
-    rule_id: str
-    group_id: str
+    rule_id: int
+    group_id: int
     key: str
     name: str
     group: str

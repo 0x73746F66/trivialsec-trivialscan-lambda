@@ -4,12 +4,13 @@ from secrets import token_urlsafe
 from typing import Union
 from datetime import timedelta
 
-from fastapi import Header, Query, APIRouter, Response, File, UploadFile, status
+from fastapi import Header, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
 from cachier import cachier
 
 import internals
 import models
+import config
 import services.aws
 import services.helpers
 
@@ -76,17 +77,15 @@ def retrieve_summary(
     },
     tags=["Scan Reports"],
 )
-@cachier(
-    stale_after=timedelta(minutes=5),
-    cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("report_id"))+str(kw.get("full_certs"))+str(kw.get("full_hosts"))
-)
+# @cachier(
+#     stale_after=timedelta(minutes=5),
+#     cache_dir=internals.CACHE_DIR,
+#     hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("report_id"))+str(kw.get("full_certs"))+str(kw.get("full_hosts"))
+# )
 def retrieve_full_report(
     request: Request,
     response: Response,
     report_id: str,
-    full_hosts: bool = Query(default=False, description="Returns full hostname records instead of a reference list"),
-    full_certs: bool = Query(default=False, description="Returns full linked certificiate details instead of a reference list"),
     authorization: Union[str, None] = Header(default=None),
 ):
     """
@@ -121,32 +120,52 @@ def retrieve_full_report(
         if item.cve:
             for cve in item.cve:
                 item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
+        if not item.description:
+            item.description = internals.get_rule_desc(item.rule_id, item.group_id)
+
+        groups = []
+        for group in item.compliance or []:
+            if config.pcidss4 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '4.0':
+                pci4_items = []
+                for compliance in group.items or []:
+                    compliance.description = None if not compliance.requirement else config.pcidss4.requirements.get(compliance.requirement)
+                    pci4_items.append(compliance)
+                group.items = pci4_items
+            if config.pcidss3 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '3.2.1':
+                pci3_items = []
+                for compliance in group.items or []:
+                    compliance.description = None if not compliance.requirement else config.pcidss3.requirements.get(compliance.requirement)
+                    pci3_items.append(compliance)
+                group.items = pci3_items
+            groups.append(groups)
+        if config.mitre_attack:
+            threats = []
+            for threat in item.threats or []:
+                for tactic in config.mitre_attack.tactics:
+                    if tactic.id == threat.tactic_id:
+                        threat.tactic_description = tactic.description
+                for data_source in config.mitre_attack.data_sources:
+                    if data_source.id == threat.data_source_id:
+                        threat.data_source_description = data_source.description
+                for mitigation in config.mitre_attack.mitigations:
+                    if mitigation.id == threat.mitigation_id:
+                        threat.mitigation_description = mitigation.description
+                for technique in config.mitre_attack.techniques:
+                    if technique.id == threat.technique_id:
+                        threat.technique_description = technique.description
+                    for sub_technique in technique.sub_techniques or []:
+                        if sub_technique.id == threat.sub_technique_id:
+                            threat.sub_technique_description = sub_technique.description
+                threats.append(threat)
+            item.threats = threats
+
         evaluations.append(item)
     report.evaluations = evaluations
 
-    if full_certs:
-        certs = []
-        for sha1_fingerprint in report.certificates:
-            if not isinstance(sha1_fingerprint, str):
-                continue
-            if cert := models.Certificate(sha1_fingerprint=sha1_fingerprint).load():  # type: ignore
-                certs.append(cert)
-        report.certificates = certs
-
     hosts = []
-    for target in report.targets:
-        if not isinstance(target, str):
-            continue
-        hostname, port = target.split(':')  # type: ignore
-        transport = models.HostTransport(hostname=hostname, port=port)  # type: ignore
-        if full_hosts:
-            if host := models.Host(transport=transport).load():  # type: ignore
-                host.scanning_status = services.helpers.host_scanning_status(authz.account, hostname)  # type: ignore
-                hosts.append(host)
-        else:
-            host = models.Host(transport=transport)  # type: ignore
-            host.scanning_status = services.helpers.host_scanning_status(authz.account, hostname)  # type: ignore
-            hosts.append(host)
+    for host in report.targets:
+        host.scanning_status = services.helpers.host_scanning_status(authz.account, host.transport.hostname)  # type: ignore
+        hosts.append(host)
     report.targets = hosts
 
     return report
@@ -369,8 +388,8 @@ async def store(
                 client_name=_report.client_name,
                 report_id=report_id,
                 observed_at=_report.date,
-                rule_id='%.3f' % _item['rule_id'],
-                group='%.3f' % _item['group'],
+                rule_id=_item['rule_id'],
+                group=_item['group'],
                 group_id=_item['group_id'],
                 key=_item['key'],
                 name=_item['name'],
@@ -379,7 +398,7 @@ async def store(
                 result_text=_item['result_text'],
                 result_level=_item['result_level'],
                 score=_item['score'],
-                description=_item.get('description', internals.RULE_DESCRIPTIONS.get('%.3f' % _item['rule_id'], "No details available. See references.")),
+                description=_item.get('description', internals.get_rule_desc(_item['rule_id'], _item['group_id'])),
                 metadata=_item.get('metadata', {}),
                 cve=_item.get('cve', []),
                 cvss2=_item.get('cvss2'),
@@ -473,7 +492,12 @@ def certificate_issues(
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         data = json.loads(raw)
         latest_data: list[models.EvaluationItem] = data[:limit]
-        sorted_data = list(reversed(sorted(latest_data, key=lambda x: x['observed_at'])))  # type: ignore
+        enriched_data = []
+        for item in latest_data:
+            if not item.description:
+                item.description = internals.get_rule_desc(item.rule_id, item.group_id)
+            enriched_data.append(item)
+        sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x['observed_at'])))  # type: ignore
 
         return sorted_data
 
@@ -534,7 +558,12 @@ def latest_findings(
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         data = json.loads(raw)
         latest_data: list[models.EvaluationItem] = data[:limit]
-        sorted_data = list(reversed(sorted(latest_data, key=lambda x: x['observed_at'])))  # type: ignore
+        enriched_data = []
+        for item in latest_data:
+            if not item.description:
+                item.description = internals.get_rule_desc(item.rule_id, item.group_id)
+            enriched_data.append(item)
+        sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x['observed_at'])))  # type: ignore
 
         return sorted_data
 
