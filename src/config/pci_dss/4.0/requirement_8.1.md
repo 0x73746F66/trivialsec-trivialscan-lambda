@@ -1,0 +1,1 @@
+Processes and mechanisms for identifying users and authenticating access to system components are defined and understood.

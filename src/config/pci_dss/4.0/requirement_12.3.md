@@ -1,0 +1,1 @@
+Risks to the cardholder data environment are formally identified, evaluated, and managed.

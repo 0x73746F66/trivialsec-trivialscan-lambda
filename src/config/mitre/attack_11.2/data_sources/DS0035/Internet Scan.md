@@ -1,0 +1,1 @@
+Information obtained (commonly via active network traffic probes or web crawling) regarding various types of resources and servers connected to the public Internet

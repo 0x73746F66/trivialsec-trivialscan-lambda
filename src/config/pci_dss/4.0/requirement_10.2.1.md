@@ -1,0 +1,1 @@
+Interview the system administrator and examine system configurations to verify that audit logs are enabled and active for all system components.

@@ -1,0 +1,1 @@
+Synchronize all critical system clocks and times using time synchronization technology

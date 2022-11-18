@@ -1,0 +1,1 @@
+Document and implement all key management processes and encryption key procedures used to encrypt cardholder data

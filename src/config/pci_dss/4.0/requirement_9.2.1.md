@@ -1,0 +1,1 @@
+Appropriate facility entry controls are in place to restrict physical access to systems in the CDE.

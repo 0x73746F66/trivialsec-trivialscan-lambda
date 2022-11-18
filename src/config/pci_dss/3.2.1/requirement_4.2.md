@@ -1,0 +1,1 @@
+Never send Primary Account Number (PAN) information without password over end-user messaging technologies

@@ -1,0 +1,1 @@
+Destroy media when it is no longer needed for business or legal reasons

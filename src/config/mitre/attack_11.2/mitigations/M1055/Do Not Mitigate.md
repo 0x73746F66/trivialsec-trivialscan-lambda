@@ -1,0 +1,1 @@
+This category is to associate techniques that mitigation might increase risk of compromise and therefore mitigation is not recommended.

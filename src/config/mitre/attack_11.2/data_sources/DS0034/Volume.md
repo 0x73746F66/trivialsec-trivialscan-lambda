@@ -1,0 +1,1 @@
+Block object storage hosted on-premise or by third-party providers, typically made available to resources as virtualized hard drives

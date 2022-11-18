@@ -1,0 +1,1 @@
+Make the primary account number unreadable wherever it is stored

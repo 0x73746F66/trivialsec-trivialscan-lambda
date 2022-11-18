@@ -1,0 +1,1 @@
+Encrypt cardholder data when transmitting over open, public networks

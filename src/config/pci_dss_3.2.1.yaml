@@ -1,142 +1,240 @@
----
-version: "3.2.1"
 requirements:
-  "1": Configure and use firewalls to protect cardholder data
-  "1.1": Create and implement standards for configuration of firewalls and routers
-  "1.2": Create a firewall and router configuration that restricts connections between untrusted networks and all system components in the cardholder data environment
-  "1.3": Restrict direct global access to any system component of the cardholder data medium over the internet
-  "1.4": Install personal firewall software on all mobile devices that are connected to the internet and used to access the network when they are out of the network
-  "1.5": Make sure that security policies and operational procedures for managing firewalls are documented, in use, and known to all affected parties
-  "2": Do not use the vendor's default settings for system passwords and other security parameters
-  "2.1": Always change the default settings and values provided by the manufacturer and remove or disable unnecessary default accounts before installing any system on the network
-  "2.2": Create configuration standards for all components of the system
-  "2.3": Encrypt all non-console administrative access to devices using strong encryption
-  "2.4": Keep an inventory of all PCI DSS in-scope system components
-  "2.5": Make sure that security policies and operational procedures are documented, in use, and known to all affected parties to manage the manufacturer's default values and other safety parameters
-  "2.6": Shared hosting service providers must protect the environment and cardholder data hosted by each organization
-  "3": Protect stored cardholder data
-  "3.1": Keep cardholder data storage to a minimum by developing and implementing policies, procedures and processes for data retention and destruction of cardholder data (CHD)
-  "3.2": Do not store sensitive authentication data after authorization, even if it is encrypted
-  "3.3": If the primary account number (PAN) has to be displayed, mask it to view it
-  "3.4": Make the primary account number unreadable wherever it is stored
-  "3.5": Create and implement procedures to protect the keys used to protect stored cardholder data from disclosure and misuse
-  "3.6": Document and implement all key management processes and encryption key procedures used to encrypt cardholder data
-  "3.7": Security policies and operational procedures must be documented, used and known to all affected parties to protect stored cardholder data
-  "4": Encrypt cardholder data when transmitting over open, public networks
-  "4.1": Use strong encryption and security protocols to protect sensitive cardholder data during transmission over open, public networks
-  "4.2": Never send Primary Account Number (PAN) information without password over end-user messaging technologies
-  "4.3": To encrypt the transmission of cardholder data, ensure that security policies and operational procedures are documented, in use, and known to all affected parties
-  "5": Protect all systems against malware and update anti-virus software regularly
-  "5.1": Install anti-virus software on all systems that are commonly affected by malware
-  "5.2": Make sure all anti-virus mechanisms are working properly
-  "5.3": Anti-virus software should work effectively and cannot be disabled by users
-  "5.4": Ensure that security policies and operational procedures are documented, in use, and known to all affected parties to protect systems against malware
-  "6": Develop and maintain secure systems and applications
-  "6.1": Establish a process to identify vulnerabilities using reputable outside sources and assign a risk ranking to newly discovered vulnerabilities
-  "6.2": Ensure that all system components and software are protected from known vulnerabilities by installing the applicable security patches provided by the manufacturer. Install critical security patches within a month
-  "6.3": Develop internal and external software applications securely
-  "6.3.1": Remove development, test or custom application accounts, user IDs, and passwords before applications become active or available to customers
-  "6.3.2": Perform code reviews before applications are become active or released to customers to identify possible coding vulnerabilities
-  "6.4": Follow change control processes and procedures for all changes to system components
-  "6.4.1": Separate development and test environments from live environments and implement separation with access controls
-  "6.4.2": Separation of duties between development, testing and live environments is required
-  "6.4.3": Production data (live PANs) are not used for testing or development
-  "6.4.4": Test data and accounts must be removed from system components before the system is enabled before going live
-  "6.4.5": Change control procedures should include the following
-  "6.4.5.1": Document the impact of the change
-  "6.4.5.2": Changes require documented change approval by authorized parties
-  "6.4.5.3": Perform functionality test to verify that the change does not adversely affect the security of the system
-  "6.4.5.4": Establish back-out procedures for changes
-  "6.4.6": After a significant change is complete, all relevant PCI DSS requirements should be applied to all new or modified systems and networks, and documentation updated accordingly
-  "6.5": Address common coding vulnerabilities in software development processes
-  "6.5.1": Consider injection flaws, specifically SQL injection, also OS Command Injection, LDAP and XPath injection flaws as well as other injection flaws
-  "6.5.2": |-
-    Buffer overflows; attackers can be used to do all kinds of operations if appropriate border controls are not applied. When this happens, the attacker will have the ability to add malicious code to the end of the buffer and then push the malicious code into executable memory space by overflowing the buffer. The malicious code is then run and usually allows the attacker remote access to the application or the infected system.
-
-    To avoid buffer overflows, encoding techniques including:
-
-    - Appropriate boundary controls should be implemented.
-    - Input data must be truncated accordingly.
-  "6.5.3": |-
-    Insecure cryptographic storage should be handled with the following coding techniques:
-
-    - Cryptographic flaws must be prevented.
-    - Strong cryptographic algorithms and keys should be used.
-  "6.5.4": Unsecured communications need to be handled with coding techniques that properly encrypt all sensitive communications.
-  "6.5.5": Improper error handling should be determined in software development policies, and procedures and error messages should be handled with information-proof coding techniques.
-  "6.5.6": All high risk vulnerabilities identified during the vulnerability identification process must be addressed
-  "6.5.7": Cross-Site Scripting (XSS)
-  "6.5.8": |-
-    ## Inappropriate access control
-
-    A direct object reference occurs when a developer presents a reference to an internal application object, such as a file, directory, database record, or key, as a URL or form parameter. Attackers can change these references to access other unauthorized objects.
-
-    Access controls must be applied consistently at the application layer and business logic for all URLs. The only way for an application to protect sensitive functionality is to prevent links or URLs from being viewed by unauthorized users.
-
-    Attackers can perform unauthorized actions by directly accessing these URLs. An attacker can enumerate and navigate the directory structure of a website so that they can gain access to unauthorized information and learn more about the functioning of the site for later exploitation.
-
-    If user interfaces allow access to unauthorized functions, this access can result in unauthorized persons gaining access to privileged credentials or cardholder data. Only authorized users should be allowed to access direct object references to sensitive resources. Limiting access to data sources will help prevent cardholder data from being made available to unauthorized sources.
-
-    Unsafe direct object references in software development policies and procedures, inability to restrict URL access or inappropriate access control, such as directory traversal, should be addressed with coding techniques that include:
-
-    - Users must be properly authenticated.
-    - Entries should be sanitized.
-    - Internal object references should not be disclosed to users.
-    - User interfaces that do not allow access to unauthorized functions should be designed.
-  "6.5.9": Cross-site request forgery (CSRF)
-  "6.5.10": Broken authentication and session management
-  "6.6": Constantly address new threats and vulnerabilities for Internet-facing web applications and ensure that these applications are protected from known attacks
-  "6.7": Ensure security policies and operational procedures for developing and maintaining secure systems and applications are documented, in use, and known to all affected parties
-  "7": Restrict access to cardholder data based on business requirements
-  "7.1": Limit access to system components and cardholder data only to those who need it for their job functions
-  "7.2": Create secure access control systems
-  "7.3": Ensure that security policies and operational procedures to restrict access to cardholder data are documented, in use, and known to all affected parties
-  "8": Identify and authenticate access to system components
-  "8.1": Define and implement policies and procedures to ensure correct user identity management for users and administrators across all system components
-  "8.2": Provide appropriate user authentication management for users and administrators in all system components
-  "8.3": Secure all individual administrative access to the CDE and all remote access to the CDE using multi-factor authentication
-  "8.4": Document and communicate authentication policies and procedures to all users
-  "8.5": Do not use group, shared or public IDs, passwords or other authentication methods
-  "8.6": Where other authentication mechanisms are used, the use of these mechanisms should be assigned as follows
-  "8.7": Limit all access to any database containing cardholder data
-  "8.8": Ensure that security policies and operational procedures for authentication and identification are documented, in use, and known to all affected parties
-  "9": Restrict physical access to cardholder data
-  "9.1": Create and use appropriate facility access controls to limit and monitor physical access to systems in the cardholder data environment
-  "9.2": Develop procedures to distinguish between staff and visitors easily
-  "9.3": Restrict physical access to sensitive areas for employees as follows
-  "9.4": Follow procedures to identify and empower visitors
-  "9.5": Protect all media that contains physically sensitive data
-  "9.6": Have strict control over the internal or external distribution and transmission of any media
-  "9.7": Have strict control over media storage and accessibility
-  "9.8": Destroy media when it is no longer needed for business or legal reasons
-  "9.9": Protect devices that receive payment card data through physical interaction from tampering and replacement
-  "9.10": Ensure that security policies and operational procedures to restrict physical access to cardholder data are documented, in use, and known to all affected parties
-  "10": Track and monitor all access to network resources and cardholder data
-  "10.1": Create a process that connects access to system components to each user
-  "10.2": Set up an automatic log review mechanism to reproduce events
-  "10.3": Record at least the following information for events occurring in all system components
-  "10.4": Synchronize all critical system clocks and times using time synchronization technology
-  "10.5": Keep the logs in a way that cannot be altered
-  "10.6": Regularly review logs and security events for all system components to identify abnormalities or suspicious activity
-  "10.7": Retain the log history for at least one year and have at least three months of data ready for analysis
-  "10.8": Create and implement processes for timely detection and reporting of failures of critical security control systems for service providers
-  "10.9": Ensure that security policies and operational procedures are documented, in use, and known to all affected parties to monitor all access to network resources and cardholder data
-  "11": Test security systems and processes regularly
-  "11.1": Create processes to test the presence of wireless access points (802.11), and identify all authorized and unauthorized wireless access points quarterly
-  "11.2": Perform internal and external network vulnerability scans at least every three months and after a significant change in the network
-  "11.3": Apply a methodology for penetration testing
-  "11.4": Use intrusion detection or intrusion prevention techniques to detect or prevent network intrusion
-  "11.5": Set up a change detection mechanism to detect unauthorized modification of critical system files, configuration files or content files
-  "11.6": Ensure that security policies and operational procedures for security monitoring and testing are documented, in use, and known to all affected parties
-  "12": Create a policy that addresses information security for all staff
-  "12.1": Create and publish an information security policy
-  "12.2": Create and implement a risk assessment process
-  "12.3": Acceptable usage policies for critical technologies should be developed, and the appropriate use of these technologies should be defined
-  "12.4": Ensure that security policy and procedures clearly define information security responsibilities for all personnel
-  "12.5": Assign information security management responsibilities to a person or team
-  "12.6": Implement a formal information security awareness program to inform all staff about the importance of cardholder data security
-  "12.7": To minimize the risk of attack from local sources, run a history scan of candidates before hiring
-  "12.8": Create and implement policies and procedures to manage service providers where cardholder data is shared, or that may affect the security of cardholder data
-  "12.9": Service providers must notify their customers in writing that they are responsible for the security of the cardholder data they store, process or transmit on behalf of the customer
-  "12.10": Create and implement an incident response plan. Be prepared to respond immediately to violations
-  "12.11": Service providers should evaluate at least quarterly to verify that personnel are following security policies and operational procedures
+    '1': |-
+        <p>Configure and use firewalls to protect cardholder data</p>
+    '1.1': |-
+        <p>Create and implement standards for configuration of firewalls and routers</p>
+    '1.2': |-
+        <p>Create a firewall and router configuration that restricts connections between untrusted networks and all system components in the cardholder data environment</p>
+    '1.3': |-
+        <p>Restrict direct global access to any system component of the cardholder data medium over the internet</p>
+    '1.4': |-
+        <p>Install personal firewall software on all mobile devices that are connected to the internet and used to access the network when they are out of the network</p>
+    '1.5': |-
+        <p>Make sure that security policies and operational procedures for managing firewalls are documented, in use, and known to all affected parties</p>
+    '10': |-
+        <p>Track and monitor all access to network resources and cardholder data</p>
+    '10.1': |-
+        <p>Create a process that connects access to system components to each user</p>
+    '10.2': |-
+        <p>Set up an automatic log review mechanism to reproduce events</p>
+    '10.3': |-
+        <p>Record at least the following information for events occurring in all system components</p>
+    '10.4': |-
+        <p>Synchronize all critical system clocks and times using time synchronization technology</p>
+    '10.5': |-
+        <p>Keep the logs in a way that cannot be altered</p>
+    '10.6': |-
+        <p>Regularly review logs and security events for all system components to identify abnormalities or suspicious activity</p>
+    '10.7': |-
+        <p>Retain the log history for at least one year and have at least three months of data ready for analysis</p>
+    '10.8': |-
+        <p>Create and implement processes for timely detection and reporting of failures of critical security control systems for service providers</p>
+    '10.9': |-
+        <p>Ensure that security policies and operational procedures are documented, in use, and known to all affected parties to monitor all access to network resources and cardholder data</p>
+    '11': |-
+        <p>Test security systems and processes regularly</p>
+    '11.1': |-
+        <p>Create processes to test the presence of wireless access points (802.11), and identify all authorized and unauthorized wireless access points quarterly</p>
+    '11.2': |-
+        <p>Perform internal and external network vulnerability scans at least every three months and after a significant change in the network</p>
+    '11.3': <p>Apply a methodology for penetration testing</p>
+    '11.4': |-
+        <p>Use intrusion detection or intrusion prevention techniques to detect or prevent network intrusion</p>
+    '11.5': |-
+        <p>Set up a change detection mechanism to detect unauthorized modification of critical system files, configuration files or content files</p>
+    '11.6': |-
+        <p>Ensure that security policies and operational procedures for security monitoring and testing are documented, in use, and known to all affected parties</p>
+    '12': |-
+        <p>Create a policy that addresses information security for all staff</p>
+    '12.1': |-
+        <p>Create and publish an information security policy</p>
+    '12.10': |-
+        <p>Create and implement an incident response plan. Be prepared to respond immediately to violations</p>
+    '12.11': |-
+        <p>Service providers should evaluate at least quarterly to verify that personnel are following security policies and operational procedures</p>
+    '12.2': |-
+        <p>Create and implement a risk assessment process</p>
+    '12.3': |-
+        <p>Acceptable usage policies for critical technologies should be developed, and the appropriate use of these technologies should be defined</p>
+    '12.4': |-
+        <p>Ensure that security policy and procedures clearly define information security responsibilities for all personnel</p>
+    '12.5': |-
+        <p>Assign information security management responsibilities to a person or team</p>
+    '12.6': |-
+        <p>Implement a formal information security awareness program to inform all staff about the importance of cardholder data security</p>
+    '12.7': |-
+        <p>To minimize the risk of attack from local sources, run a history scan of candidates before hiring</p>
+    '12.8': |-
+        <p>Create and implement policies and procedures to manage service providers where cardholder data is shared, or that may affect the security of cardholder data</p>
+    '12.9': |-
+        <p>Service providers must notify their customers in writing that they are responsible for the security of the cardholder data they store, process or transmit on behalf of the customer</p>
+    '2': |-
+        <p>Do not use the vendor's default settings for system passwords and other security parameters</p>
+    '2.1': |-
+        <p>Always change the default settings and values provided by the manufacturer and remove or disable unnecessary default accounts before installing any system on the network</p>
+    '2.2': |-
+        <p>Create configuration standards for all components of the system</p>
+    '2.3': |-
+        <p>Encrypt all non-console administrative access to devices using strong encryption</p>
+    '2.4': |-
+        <p>Keep an inventory of all PCI DSS in-scope system components</p>
+    '2.5': |-
+        <p>Make sure that security policies and operational procedures are documented, in use, and known to all affected parties to manage the manufacturer's default values and other safety parameters</p>
+    '2.6': |-
+        <p>Shared hosting service providers must protect the environment and cardholder data hosted by each organization</p>
+    '3': <p>Protect stored cardholder data</p>
+    '3.1': |-
+        <p>Keep cardholder data storage to a minimum by developing and implementing policies, procedures and processes for data retention and destruction of cardholder data (CHD)</p>
+    '3.2': |-
+        <p>Do not store sensitive authentication data after authorization, even if it is encrypted</p>
+    '3.3': |-
+        <p>If the primary account number (PAN) has to be displayed, mask it to view it</p>
+    '3.4': |-
+        <p>Make the primary account number unreadable wherever it is stored</p>
+    '3.5': |-
+        <p>Create and implement procedures to protect the keys used to protect stored cardholder data from disclosure and misuse</p>
+    '3.6': |-
+        <p>Document and implement all key management processes and encryption key procedures used to encrypt cardholder data</p>
+    '3.7': |-
+        <p>Security policies and operational procedures must be documented, used and known to all affected parties to protect stored cardholder data</p>
+    '4': |-
+        <p>Encrypt cardholder data when transmitting over open, public networks</p>
+    '4.1': |-
+        <p>Use strong encryption and security protocols to protect sensitive cardholder data during transmission over open, public networks</p>
+    '4.2': |-
+        <p>Never send Primary Account Number (PAN) information without password over end-user messaging technologies</p>
+    '4.3': |-
+        <p>To encrypt the transmission of cardholder data, ensure that security policies and operational procedures are documented, in use, and known to all affected parties</p>
+    '5': |-
+        <p>Protect all systems against malware and update anti-virus software regularly</p>
+    '5.1': |-
+        <p>Install anti-virus software on all systems that are commonly affected by malware</p>
+    '5.2': |-
+        <p>Make sure all anti-virus mechanisms are working properly</p>
+    '5.3': |-
+        <p>Anti-virus software should work effectively and cannot be disabled by users</p>
+    '5.4': |-
+        <p>Ensure that security policies and operational procedures are documented, in use, and known to all affected parties to protect systems against malware</p>
+    '6': |-
+        <p>Develop and maintain secure systems and applications</p>
+    '6.1': |-
+        <p>Establish a process to identify vulnerabilities using reputable outside sources and assign a risk ranking to newly discovered vulnerabilities</p>
+    '6.2': |-
+        <p>Ensure that all system components and software are protected from known vulnerabilities by installing the applicable security patches provided by the manufacturer. Install critical security patches within a month</p>
+    '6.3': |-
+        <p>Develop internal and external software applications securely</p>
+    6.3.1: |-
+        <p>Remove development, test or custom application accounts, user IDs, and passwords before applications become active or available to customers</p>
+    6.3.2: |-
+        <p>Perform code reviews before applications are become active or released to customers to identify possible coding vulnerabilities</p>
+    '6.4': |-
+        <p>Follow change control processes and procedures for all changes to system components</p>
+    6.4.1: |-
+        <p>Separate development and test environments from live environments and implement separation with access controls</p>
+    6.4.2: |-
+        <p>Separation of duties between development, testing and live environments is required</p>
+    6.4.3: |-
+        <p>Production data (live PANs) are not used for testing or development</p>
+    6.4.4: |-
+        <p>Test data and accounts must be removed from system components before the system is enabled before going live</p>
+    6.4.5: |-
+        <p>Change control procedures should include the following</p>
+    6.4.5.1: <p>Document the impact of the change</p>
+    6.4.5.2: |-
+        <p>Changes require documented change approval by authorized parties</p>
+    6.4.5.3: |-
+        <p>Perform functionality test to verify that the change does not adversely affect the security of the system</p>
+    6.4.5.4: <p>Establish back-out procedures for changes</p>
+    6.4.6: |-
+        <p>After a significant change is complete, all relevant PCI DSS requirements should be applied to all new or modified systems and networks, and documentation updated accordingly</p>
+    '6.5': |-
+        <p>Address common coding vulnerabilities in software development processes</p>
+    6.5.1: |-
+        <p>Consider injection flaws, specifically SQL injection, also OS Command Injection, LDAP and XPath injection flaws as well as other injection flaws</p>
+    6.5.10: |-
+        <p>Broken authentication and session management</p>
+    6.5.2: |-
+        <p>Buffer overflows; attackers can be used to do all kinds of operations if appropriate border controls are not applied. When this happens, the attacker will have the ability to add malicious code to the end of the buffer and then push the malicious code into executable memory space by overflowing the buffer. The malicious code is then run and usually allows the attacker remote access to the application or the infected system.</p>
+        <p>To avoid buffer overflows, encoding techniques including:</p>
+        <ul>
+        <li>Appropriate boundary controls should be implemented.</li>
+        <li>Input data must be truncated accordingly.</li>
+        </ul>
+    6.5.3: |-
+        <p>Insecure cryptographic storage should be handled with the following coding techniques:</p>
+        <ul>
+        <li>Cryptographic flaws must be prevented.</li>
+        <li>Strong cryptographic algorithms and keys should be used.</li>
+        </ul>
+    6.5.4: |-
+        <p>Unsecured communications need to be handled with coding techniques that properly encrypt all sensitive communications.</p>
+    6.5.5: |-
+        <p>Improper error handling should be determined in software development policies, and procedures and error messages should be handled with information-proof coding techniques.</p>
+    6.5.6: |-
+        <p>All high risk vulnerabilities identified during the vulnerability identification process must be addressed</p>
+    6.5.7: <p>Cross-Site Scripting (XSS)</p>
+    6.5.8: |-
+        <h3>Inappropriate access control</h3>
+        <p>A direct object reference occurs when a developer presents a reference to an internal application object, such as a file, directory, database record, or key, as a URL or form parameter. Attackers can change these references to access other unauthorized objects.</p>
+        <p>Access controls must be applied consistently at the application layer and business logic for all URLs. The only way for an application to protect sensitive functionality is to prevent links or URLs from being viewed by unauthorized users.</p>
+        <p>Attackers can perform unauthorized actions by directly accessing these URLs. An attacker can enumerate and navigate the directory structure of a website so that they can gain access to unauthorized information and learn more about the functioning of the site for later exploitation.</p>
+        <p>If user interfaces allow access to unauthorized functions, this access can result in unauthorized persons gaining access to privileged credentials or cardholder data. Only authorized users should be allowed to access direct object references to sensitive resources. Limiting access to data sources will help prevent cardholder data from being made available to unauthorized sources.</p>
+        <p>Unsafe direct object references in software development policies and procedures, inability to restrict URL access or inappropriate access control, such as directory traversal, should be addressed with coding techniques that include:</p>
+        <ul>
+        <li>Users must be properly authenticated.</li>
+        <li>Entries should be sanitized.</li>
+        <li>Internal object references should not be disclosed to users.</li>
+        <li>User interfaces that do not allow access to unauthorized functions should be designed.</li>
+        </ul>
+    6.5.9: <p>Cross-site request forgery (CSRF)</p>
+    '6.6': |-
+        <p>Constantly address new threats and vulnerabilities for Internet-facing web applications and ensure that these applications are protected from known attacks</p>
+    '6.7': |-
+        <p>Ensure security policies and operational procedures for developing and maintaining secure systems and applications are documented, in use, and known to all affected parties</p>
+    '7': |-
+        <p>Restrict access to cardholder data based on business requirements</p>
+    '7.1': |-
+        <p>Limit access to system components and cardholder data only to those who need it for their job functions</p>
+    '7.2': <p>Create secure access control systems</p>
+    '7.3': |-
+        <p>Ensure that security policies and operational procedures to restrict access to cardholder data are documented, in use, and known to all affected parties</p>
+    '8': |-
+        <p>Identify and authenticate access to system components</p>
+    '8.1': |-
+        <p>Define and implement policies and procedures to ensure correct user identity management for users and administrators across all system components</p>
+    '8.2': |-
+        <p>Provide appropriate user authentication management for users and administrators in all system components</p>
+    '8.3': |-
+        <p>Secure all individual administrative access to the CDE and all remote access to the CDE using multi-factor authentication</p>
+    '8.4': |-
+        <p>Document and communicate authentication policies and procedures to all users</p>
+    '8.5': |-
+        <p>Do not use group, shared or public IDs, passwords or other authentication methods</p>
+    '8.6': |-
+        <p>Where other authentication mechanisms are used, the use of these mechanisms should be assigned as follows</p>
+    '8.7': |-
+        <p>Limit all access to any database containing cardholder data</p>
+    '8.8': |-
+        <p>Ensure that security policies and operational procedures for authentication and identification are documented, in use, and known to all affected parties</p>
+    '9': <p>Restrict physical access to cardholder data</p>
+    '9.1': |-
+        <p>Create and use appropriate facility access controls to limit and monitor physical access to systems in the cardholder data environment</p>
+    '9.10': |-
+        <p>Ensure that security policies and operational procedures to restrict physical access to cardholder data are documented, in use, and known to all affected parties</p>
+    '9.2': |-
+        <p>Develop procedures to distinguish between staff and visitors easily</p>
+    '9.3': |-
+        <p>Restrict physical access to sensitive areas for employees as follows</p>
+    '9.4': |-
+        <p>Follow procedures to identify and empower visitors</p>
+    '9.5': |-
+        <p>Protect all media that contains physically sensitive data</p>
+    '9.6': |-
+        <p>Have strict control over the internal or external distribution and transmission of any media</p>
+    '9.7': |-
+        <p>Have strict control over media storage and accessibility</p>
+    '9.8': |-
+        <p>Destroy media when it is no longer needed for business or legal reasons</p>
+    '9.9': |-
+        <p>Protect devices that receive payment card data through physical interaction from tampering and replacement</p>
+version: 3.2.1

@@ -1,0 +1,1 @@
+Install personal firewall software on all mobile devices that are connected to the internet and used to access the network when they are out of the network

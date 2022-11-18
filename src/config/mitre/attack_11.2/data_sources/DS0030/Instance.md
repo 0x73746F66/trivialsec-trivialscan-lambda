@@ -1,0 +1,1 @@
+A virtual server environment which runs workloads, hosted on-premise or by third-party cloud providers

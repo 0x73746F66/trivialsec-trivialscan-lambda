@@ -1,0 +1,1 @@
+Anti-malware mechanisms and processes are active, maintained, and monitored.

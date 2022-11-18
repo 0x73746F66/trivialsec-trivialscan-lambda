@@ -1,0 +1,1 @@
+Access to consoles in sensitive areas is restricted via locking when not in use.

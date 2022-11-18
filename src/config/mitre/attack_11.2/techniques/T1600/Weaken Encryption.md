@@ -1,0 +1,1 @@
+Adversaries may compromise a network device's encryption capability in order to bypass encryption that would otherwise protect data communications.

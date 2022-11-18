@@ -1,0 +1,1 @@
+Improper error handling should be determined in software development policies, and procedures and error messages should be handled with information-proof coding techniques.

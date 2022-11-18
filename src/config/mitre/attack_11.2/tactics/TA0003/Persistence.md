@@ -1,0 +1,1 @@
+The adversary is trying to maintain their foothold.

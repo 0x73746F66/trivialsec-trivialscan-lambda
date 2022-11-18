@@ -7,7 +7,6 @@ from datetime import timedelta
 from fastapi import Header, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
 from cachier import cachier
-from markdown import markdown
 
 import internals
 import models
@@ -106,60 +105,17 @@ def retrieve_full_report(
         response.status_code = status.HTTP_401_UNAUTHORIZED
         response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
         return
+
     report = models.FullReport(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
     if not report:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    for item in report.evaluations or []:
-        if not item.observed_at:
-            item.observed_at = report.date
-        if item.cvss2:
-            item.references.append(models.ReferenceItem(name=f"CVSSv2 {item.cvss2}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v2-calculator?vector=({item.cvss2})"))  # type: ignore
-        if item.cvss3:
-            item.references.append(models.ReferenceItem(name=f"CVSSv3.1 {item.cvss3}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?version=3.1&vector={item.cvss3}"))  # type: ignore
-        if item.cve:
-            for cve in item.cve:
-                item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
-        if not item.description:
-            item.description = markdown(config.get_rule_desc(f"{item.group_id}.{item.rule_id}"))
-
-        for group in item.compliance or []:
-            if config.pcidss4 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '4.0':
-                pci4_items = []
-                for compliance in group.items or []:
-                    compliance.description = None if not compliance.requirement else markdown(config.pcidss4.requirements.get(compliance.requirement, ''))
-                    pci4_items.append(compliance)
-                group.items = pci4_items
-            if config.pcidss3 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '3.2.1':
-                pci3_items = []
-                for compliance in group.items or []:
-                    compliance.description = None if not compliance.requirement else markdown(config.pcidss3.requirements.get(compliance.requirement, ''))
-                    pci3_items.append(compliance)
-                group.items = pci3_items
-            if group.compliance in [models.ComplianceName.NIST_SP800_131A, models.ComplianceName.FIPS_140_2]:
-                group.items = None
-
-        if config.mitre_attack:
-            for threat in item.threats or []:
-                for tactic in config.mitre_attack.tactics:
-                    if tactic.id == threat.tactic_id:
-                        threat.tactic_description = markdown(tactic.description)
-                for data_source in config.mitre_attack.data_sources:
-                    if data_source.id == threat.data_source_id:
-                        threat.data_source_description = markdown(data_source.description)
-                for mitigation in config.mitre_attack.mitigations:
-                    if mitigation.id == threat.mitigation_id:
-                        threat.mitigation_description = markdown(mitigation.description)
-                for technique in config.mitre_attack.techniques:
-                    if technique.id == threat.technique_id:
-                        threat.technique_description = markdown(technique.description)
-                    for sub_technique in technique.sub_techniques or []:
-                        if sub_technique.id == threat.sub_technique_id:
-                            threat.sub_technique_description = markdown(sub_technique.description)
-
+    report.evaluations = services.helpers.markup_descriptions(report)
+    monitor = models.Monitor(account=authz.account).load()  # type: ignore
+    queue = models.Queue(account=authz.account).load()  # type: ignore
     hosts = []
     for host in report.targets:
-        host.scanning_status = services.helpers.host_scanning_status(authz.account, host.transport.hostname)  # type: ignore
+        host.scanning_status = services.helpers.host_scanning_status(host.transport.hostname, queue, monitor)  # type: ignore
         hosts.append(host)
     report.targets = hosts
 

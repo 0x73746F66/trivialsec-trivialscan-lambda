@@ -1,0 +1,1 @@
+Computer software that provides low-level control for the hardware and device(s) of a host, such as BIOS or UEFI/EFI

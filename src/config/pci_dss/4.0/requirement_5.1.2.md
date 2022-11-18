@@ -1,0 +1,1 @@
+Roles and responsibilities for performing activities in Requirement 5 are documented, assigned, and understood.

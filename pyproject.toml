@@ -34,7 +34,6 @@ dependencies = [
     "cachier==1.5.4",
     "tldextract==3.4.0",
     "pyyaml==6.0",
-    "markdown==3.4.1",
 ]
 
 [tool.coverage.run]

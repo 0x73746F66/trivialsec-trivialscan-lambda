@@ -1,0 +1,1 @@
+Point-of-interaction (POI) devices are protected from tampering and unauthorized substitution.

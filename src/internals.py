@@ -187,7 +187,7 @@ class Authorization:
         self.ip_addr = ip_addr if ip_addr else request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP"))
         self.user_agent = user_agent if user_agent else request.headers.get("User-Agent")
         if not self.ip_addr:
-            logger.error("IP Address not determined, potential conflict if not deliberate or is running locally")
+            logger.warning("IP Address not determined, potential conflict if not deliberate or is running locally")
 
         self.is_valid: bool = False
         self.account: Union[models.MemberAccount, None] = None
@@ -211,7 +211,7 @@ class Authorization:
             if not self.member:
                 logger.critical(f"DENY missing MemberProfile {self._hmac.id}")
                 return
-            self.account = self.member.account.load()  # type: ignore
+            self.account = self.member.account  # type: ignore
             logger.info(f'Session inputs; {self.member.email} | {ua.get_browser()} | {ua.get_os()} | {ua.get_device()}')
             session_token = hashlib.sha224(bytes(f'{self.member.email}{ua.get_browser()}{ua.get_os()}{ua.get_device()}', 'ascii')).hexdigest()
             logger.info(f"Session HMAC-based Authorization: session_token {session_token}")
@@ -219,20 +219,6 @@ class Authorization:
             if not self.session:
                 logger.critical(f"DENY missing MemberSession {self._hmac.id}")
                 return
-            if any([
-                self.account.display != self.member.account.display,  # type: ignore
-                self.account.billing_email != self.member.account.billing_email,  # type: ignore
-                self.account.primary_email != self.member.account.primary_email,  # type: ignore
-            ]):
-                self.member.account = self.account
-                self.member.save()
-            if any([
-                self.account.display != self.session.member.account.display,  # type: ignore
-                self.account.billing_email != self.session.member.account.billing_email,  # type: ignore
-                self.account.primary_email != self.session.member.account.primary_email,  # type: ignore
-            ]):
-                self.session.member = self.member  # type: ignore
-                self.session.save()  # type: ignore
             secret_key = self.session.access_token  # type: ignore
         elif account_name is None or self._hmac.id == account_name:
             logger.info(f"Secret Key HMAC-based Authorization: account_name {account_name}")
@@ -241,18 +227,9 @@ class Authorization:
                 secret_key = self.account.api_key
         elif account_name:
             logger.info(f"Client Token HMAC-based Authorization: client_name {self._hmac.id}")
-            self.account = models.MemberAccount(name=account_name).load()  # type: ignore
-            if not self.account:
-                return
-            self.client = models.Client(account=self.account, name=self._hmac.id).load()  # type: ignore
+            self.client = models.Client(name=self._hmac.id).load(account_name=account_name)  # type: ignore
             if self.client:
-                if any([
-                    self.account.display != self.client.account.display,  # type: ignore
-                    self.account.billing_email != self.client.account.billing_email,  # type: ignore
-                    self.account.primary_email != self.client.account.primary_email,  # type: ignore
-                ]):
-                    self.client.account = self.account
-                    self.client.save()
+                self.account = self.client.account
                 secret_key = self.client.access_token
         if not secret_key:
             logger.critical("Unhandled validation")

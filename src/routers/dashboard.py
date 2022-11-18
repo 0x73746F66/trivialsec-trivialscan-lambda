@@ -5,7 +5,6 @@ from datetime import timedelta
 from fastapi import Header, APIRouter, Response, status
 from starlette.requests import Request
 from cachier import cachier
-from markdown import markdown
 
 import internals
 import models
@@ -179,7 +178,7 @@ def certificate_issues(
         for _item in latest_data:
             item = models.EvaluationItem(**_item)
             if not item.description:
-                item.description = markdown(config.get_rule_desc(f"{item.group_id}.{item.rule_id}"))
+                item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
             enriched_data.append(item)
         sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))  # type: ignore
 
@@ -246,19 +245,19 @@ def latest_findings(
         for _item in latest_data:
             item = models.EvaluationItem(**_item)
             if not item.description:
-                item.description = markdown(config.get_rule_desc(f"{item.group_id}.{item.rule_id}"))
+                item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
 
             for group in item.compliance or []:
                 if config.pcidss4 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '4.0':
                     pci4_items = []
                     for compliance in group.items or []:
-                        compliance.description = None if not compliance.requirement else markdown(config.pcidss4.requirements.get(compliance.requirement, ''))
+                        compliance.description = None if not compliance.requirement else config.pcidss4.requirements.get(compliance.requirement, '')
                         pci4_items.append(compliance)
                     group.items = pci4_items
                 if config.pcidss3 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '3.2.1':
                     pci3_items = []
                     for compliance in group.items or []:
-                        compliance.description = None if not compliance.requirement else markdown(config.pcidss3.requirements.get(compliance.requirement, ''))
+                        compliance.description = None if not compliance.requirement else config.pcidss3.requirements.get(compliance.requirement, '')
                         pci3_items.append(compliance)
                     group.items = pci3_items
                 if group.compliance in [models.ComplianceName.NIST_SP800_131A, models.ComplianceName.FIPS_140_2]:
@@ -268,19 +267,19 @@ def latest_findings(
                 for threat in item.threats or []:
                     for tactic in config.mitre_attack.tactics:
                         if tactic.id == threat.tactic_id:
-                            threat.tactic_description = markdown(tactic.description)
+                            threat.tactic_description = tactic.description
                     for data_source in config.mitre_attack.data_sources:
                         if data_source.id == threat.data_source_id:
-                            threat.data_source_description = markdown(data_source.description)
+                            threat.data_source_description = data_source.description
                     for mitigation in config.mitre_attack.mitigations:
                         if mitigation.id == threat.mitigation_id:
-                            threat.mitigation_description = markdown(mitigation.description)
+                            threat.mitigation_description = mitigation.description
                     for technique in config.mitre_attack.techniques:
                         if technique.id == threat.technique_id:
-                            threat.technique_description = markdown(technique.description)
+                            threat.technique_description = technique.description
                         for sub_technique in technique.sub_techniques or []:
                             if sub_technique.id == threat.sub_technique_id:
-                                threat.sub_technique_description = markdown(sub_technique.description)
+                                threat.sub_technique_description = sub_technique.description
 
             enriched_data.append(item)
         sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))  # type: ignore

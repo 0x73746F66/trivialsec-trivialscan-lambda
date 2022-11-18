@@ -1,0 +1,1 @@
+Additional requirement for service providers only: All service providers provide a secure service offering.

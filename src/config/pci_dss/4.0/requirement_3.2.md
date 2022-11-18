@@ -1,0 +1,1 @@
+Storage of account data is kept to a minimum.

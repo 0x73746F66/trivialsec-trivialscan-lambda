@@ -491,7 +491,7 @@ class MemberAccount(AccountRegistration, DAL):
         object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
         return services.aws.delete_s3(object_key)
 
-    def update_members(self) -> bool:
+    def update_members(self) -> bool: # TODO this should be a Lambda trigger on suffix registration.json
         prefix_key = f"{internals.APP_ENV}/accounts/{self.name}/"
         members: list['MemberProfile'] = []
         member_matches = services.aws.list_s3(prefix_key=f"{prefix_key}members/")

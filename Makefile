@@ -71,6 +71,7 @@ output: env init
 	@echo -e $(bold)$(primary)trivialscan_policy_arn$(clear) = $(shell terraform -chdir=plans output trivialscan_policy_arn)
 
 build: env ## makes the lambda zip archive
+	python .$(BUILD_ENV)/build_yaml_descriptions.py
 	./.$(BUILD_ENV)/bin/build-archive
 
 tfinstall:

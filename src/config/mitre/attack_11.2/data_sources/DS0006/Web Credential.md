@@ -1,0 +1,1 @@
+Credential material, such as session cookies or tokens, used to authenticate to web applications and services

@@ -1,0 +1,1 @@
+Processes and mechanisms for restricting access to system components and cardholder data by business need to know are defined and understood.

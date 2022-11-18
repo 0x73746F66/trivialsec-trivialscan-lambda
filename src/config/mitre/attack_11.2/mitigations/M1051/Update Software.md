@@ -1,0 +1,1 @@
+Perform regular software updates to mitigate exploitation risk.

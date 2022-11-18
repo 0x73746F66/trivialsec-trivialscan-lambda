@@ -1,0 +1,1 @@
+An adversary may disable cloud logging capabilities and integrations to limit what data is collected on their activities and avoid detection.

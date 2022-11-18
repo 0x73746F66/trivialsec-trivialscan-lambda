@@ -1,0 +1,1 @@
+Access to displays of full PAN and ability to copy PAN is restricted.

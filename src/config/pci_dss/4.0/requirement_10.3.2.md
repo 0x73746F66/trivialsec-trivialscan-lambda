@@ -1,0 +1,1 @@
+Audit log files are protected to prevent modifications by individuals.

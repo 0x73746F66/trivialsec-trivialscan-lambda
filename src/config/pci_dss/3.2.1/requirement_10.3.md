@@ -1,0 +1,1 @@
+Record at least the following information for events occurring in all system components

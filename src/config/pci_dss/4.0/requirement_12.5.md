@@ -1,0 +1,1 @@
+PCI DSS scope is documented and validated.

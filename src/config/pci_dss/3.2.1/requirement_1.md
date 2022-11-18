@@ -1,0 +1,1 @@
+Configure and use firewalls to protect cardholder data

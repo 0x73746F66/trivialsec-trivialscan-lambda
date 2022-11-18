@@ -1,0 +1,1 @@
+Logon occurring on a system or resource (local, domain, or cloud) to which a user/device is gaining access after successful authentication and authorization

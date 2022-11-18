@@ -1,0 +1,1 @@
+Physical access controls manage entry into facilities and systems containing cardholder data.

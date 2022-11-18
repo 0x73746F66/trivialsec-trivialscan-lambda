@@ -1,0 +1,1 @@
+Events collected by third-party services such as mail servers, web applications, or other appliances (not by the native OS or platform)

@@ -1,0 +1,1 @@
+The personal identification number (PIN) and the PIN block are not retained upon completion of the authorization process.

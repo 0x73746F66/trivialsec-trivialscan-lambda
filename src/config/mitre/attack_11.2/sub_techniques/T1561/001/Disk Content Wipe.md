@@ -1,0 +1,1 @@
+Adversaries may erase the contents of storage devices on specific systems or in large numbers in a network to interrupt availability to system and network resources.

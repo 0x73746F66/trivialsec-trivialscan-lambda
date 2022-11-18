@@ -1,0 +1,1 @@
+Establish a process to identify vulnerabilities using reputable outside sources and assign a risk ranking to newly discovered vulnerabilities

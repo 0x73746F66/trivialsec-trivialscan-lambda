@@ -1,0 +1,1 @@
+Specific personnel are designated to be available on a 24/7 basis to respond to suspected or confirmed security incidents.

@@ -6,6 +6,7 @@ from dns.exception import DNSException, Timeout as DNSTimeoutError
 from tldextract.tldextract import TLDExtract
 from pydantic import IPvAnyAddress
 
+import config
 import models
 import internals
 
@@ -148,19 +149,20 @@ def retrieve_ip_for_host(hostname: str) -> list[IPvAnyAddress]:
     return list(results)
 
 def host_scanning_status(
-        account: models.MemberAccount,
-        hostname: str
+        hostname: str,
+        queue: Union[models.Queue, None] = None,
+        monitor: Union[models.Monitor, None] = None,
     ) -> Union[dict[str, Any], None]:
     response = {
         'monitoring': False,
         'queued_timestamp': None,
         'queue_status': None,
     }
-    if monitor := models.Monitor(account=account).load():  # type: ignore
+    if monitor:
         for target in monitor.targets:
             if target.hostname == hostname:
                 response['monitoring'] = target.enabled
-    if queue := models.Queue(account=account).load():  # type: ignore
+    if queue:
         for target in queue.targets:
             if target.hostname == hostname:
                 response["queued_timestamp"] = target.timestamp
@@ -169,3 +171,67 @@ def host_scanning_status(
                     response["queue_status"] = "Processing"
 
     return response
+
+def markup_descriptions(report: Union[models.FullReport, dict, None], evaluations: Union[list[Union[models.EvaluationItem, dict]], None] = None) -> list[models.EvaluationItem]:
+    report_date = None
+    report_evaluations: list[models.EvaluationItem] = []
+    if isinstance(evaluations, list) and len(evaluations) > 0:
+        if isinstance(evaluations[0], dict):
+            report_evaluations = [models.EvaluationItem(**evaluation) for evaluation in evaluations]  # type: ignore
+        if isinstance(evaluations[0], models.EvaluationItem):
+            report_evaluations = evaluations  # type: ignore
+    if isinstance(report, dict):
+        report_date = report.get('date')
+        report_evaluations = [models.EvaluationItem(**evaluation) for evaluation in report.get('evaluations', []) or []]
+    elif isinstance(report, models.FullReport):
+        report_date = report.date
+        report_evaluations = report.evaluations or []
+
+    for item in report_evaluations:
+        if report_date and not item.observed_at:
+            item.observed_at = report_date
+        if item.cvss2:
+            item.references.append(models.ReferenceItem(name=f"CVSSv2 {item.cvss2}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v2-calculator?vector=({item.cvss2})"))  # type: ignore
+        if item.cvss3:
+            item.references.append(models.ReferenceItem(name=f"CVSSv3.1 {item.cvss3}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?version=3.1&vector={item.cvss3}"))  # type: ignore
+        if item.cve:
+            for cve in item.cve:
+                item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
+        if not item.description:
+            item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
+
+        for group in item.compliance or []:
+            if config.pcidss4 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '4.0':
+                pci4_items = []
+                for compliance in group.items or []:
+                    compliance.description = None if not compliance.requirement else config.pcidss4.requirements.get(compliance.requirement, '')
+                    pci4_items.append(compliance)
+                group.items = pci4_items
+            if config.pcidss3 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '3.2.1':
+                pci3_items = []
+                for compliance in group.items or []:
+                    compliance.description = None if not compliance.requirement else config.pcidss3.requirements.get(compliance.requirement, '')
+                    pci3_items.append(compliance)
+                group.items = pci3_items
+            if group.compliance in [models.ComplianceName.NIST_SP800_131A, models.ComplianceName.FIPS_140_2]:
+                group.items = None
+
+        if config.mitre_attack:
+            for threat in item.threats or []:
+                for tactic in config.mitre_attack.tactics:
+                    if tactic.id == threat.tactic_id:
+                        threat.tactic_description = tactic.description
+                for data_source in config.mitre_attack.data_sources:
+                    if data_source.id == threat.data_source_id:
+                        threat.data_source_description = data_source.description
+                for mitigation in config.mitre_attack.mitigations:
+                    if mitigation.id == threat.mitigation_id:
+                        threat.mitigation_description = mitigation.description
+                for technique in config.mitre_attack.techniques:
+                    if technique.id == threat.technique_id:
+                        threat.technique_description = technique.description
+                    for sub_technique in technique.sub_techniques or []:
+                        if sub_technique.id == threat.sub_technique_id:
+                            threat.sub_technique_description = sub_technique.description
+
+    return report_evaluations

@@ -1,0 +1,1 @@
+Restrict the ability to modify certain hives or keys in the Windows Registry.

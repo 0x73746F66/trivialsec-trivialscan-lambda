@@ -1,0 +1,1 @@
+Key-management policies and procedures are implemented to include generation of strong cryptographic keys used to protect stored account data.

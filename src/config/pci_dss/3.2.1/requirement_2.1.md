@@ -1,0 +1,1 @@
+Always change the default settings and values provided by the manufacturer and remove or disable unnecessary default accounts before installing any system on the network

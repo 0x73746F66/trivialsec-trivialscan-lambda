@@ -259,7 +259,7 @@ async def update_billing_email(
                 return
         internals.logger.info(f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
         authz.account.billing_email = data.email  # type: ignore
-        if not authz.account.save():  # type: ignore
+        if not authz.account.save() or not authz.account.update_members():  # type: ignore
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         try:
@@ -337,7 +337,7 @@ async def update_primary_email(
                 return
         internals.logger.info(f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}")
         authz.account.primary_email = data.email  # type: ignore
-        if not authz.account.save():  # type: ignore
+        if not authz.account.save() or not authz.account.update_members():  # type: ignore
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         return authz.account

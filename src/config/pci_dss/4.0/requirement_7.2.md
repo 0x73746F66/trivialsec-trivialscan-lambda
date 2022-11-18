@@ -1,0 +1,1 @@
+Access to system components and data is appropriately defined and assigned.

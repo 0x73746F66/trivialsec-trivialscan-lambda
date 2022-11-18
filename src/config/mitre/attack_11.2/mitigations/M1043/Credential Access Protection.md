@@ -1,0 +1,1 @@
+Use capabilities to prevent successful credential access by adversaries; including blocking forms of credential dumping.

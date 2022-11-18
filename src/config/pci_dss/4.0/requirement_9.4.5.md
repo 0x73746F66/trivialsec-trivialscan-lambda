@@ -1,0 +1,1 @@
+Inventory logs of all electronic media with cardholder data are maintained.

@@ -1,0 +1,1 @@
+Processes and mechanisms for developing and maintaining secure systems and software are defined and understood.

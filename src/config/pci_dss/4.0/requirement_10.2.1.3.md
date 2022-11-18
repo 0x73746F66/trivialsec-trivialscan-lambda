@@ -1,0 +1,1 @@
+Audit logs capture all access to audit logs.

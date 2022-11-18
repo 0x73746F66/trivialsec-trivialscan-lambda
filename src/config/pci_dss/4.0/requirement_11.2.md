@@ -1,0 +1,1 @@
+Wireless access points are identified and monitored, and unauthorized wireless access points are addressed.

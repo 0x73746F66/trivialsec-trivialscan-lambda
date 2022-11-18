@@ -1,0 +1,1 @@
+Restrict access by setting directory and file permissions that are not specific to users or privileged accounts.

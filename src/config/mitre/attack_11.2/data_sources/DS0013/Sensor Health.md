@@ -1,0 +1,1 @@
+Information from host telemetry providing insights about system status, errors, or other notable functional activity

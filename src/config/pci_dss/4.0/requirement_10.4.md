@@ -1,0 +1,1 @@
+Audit logs are reviewed to identify anomalies or suspicious activity.

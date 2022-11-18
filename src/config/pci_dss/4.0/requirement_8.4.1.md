@@ -1,0 +1,1 @@
+MFA is implemented for all non-console access into the CDE for personnel with administrative access.

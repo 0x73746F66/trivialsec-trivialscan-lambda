@@ -1,0 +1,1 @@
+Processes and mechanisms for protecting all systems and networks from malicious software are defined and understood.

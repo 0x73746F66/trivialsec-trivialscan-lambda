@@ -1,0 +1,1 @@
+Constantly address new threats and vulnerabilities for Internet-facing web applications and ensure that these applications are protected from known attacks

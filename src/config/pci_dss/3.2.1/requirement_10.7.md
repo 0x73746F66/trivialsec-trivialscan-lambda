@@ -1,0 +1,1 @@
+Retain the log history for at least one year and have at least three months of data ready for analysis

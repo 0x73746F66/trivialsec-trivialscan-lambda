@@ -1,0 +1,1 @@
+Audit logs capture all invalid logical access attempts.

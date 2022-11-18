@@ -1,0 +1,1 @@
+Audit log history is retained and available for analysis.

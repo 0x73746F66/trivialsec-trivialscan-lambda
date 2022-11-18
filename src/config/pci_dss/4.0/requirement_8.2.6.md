@@ -1,0 +1,1 @@
+Inactive user accounts are removed or disabled within 90 days of inactivity.

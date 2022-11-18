@@ -1,0 +1,1 @@
+Adversaries may attempt to access the Cloud Instance Metadata API to collect credentials and other sensitive data.

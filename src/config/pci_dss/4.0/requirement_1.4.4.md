@@ -1,0 +1,1 @@
+System components that store cardholder data are not directly accessible from untrusted networks.

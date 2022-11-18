@@ -1,0 +1,1 @@
+Test data and test accounts are removed from system components before the system goes into production.

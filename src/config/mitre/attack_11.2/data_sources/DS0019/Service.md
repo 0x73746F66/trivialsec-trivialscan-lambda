@@ -1,0 +1,1 @@
+A computer process that is configured to execute continuously in the background and perform system tasks, in some cases before any user has logged in

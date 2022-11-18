@@ -1,0 +1,1 @@
+Audit logs are protected from destruction and unauthorized modifications.

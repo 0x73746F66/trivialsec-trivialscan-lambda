@@ -1,0 +1,1 @@
+If the primary account number (PAN) has to be displayed, mask it to view it

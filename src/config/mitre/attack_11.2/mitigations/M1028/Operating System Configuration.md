@@ -1,0 +1,1 @@
+Make configuration changes related to the operating system or a common feature of the operating system that result in system hardening against techniques.

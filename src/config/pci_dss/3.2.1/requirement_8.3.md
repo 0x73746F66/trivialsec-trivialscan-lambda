@@ -1,0 +1,1 @@
+Secure all individual administrative access to the CDE and all remote access to the CDE using multi-factor authentication

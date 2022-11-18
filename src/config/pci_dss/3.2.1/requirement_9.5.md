@@ -1,0 +1,1 @@
+Protect all media that contains physically sensitive data

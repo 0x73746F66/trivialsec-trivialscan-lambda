@@ -1,0 +1,1 @@
+Audit logs are implemented to support the detection of anomalies and suspicious activity, and the forensic analysis of events.

@@ -1,0 +1,1 @@
+Key-management policies and procedures are implemented to include secure distribution of cryptographic keys used to protect stored account data.

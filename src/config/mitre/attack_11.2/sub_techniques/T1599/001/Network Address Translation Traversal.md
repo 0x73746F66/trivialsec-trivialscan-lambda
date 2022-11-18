@@ -1,0 +1,1 @@
+Adversaries may bridge network boundaries by modifying a network device's Network Address Translation (NAT) configuration. Malicious modifications to NAT may enable an adversary to bypass restrictions on traffic routing that otherwise separate trusted and untrusted networks.

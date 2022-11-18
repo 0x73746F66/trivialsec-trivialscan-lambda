@@ -1,0 +1,1 @@
+Adversaries may grant additional permission levels to maintain persistent access to an adversary-controlled email account.

@@ -1,0 +1,1 @@
+The server indivated client certificate subject's it will accept, or the client presented a Certificate to initiate an MTLS connection with this server.

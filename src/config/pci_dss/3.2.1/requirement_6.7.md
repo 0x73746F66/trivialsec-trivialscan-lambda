@@ -1,0 +1,1 @@
+Ensure security policies and operational procedures for developing and maintaining secure systems and applications are documented, in use, and known to all affected parties

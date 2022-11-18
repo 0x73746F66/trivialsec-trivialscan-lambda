@@ -1,0 +1,1 @@
+Only necessary services, protocols, daemons, and functions are enabled, and all unnecessary functionality is removed or disabled.

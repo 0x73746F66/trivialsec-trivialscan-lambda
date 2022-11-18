@@ -1,0 +1,1 @@
+After a significant change is complete, all relevant PCI DSS requirements should be applied to all new or modified systems and networks, and documentation updated accordingly

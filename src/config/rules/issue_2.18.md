@@ -1,0 +1,1 @@
+A revoked certificate that remains in use is an indication of misconfiuguration, misuse, or abuse.

@@ -1,0 +1,1 @@
+Media with cardholder data is securely stored, accessed, distributed, and destroyed.

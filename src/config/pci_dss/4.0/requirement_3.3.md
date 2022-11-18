@@ -1,0 +1,1 @@
+Sensitive authentication data (SAD) is not stored after authorization.

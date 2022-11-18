@@ -1,0 +1,1 @@
+Processes and mechanisms for protecting cardholder data with strong cryptography during transmission over open, public networks are defined and documented.

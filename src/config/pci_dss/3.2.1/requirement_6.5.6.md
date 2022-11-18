@@ -1,0 +1,1 @@
+All high risk vulnerabilities identified during the vulnerability identification process must be addressed

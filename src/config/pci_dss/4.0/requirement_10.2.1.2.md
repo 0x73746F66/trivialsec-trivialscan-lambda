@@ -1,0 +1,1 @@
+Audit logs capture all actions taken by any individual with administrative access, including any interactive use of application or system accounts.

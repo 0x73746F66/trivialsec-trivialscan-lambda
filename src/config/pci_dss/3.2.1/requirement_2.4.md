@@ -1,0 +1,1 @@
+Keep an inventory of all PCI DSS in-scope system components

@@ -1,0 +1,1 @@
+Additional requirement for service providers only: Service providers with remote access to customer premises use unique authentication factors for each customer premises.

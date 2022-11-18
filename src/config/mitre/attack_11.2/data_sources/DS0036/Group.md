@@ -1,0 +1,1 @@
+A collection of multiple user accounts that share the same access rights to the computer and/or network resources and have common security rights

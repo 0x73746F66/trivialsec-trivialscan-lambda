@@ -1,0 +1,1 @@
+Unauthorized changes on payment pages are detected and responded to.

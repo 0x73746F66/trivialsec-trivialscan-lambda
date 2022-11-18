@@ -1,0 +1,1 @@
+Create configuration standards for all components of the system

@@ -1,0 +1,1 @@
+Keep the logs in a way that cannot be altered

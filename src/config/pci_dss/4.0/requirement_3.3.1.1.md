@@ -1,0 +1,1 @@
+The full contents of any track are not retained upon completion of the authorization process.

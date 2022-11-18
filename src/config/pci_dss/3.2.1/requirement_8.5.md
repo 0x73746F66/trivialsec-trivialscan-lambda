@@ -1,0 +1,1 @@
+Do not use group, shared or public IDs, passwords or other authentication methods

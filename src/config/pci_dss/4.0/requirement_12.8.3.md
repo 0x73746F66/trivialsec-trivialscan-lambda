@@ -1,0 +1,1 @@
+An established process is implemented for engaging TPSPs, including proper due diligence prior to engagement.

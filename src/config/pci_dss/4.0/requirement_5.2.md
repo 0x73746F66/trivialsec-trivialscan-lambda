@@ -1,0 +1,1 @@
+Malicious software (malware) is prevented or detected and addressed.

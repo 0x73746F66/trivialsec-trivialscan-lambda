@@ -1,0 +1,1 @@
+Prevent modification of environment variables by unauthorized users and groups.

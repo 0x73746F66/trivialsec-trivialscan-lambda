@@ -1,0 +1,1 @@
+Adversaries may access data objects from improperly secured cloud storage.

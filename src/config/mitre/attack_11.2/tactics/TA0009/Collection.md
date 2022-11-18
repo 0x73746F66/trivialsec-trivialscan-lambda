@@ -1,0 +1,1 @@
+The adversary is trying to gather data of interest to their goal.

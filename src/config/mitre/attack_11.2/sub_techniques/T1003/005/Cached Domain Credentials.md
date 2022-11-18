@@ -1,0 +1,1 @@
+Adversaries may attempt to access cached domain credentials used to allow authentication to occur in the event a domain controller is unavailable.

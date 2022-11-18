@@ -5,7 +5,8 @@ resource "aws_lambda_function" "trivialscan" {
   role          = aws_iam_role.trivialscan_role.arn
   handler       = "app.handler"
   runtime       = local.python_version
-  timeout       = 900
+  timeout       = local.timeout
+  memory_size   = local.memory_size
 
   environment {
     variables = {

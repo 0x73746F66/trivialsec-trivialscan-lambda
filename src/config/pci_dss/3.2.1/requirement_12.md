@@ -1,0 +1,1 @@
+Create a policy that addresses information security for all staff

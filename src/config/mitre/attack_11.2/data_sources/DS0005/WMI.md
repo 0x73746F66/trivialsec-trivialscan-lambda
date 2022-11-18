@@ -1,0 +1,1 @@
+The infrastructure for management data and operations that enables local and remote management of Windows personal computers and servers

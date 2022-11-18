@@ -1,0 +1,1 @@
+An access control system(s) is in place that restricts access based on a user's need to know and covers all system components.

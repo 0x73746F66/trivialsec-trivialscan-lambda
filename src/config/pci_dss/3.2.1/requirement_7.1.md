@@ -1,0 +1,1 @@
+Limit access to system components and cardholder data only to those who need it for their job functions

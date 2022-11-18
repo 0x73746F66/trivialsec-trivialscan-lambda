@@ -1,0 +1,1 @@
+Restrict execution of code to a virtual environment on or in transit to an endpoint system.

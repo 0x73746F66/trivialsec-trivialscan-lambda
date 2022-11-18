@@ -1,0 +1,1 @@
+Implement configuration changes to software (other than the operating system) to mitigate security risks associated to how the software operates.

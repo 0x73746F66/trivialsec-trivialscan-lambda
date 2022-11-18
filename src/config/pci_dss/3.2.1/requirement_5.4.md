@@ -1,0 +1,1 @@
+Ensure that security policies and operational procedures are documented, in use, and known to all affected parties to protect systems against malware

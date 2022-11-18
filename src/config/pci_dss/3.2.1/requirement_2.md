@@ -1,0 +1,1 @@
+Do not use the vendor's default settings for system passwords and other security parameters

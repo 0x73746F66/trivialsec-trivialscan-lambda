@@ -101,7 +101,7 @@ def get_rule_desc(evaluation_id: str, default: str = 'No additional information 
 def get_rule_recommendation(evaluation_id: str, default: str = 'TBA') -> str:
     if not _rules:
         return default
-    return _rules.get(evaluation_id, {}).get('issue', default)
+    return _rules.get(evaluation_id, {}).get('recommendation', default)
 
 # helper loaders
 mitre_attack = get_mitre_attack()

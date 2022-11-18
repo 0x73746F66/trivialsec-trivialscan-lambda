@@ -1,0 +1,1 @@
+If a user session has been idle for more than 15 minutes, the user is required to re-authenticate to re-activate the terminal or session.

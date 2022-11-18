@@ -1,0 +1,1 @@
+System clocks and time are synchronized using time-synchronization technology.

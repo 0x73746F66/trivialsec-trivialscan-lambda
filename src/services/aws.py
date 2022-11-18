@@ -139,7 +139,7 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET) -> list[str]:
     - bucket_name: s3 bucket with target contents
     - prefix_key: pattern to match in s3
     """
-    internals.logger.info(f"requesting bucket {bucket_name} key prefix {prefix_key}")
+    internals.logger.info(f"list_s3 key prefix {prefix_key}")
     keys = []
     next_token = ''
     base_kwargs = {
@@ -186,7 +186,7 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET) -> list[str]:
     backoff=1,
 )
 def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None) -> Any:
-    internals.logger.info(f"requesting bucket {bucket_name} object key {path_key}")
+    internals.logger.info(f"get_s3 object key {path_key}")
     try:
         response = s3_client.get_object(
             Bucket=bucket_name, Key=path_key)
@@ -217,7 +217,7 @@ def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None) 
     backoff=1,
 )
 def delete_s3(path_key: str, bucket_name: str = STORE_BUCKET, **kwargs) -> bool:
-    internals.logger.info(f"requesting bucket {bucket_name} object key {path_key}")
+    internals.logger.info(f"delete_s3 object key {path_key}")
     try:
         response = s3_client.delete_object(
             Bucket=bucket_name, Key=path_key, **kwargs)

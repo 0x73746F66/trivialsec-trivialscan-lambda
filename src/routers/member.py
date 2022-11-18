@@ -474,8 +474,8 @@ async def update_email(
                 return
 
         link = models.AcceptEdit(
-            account=authz.account,
-            requester=authz.member,
+            account=authz.account,  # type: ignore
+            requester=authz.member,  # type: ignore
             accept_token=token,
             old_value=authz.member.email,  # type: ignore
             ip_addr=authz.ip_addr,

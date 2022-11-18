@@ -1,0 +1,1 @@
+External and internal penetration testing is regularly performed, and exploitable vulnerabilities and security weaknesses are corrected.

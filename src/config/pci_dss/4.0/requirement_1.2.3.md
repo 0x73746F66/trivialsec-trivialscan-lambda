@@ -1,0 +1,1 @@
+An accurate network diagram(s) is maintained that shows all connections between the CDE and other networks, including any wireless networks

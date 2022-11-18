@@ -1,0 +1,1 @@
+Adversaries may patch the authentication process on a domain controller to bypass the typical authentication mechanisms and enable access to accounts.

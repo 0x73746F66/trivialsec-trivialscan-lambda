@@ -1,0 +1,1 @@
+A comprehensive information security policy that governs and provides direction for protection of the entity's information assets is known and current.

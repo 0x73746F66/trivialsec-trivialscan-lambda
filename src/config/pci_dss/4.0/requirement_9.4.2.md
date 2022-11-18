@@ -1,0 +1,1 @@
+All media with cardholder data is classified in accordance with the sensitivity of the data.

@@ -1,0 +1,1 @@
+Set up a change detection mechanism to detect unauthorized modification of critical system files, configuration files or content files

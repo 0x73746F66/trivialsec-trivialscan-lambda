@@ -1,0 +1,1 @@
+Protect sensitive information with strong encryption.

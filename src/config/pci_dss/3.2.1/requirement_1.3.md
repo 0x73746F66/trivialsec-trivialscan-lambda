@@ -1,0 +1,1 @@
+Restrict direct global access to any system component of the cardholder data medium over the internet

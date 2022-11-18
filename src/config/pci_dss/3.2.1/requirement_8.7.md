@@ -1,0 +1,1 @@
+Limit all access to any database containing cardholder data
