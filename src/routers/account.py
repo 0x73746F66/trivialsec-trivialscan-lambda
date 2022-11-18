@@ -164,7 +164,7 @@ async def support_request(
     try:
         sendgrid = services.sendgrid.send_email(
             subject=f"Support | {data.subject}",
-            sender_name=authz.member.account.name,  # type: ignore
+            sender_name=authz.account.name,  # type: ignore
             sender=authz.member.email,  # type: ignore
             recipient="support@trivialsec.com",
             template='support',
