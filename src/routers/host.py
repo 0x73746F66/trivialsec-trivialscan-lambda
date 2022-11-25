@@ -15,28 +15,40 @@ import services.helpers
 router = APIRouter()
 
 
-@router.get("/hosts",
+@router.get(
+    "/hosts",
     response_model=list[models.Host],
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         204: {"description": "No scan data is present for this account"},
-        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-        500: {"description": "An unhandled error occured during an AWS request for data access"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
     },
     tags=["Hostname"],
 )
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("return_details"))
-    )
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"]
+    + str(kw.get("return_details")),
+)
 def retrieve_hosts(
     request: Request,
     response: Response,
-    return_details: bool = Query(default=False, description="Returns the full record for this hostname"),
+    return_details: bool = Query(
+        default=False, description="Returns the full record for this hostname"
+    ),
     authorization: Union[str, None] = Header(default=None),
 ):
     """
@@ -45,7 +57,7 @@ def retrieve_hosts(
     full record
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -56,35 +68,20 @@ def retrieve_hosts(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
-    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/summaries.json"  # type: ignore
-    try:
-        raw = services.aws.get_s3(path_key=object_key)
-
-    except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        internals.logger.exception(err)
-        return []
-
-    if not raw:
-        internals.logger.warning(f"No reports for {object_key}")
+    scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
+    if not scanner_record:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     seen = set()
     data = []
-    summaries = json.loads(raw)
-    for item in summaries:
-        report = models.ReportSummary(**item)
-        for target in report.targets or []:
+    for report in scanner_record.history:
+        for host in report.targets or []:
+            target = f"{host.transport.hostname}:{host.transport.port}"
             if target not in seen:
                 seen.add(target)
-                hostname, port = target.split(":")
-                tspt = models.HostTransport(hostname=hostname, port=port)  # type: ignore
-                host = models.Host(transport=tspt)  # type: ignore
-                if return_details:
-                    host.load()
                 data.append(host)
 
     if not data:
@@ -93,37 +90,54 @@ def retrieve_hosts(
     return data
 
 
-@router.get("/host/{hostname}",
+@router.get(
+    "/host/{hostname}",
     response_model=models.Host,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         204: {"description": "No scan data is present for this account"},
-        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-        500: {"description": "An unhandled error occured during an AWS request for data access"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
     },
     tags=["Hostname"],
 )
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("port",""))+str(kw.get("last_updated",""))
-    )
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"]
+    + str(kw.get("port", ""))
+    + str(kw.get("last_updated", "")),
+)
 def retrieve_host(
     request: Request,
     response: Response,
     hostname: str,
-    port: Union[int, None] = Query(default=None, description="defaults to 443 when not searching by date, otherwise leaving the port empty returns first found on date regardless of port"),
-    last_updated: Union[datetime, None] = Query(default=None, description="Return the result for specific date rather than the latest (default) Host information"),
+    port: Union[int, None] = Query(
+        default=None,
+        description="defaults to 443 when not searching by date, otherwise leaving the port empty returns first found on date regardless of port",
+    ),
+    last_updated: Union[datetime, None] = Query(
+        default=None,
+        description="Return the result for specific date rather than the latest (default) Host information",
+    ),
     authorization: Union[str, None] = Header(default=None),
 ):
     """
     Retrieves TLS data on any hostname, providing an optional port number
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -134,7 +148,7 @@ def retrieve_host(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
     prefix_key = path.join(internals.APP_ENV, "hosts", hostname)

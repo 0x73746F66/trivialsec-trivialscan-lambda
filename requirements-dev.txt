@@ -10,7 +10,6 @@ boto3
 typed-ast
 black
 pre-commit
-checkov
 detect-secrets
 pip-audit
 uvicorn==0.18.2

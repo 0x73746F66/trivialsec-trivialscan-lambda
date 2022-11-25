@@ -12,21 +12,27 @@ import internals
 
 
 def get_quotas(
-        account: models.MemberAccount,
-        load_monitoring: bool = True,
-        load_passive: bool = True,
-        load_active: bool = True,
-    ) -> models.AccountQuotas:
+    account: models.MemberAccount,
+    scanner_record: models.ScannerRecord,
+) -> models.AccountQuotas:
     active = 0
     passive = 0
     monitoring = 0
-    if load_monitoring:
-        if monitor := models.Monitor(account=account).load():  # type: ignore
-            monitoring = sum(1 if item.enabled else 0 for item in monitor.targets)
-    if load_passive:
-        pass # TODO
-    if load_active:
-        pass  # TODO
+    if len(scanner_record.monitored_targets or []) > 0:  # type: ignore
+        monitoring = sum(
+            1 if item.enabled else 0 for item in scanner_record.monitored_targets
+        )
+    if len(scanner_record.history or []) > 0:  # type: ignore
+        passive = sum(
+            1 if item.is_passive and item.type == models.ScanRecordType.ONDEMAND else 0
+            for item in scanner_record.history
+        )
+        active = sum(
+            1
+            if not item.is_passive and item.type == models.ScanRecordType.ONDEMAND
+            else 0
+            for item in scanner_record.history
+        )
 
     new_only = True
     unlimited_monitoring = False
@@ -38,17 +44,31 @@ def get_quotas(
         unlimited_scans = True
     if sub := models.SubscriptionBasics().load(account.name):  # type: ignore
         monitoring_total = 1 if not sub.metadata else sub.metadata.get("monitoring", 1)
-        passive_total = 1 if not sub.metadata else sub.metadata.get("managed_passive", 1)
+        passive_total = (
+            1 if not sub.metadata else sub.metadata.get("managed_passive", 1)
+        )
         active_total = 0 if not sub.metadata else sub.metadata.get("managed_active", 0)
     elif sub := models.SubscriptionPro().load(account.name):  # type: ignore
-        monitoring_total = 10 if not sub.metadata else sub.metadata.get("monitoring", 10)
-        passive_total = 500 if not sub.metadata else sub.metadata.get("managed_passive", 500)
-        active_total = 50 if not sub.metadata else sub.metadata.get("managed_active", 50)
+        monitoring_total = (
+            10 if not sub.metadata else sub.metadata.get("monitoring", 10)
+        )
+        passive_total = (
+            500 if not sub.metadata else sub.metadata.get("managed_passive", 500)
+        )
+        active_total = (
+            50 if not sub.metadata else sub.metadata.get("managed_active", 50)
+        )
         new_only = False
     elif sub := models.SubscriptionEnterprise().load(account.name):  # type: ignore
-        monitoring_total = 50 if not sub.metadata else sub.metadata.get("monitoring", 50)
-        passive_total = 1000 if not sub.metadata else sub.metadata.get("managed_passive", 1000)
-        active_total = 100 if not sub.metadata else sub.metadata.get("managed_active", 100)
+        monitoring_total = (
+            50 if not sub.metadata else sub.metadata.get("monitoring", 50)
+        )
+        passive_total = (
+            1000 if not sub.metadata else sub.metadata.get("managed_passive", 1000)
+        )
+        active_total = (
+            100 if not sub.metadata else sub.metadata.get("managed_active", 100)
+        )
         new_only = False
     elif sub := models.SubscriptionUnlimited().load(account.name):  # type: ignore
         unlimited_scans = True
@@ -96,7 +116,7 @@ def parse_authorization_header(authorization_header: str) -> dict[str, str]:
             else:
                 pairs[-1] = pairs[-1] + "," + pair
         if not auth_param_re.match(pairs[-1]):  # type: ignore
-            raise ValueError('Malformed auth parameters')
+            raise ValueError("Malformed auth parameters")
     for pair in pairs:
         (key, value) = pair.strip().split("=", 1)
         # For quoted strings, remove quotes and backslash-escapes.
@@ -109,7 +129,11 @@ def parse_authorization_header(authorization_header: str) -> dict[str, str]:
     return parsed_header
 
 
-def dns_query(domain_name: str, try_apex: bool = False, resolve_type: rdatatype.RdataType = rdatatype.A) -> Union[resolver.Answer, None]:
+def dns_query(
+    domain_name: str,
+    try_apex: bool = False,
+    resolve_type: rdatatype.RdataType = rdatatype.A,
+) -> Union[resolver.Answer, None]:
     answer = None
     dns_resolver = resolver.Resolver(configure=True)
     internals.logger.info(f"Trying to resolve {resolve_type} for {domain_name}")
@@ -117,22 +141,33 @@ def dns_query(domain_name: str, try_apex: bool = False, resolve_type: rdatatype.
     try:
         answer = dns_resolver.resolve(domain_name, resolve_type)
     except (resolver.NoAnswer, resolver.NXDOMAIN):
-        internals.logger.warning(f"get_dns {resolve_type} for {domain_name} DNS NoAnswer")
+        internals.logger.warning(
+            f"get_dns {resolve_type} for {domain_name} DNS NoAnswer"
+        )
     except DNSTimeoutError:
-        internals.logger.warning(f"get_dns {resolve_type} for {domain_name} DNS Timeout")
+        internals.logger.warning(
+            f"get_dns {resolve_type} for {domain_name} DNS Timeout"
+        )
     except DNSException as ex:
         internals.logger.warning(ex, exc_info=True)
     except ConnectionResetError:
-        internals.logger.warning(f"get_dns {resolve_type} for {domain_name} Connection reset by peer")
+        internals.logger.warning(
+            f"get_dns {resolve_type} for {domain_name} Connection reset by peer"
+        )
     except ConnectionError:
-        internals.logger.warning(f"get_dns {resolve_type} for {domain_name} Name or service not known")
+        internals.logger.warning(
+            f"get_dns {resolve_type} for {domain_name} Name or service not known"
+        )
 
     tldext = TLDExtract(cache_dir=internals.CACHE_DIR)(f"http://{domain_name}")
     if not answer and try_apex and tldext.registered_domain != domain_name:
-        return dns_query(tldext.registered_domain, try_apex=try_apex, resolve_type=resolve_type)
+        return dns_query(
+            tldext.registered_domain, try_apex=try_apex, resolve_type=resolve_type
+        )
     if not answer:
         return None
     return answer
+
 
 def retrieve_ip_for_host(hostname: str) -> list[IPvAnyAddress]:
     results = set()
@@ -140,39 +175,42 @@ def retrieve_ip_for_host(hostname: str) -> list[IPvAnyAddress]:
     domains_to_check.add(hostname)
     if answer := dns_query(hostname, resolve_type=rdatatype.CNAME):
         try:
-            domains_to_check.add(answer.rrset.to_rdataset().to_text().split(' ').pop()[:-1])  # type: ignore
-        except: pass  # pylint: disable=bare-except
+            domains_to_check.add(answer.rrset.to_rdataset().to_text().split(" ").pop()[:-1])  # type: ignore
+        except:
+            pass  # pylint: disable=bare-except
     for domain in domains_to_check:
         for resolve_type in [rdatatype.A, rdatatype.AAAA]:
             if answer := dns_query(domain, resolve_type=resolve_type):
-                results.update(ip.split(' ').pop() for ip in answer.rrset.to_rdataset().to_text().splitlines())  # type: ignore
+                results.update(ip.split(" ").pop() for ip in answer.rrset.to_rdataset().to_text().splitlines())  # type: ignore
     return list(results)
 
+
 def host_scanning_status(
-        hostname: str,
-        queue: Union[models.Queue, None] = None,
-        monitor: Union[models.Monitor, None] = None,
-    ) -> Union[dict[str, Any], None]:
+    hostname: str,
+    scanner_record: models.ScannerRecord,
+) -> Union[dict[str, Any], None]:
     response = {
-        'monitoring': False,
-        'queued_timestamp': None,
-        'queue_status': None,
+        "monitoring": False,
+        "queued_timestamp": None,
+        "queue_status": None,
     }
-    if monitor:
-        for target in monitor.targets:
-            if target.hostname == hostname:
-                response['monitoring'] = target.enabled
-    if queue:
-        for target in queue.targets:
-            if target.hostname == hostname:
-                response["queued_timestamp"] = target.timestamp
-                response["queue_status"] = "Queued"
-                if target.scan_timestamp:
-                    response["queue_status"] = "Processing"
+    for target in scanner_record.monitored_targets:
+        if target.hostname == hostname:
+            response["monitoring"] = target.enabled
+    for target in scanner_record.queue_targets:
+        if target.hostname == hostname:
+            response["queued_timestamp"] = target.timestamp
+            response["queue_status"] = "Queued"
+            if target.scan_timestamp:
+                response["queue_status"] = "Processing"
 
     return response
 
-def markup_descriptions(report: Union[models.FullReport, dict, None], evaluations: Union[list[Union[models.EvaluationItem, dict]], None] = None) -> list[models.EvaluationItem]:
+
+def load_descriptions(
+    report: Union[models.FullReport, dict, None],
+    evaluations: Union[list[Union[models.EvaluationItem, dict]], None] = None,
+) -> list[models.EvaluationItem]:
     report_date = None
     report_evaluations: list[models.EvaluationItem] = []
     if isinstance(evaluations, list) and len(evaluations) > 0:
@@ -181,8 +219,11 @@ def markup_descriptions(report: Union[models.FullReport, dict, None], evaluation
         if isinstance(evaluations[0], models.EvaluationItem):
             report_evaluations = evaluations  # type: ignore
     if isinstance(report, dict):
-        report_date = report.get('date')
-        report_evaluations = [models.EvaluationItem(**evaluation) for evaluation in report.get('evaluations', []) or []]
+        report_date = report.get("date")
+        report_evaluations = [
+            models.EvaluationItem(**evaluation)
+            for evaluation in report.get("evaluations", []) or []
+        ]
     elif isinstance(report, models.FullReport):
         report_date = report.date
         report_evaluations = report.evaluations or []
@@ -201,19 +242,38 @@ def markup_descriptions(report: Union[models.FullReport, dict, None], evaluation
             item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
 
         for group in item.compliance or []:
-            if config.pcidss4 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '4.0':
+            if (
+                config.pcidss4
+                and group.compliance == models.ComplianceName.PCI_DSS
+                and group.version == "4.0"
+            ):
                 pci4_items = []
                 for compliance in group.items or []:
-                    compliance.description = None if not compliance.requirement else config.pcidss4.requirements.get(compliance.requirement, '')
+                    compliance.description = (
+                        None
+                        if not compliance.requirement
+                        else config.pcidss4.requirements.get(compliance.requirement, "")
+                    )
                     pci4_items.append(compliance)
                 group.items = pci4_items
-            if config.pcidss3 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '3.2.1':
+            if (
+                config.pcidss3
+                and group.compliance == models.ComplianceName.PCI_DSS
+                and group.version == "3.2.1"
+            ):
                 pci3_items = []
                 for compliance in group.items or []:
-                    compliance.description = None if not compliance.requirement else config.pcidss3.requirements.get(compliance.requirement, '')
+                    compliance.description = (
+                        None
+                        if not compliance.requirement
+                        else config.pcidss3.requirements.get(compliance.requirement, "")
+                    )
                     pci3_items.append(compliance)
                 group.items = pci3_items
-            if group.compliance in [models.ComplianceName.NIST_SP800_131A, models.ComplianceName.FIPS_140_2]:
+            if group.compliance in [
+                models.ComplianceName.NIST_SP800_131A,
+                models.ComplianceName.FIPS_140_2,
+            ]:
                 group.items = None
 
         if config.mitre_attack:

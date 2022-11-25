@@ -17,23 +17,33 @@ import services.helpers
 router = APIRouter()
 
 
-@router.get("/summary/{report_id}",
+@router.get(
+    "/summary/{report_id}",
     response_model=models.ReportSummary,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         204: {"description": "No scan data is present for this account"},
-        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-        500: {"description": "An unhandled error occured during an AWS request for data access"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
     },
     tags=["Scan Reports"],
 )
 @cachier(
     stale_after=timedelta(hours=1),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+kw.get("report_id")
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"]
+    + kw.get("report_id"),
 )
 def retrieve_summary(
     request: Request,
@@ -42,10 +52,10 @@ def retrieve_summary(
     authorization: Union[str, None] = Header(default=None),
 ):
     """
-    Retrieves a summary of a Trivial Scanner report for the provided report identiffier
+    Retrieves a summary of a Trivial Scanner report for the provided report identifier
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -56,31 +66,45 @@ def retrieve_summary(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
-    summary = models.ReportSummary(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
-    if not summary:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-    return summary
+    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+        for summary in scanner_record.history:
+            if summary.report_id == report_id:
+                return summary
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/report/{report_id}",
+@router.get(
+    "/report/{report_id}",
     response_model=models.FullReport,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         204: {"description": "No scan data is present for this account"},
-        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-        500: {"description": "An unhandled error occured during an AWS request for data access"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
     },
     tags=["Scan Reports"],
 )
 @cachier(
     stale_after=timedelta(minutes=15),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("report_id"))+str(kw.get("full_certs"))+str(kw.get("full_hosts"))
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"]
+    + str(kw.get("report_id"))
+    + str(kw.get("full_certs"))
+    + str(kw.get("full_hosts")),
 )
 def retrieve_full_report(
     request: Request,
@@ -92,7 +116,7 @@ def retrieve_full_report(
     Retrieves a full Trivial Scanner report for the provided report identiffier
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -103,43 +127,53 @@ def retrieve_full_report(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
     report = models.FullReport(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
     if not report:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-    report.evaluations = services.helpers.markup_descriptions(report)
-    monitor = models.Monitor(account=authz.account).load()  # type: ignore
-    queue = models.Queue(account=authz.account).load()  # type: ignore
+    report.evaluations = services.helpers.load_descriptions(report)
+    scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
     hosts = []
-    for host in report.targets:
-        host.scanning_status = services.helpers.host_scanning_status(host.transport.hostname, queue, monitor)  # type: ignore
+    for host in report.targets:  # type: ignore
+        host.scanning_status = services.helpers.host_scanning_status(host.transport.hostname, scanner_record)  # type: ignore
         hosts.append(host)
     report.targets = hosts
 
     return report
 
 
-@router.get("/certificate/{sha1_fingerprint}",
+@router.get(
+    "/certificate/{sha1_fingerprint}",
     response_model=models.Certificate,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
         204: {"description": "No scan data is present for this account"},
-        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-        500: {"description": "An unhandled error occured during an AWS request for data access"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
     },
     tags=["Scan Reports"],
 )
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+kw.get("sha1_fingerprint")+str(kw.get("include_pem"))
-    )
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"]
+    + kw.get("sha1_fingerprint")
+    + str(kw.get("include_pem")),
+)
 def retrieve_certificate(
     request: Request,
     response: Response,
@@ -151,7 +185,7 @@ def retrieve_certificate(
     Retrieves TLS Certificate data by SHA1 fingerprint, optionally provides the PEM encoded certificate
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -162,7 +196,7 @@ def retrieve_certificate(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
     pem_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
@@ -180,14 +214,24 @@ def retrieve_certificate(
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
 
-@router.post("/store/{report_type}",
+
+@router.post(
+    "/store/{report_type}",
     status_code=status.HTTP_201_CREATED,
     responses={
         204: {"description": "No scan data is present for this account"},
-        401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-        403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-        412: {"description": "When uploading a detailed report, the summary must first be sent"},
-        500: {"description": "An unhandled error occured during an AWS request for data access"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        412: {
+            "description": "When uploading a detailed report, the summary must first be sent"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
     },
     tags=["Scan Reports"],
 )
@@ -207,7 +251,7 @@ async def store(
     data = {}
     contents = await file.read()
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -220,7 +264,7 @@ async def store(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
     if file.filename.endswith(".json"):
@@ -235,27 +279,37 @@ async def store(
     if report_type is models.ReportType.REPORT:
         report_id = token_urlsafe(56)
         results_uri = f"/result/{report_id}/detail"
-        report = models.ReportSummary(report_id=report_id, results_uri=results_uri, **data)
-        if report.save():
-            scans_map: dict[str, dict[str, list[str]]] = {}
-            object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"  # type: ignore
-            if history_raw := services.aws.get_s3(path_key=object_key):
-                scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
-            for target in report.targets or []:
-                scans_map.setdefault(target, {'reports': []})  # type: ignore
-                scans_map[target]['reports'].append(report.report_id)  # type: ignore
-            services.aws.store_s3(object_key, json.dumps(scans_map, default=str))
+        report = models.ReportSummary(
+            report_id=report_id,
+            results_uri=results_uri,
+            type=models.ScanRecordType.SELF_MANAGED,
+            category=models.ScanRecordCategory.RECONNAISSANCE,
+            is_passive=True,
+            **data,
+        )
+        scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
+        if not scanner_record:
+            scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        scanner_record.history.append(report)
+        if scanner_record.save():
             return {"results_uri": results_uri}
 
     if report_type is models.ReportType.EVALUATIONS:
         report_id = file.filename.replace(".json", "")
-        _report = models.ReportSummary(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
+        scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
+        if not scanner_record:
+            response.status_code = status.HTTP_412_PRECONDITION_FAILED
+            return
+        _report = None
+        for summary in scanner_record.history:
+            if summary.report_id == report_id:
+                _report = summary
         if not _report:
             response.status_code = status.HTTP_412_PRECONDITION_FAILED
             return
         items = []
         certs = {}
-        for _item in data['evaluations']:
+        for _item in data["evaluations"]:
             item = models.EvaluationItem(
                 generator=_report.generator,
                 version=_report.version,
@@ -263,28 +317,46 @@ async def store(
                 client_name=_report.client_name,
                 report_id=report_id,
                 observed_at=_report.date,
-                rule_id=_item['rule_id'],
-                group=_item['group'],
-                group_id=_item['group_id'],
-                key=_item['key'],
-                name=_item['name'],
-                result_value=_item['result_value'],
-                result_label=_item['result_label'],
-                result_text=_item['result_text'],
-                result_level=_item['result_level'],
-                score=_item['score'],
-                description=_item.get('description', config.get_rule_desc(f"{_item['rule_id']}.{_item['group_id']}")),
-                metadata=_item.get('metadata', {}),
-                cve=_item.get('cve', []),
-                cvss2=_item.get('cvss2'),
-                cvss3=_item.get('cvss3'),
-                references=[models.ReferenceItem(name=ref['name'], url=ref['url']) for ref in _item.get('references', []) or []],
-                compliance=[models.ComplianceGroup(compliance=comp['compliance'], version=comp['version'], items=[
-                    models.ComplianceItem(**item) for item in comp.get('items', [])
-                ]) for comp in _item['compliance']],
-                threats=[models.ThreatItem(**threat) for threat in _item.get('threats', [])],
-                transport=models.HostTransport(**data['transport']),
-                certificate=None if not _item.get('certificate') else models.Certificate(**_item['certificate']),
+                rule_id=_item["rule_id"],
+                group=_item["group"],
+                group_id=_item["group_id"],
+                key=_item["key"],
+                name=_item["name"],
+                result_value=_item["result_value"],
+                result_label=_item["result_label"],
+                result_text=_item["result_text"],
+                result_level=_item["result_level"],
+                score=_item["score"],
+                description=_item.get(
+                    "description",
+                    config.get_rule_desc(f"{_item['rule_id']}.{_item['group_id']}"),
+                ),
+                metadata=_item.get("metadata", {}),
+                cve=_item.get("cve", []),
+                cvss2=_item.get("cvss2"),
+                cvss3=_item.get("cvss3"),
+                references=[
+                    models.ReferenceItem(name=ref["name"], url=ref["url"])
+                    for ref in _item.get("references", []) or []
+                ],
+                compliance=[
+                    models.ComplianceGroup(
+                        compliance=comp["compliance"],
+                        version=comp["version"],
+                        items=[
+                            models.ComplianceItem(**item)
+                            for item in comp.get("items", [])
+                        ],
+                    )
+                    for comp in _item["compliance"]
+                ],
+                threats=[
+                    models.ThreatItem(**threat) for threat in _item.get("threats", [])
+                ],
+                transport=models.HostTransport(**data["transport"]),
+                certificate=None
+                if not _item.get("certificate")
+                else models.Certificate(**_item["certificate"]),
             )
             if item.group == "certificate" and item.metadata.get("sha1_fingerprint"):
                 if item.metadata.get("sha1_fingerprint") not in certs:
@@ -299,7 +371,9 @@ async def store(
     if report_type is models.ReportType.HOST:
         report = models.Host(**data)  # type: ignore
         if report.save():
-            return {"results_uri": f"/host/{report.transport.hostname}/{report.transport.port}"}
+            return {
+                "results_uri": f"/host/{report.transport.hostname}/{report.transport.port}"
+            }
 
     if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".json"):
         report = models.Certificate(**data)  # type: ignore
@@ -308,7 +382,9 @@ async def store(
 
     if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".pem"):
         sha1_fingerprint = file.filename.replace(".pem", "")
-        object_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
+        object_key = path.join(
+            internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem"
+        )
         if services.aws.store_s3(object_key, contents):  # type: ignore
             return {"results_uri": f"/certificate/{sha1_fingerprint}"}
 

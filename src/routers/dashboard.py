@@ -17,23 +17,32 @@ import services.helpers
 router = APIRouter()
 
 
-@router.get("/dashboard/compliance",
-            response_model=list[models.DashboardCompliance],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            responses={
-                204: {"description": "No scan data is present for this account"},
-                401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-                403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-                500: {"description": "An unhandled error occured during an AWS request for data access"},
-            },
-            tags=["Dashboard"],
-            )
+@router.get(
+    "/dashboard/compliance",
+    response_model=list[models.DashboardCompliance],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Dashboard"],
+)
 @cachier(
     stale_after=timedelta(minutes=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"],
 )
 def dashboard_compliance(
     request: Request,
@@ -44,7 +53,7 @@ def dashboard_compliance(
     Retrieves a collection of your clients
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -55,7 +64,7 @@ def dashboard_compliance(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
     object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-compliance.json"  # type: ignore
@@ -66,7 +75,7 @@ def dashboard_compliance(
         data = json.loads(raw)
         for item in data:
             try:
-                item['label'] = getattr(models.GraphLabel, item['label'])
+                item["label"] = getattr(models.GraphLabel, item["label"])
             except AttributeError:
                 pass  # Label should already be the correct value
 
@@ -78,22 +87,31 @@ def dashboard_compliance(
     return
 
 
-@router.get("/dashboard/quotas",
-            response_model=models.AccountQuotas,
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            responses={
-                401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-                403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-                500: {"description": "An unhandled error occured during an AWS request for data access"},
-            },
-            tags=["Dashboard"],
-            )
+@router.get(
+    "/dashboard/quotas",
+    response_model=models.AccountQuotas,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Dashboard"],
+)
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"],
 )
 def dashboard_quotas(
     request: Request,
@@ -104,56 +122,7 @@ def dashboard_quotas(
     Retrieves a collection of your clients
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get(
-            "http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get(
-            "http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
-        return
-
-    return services.helpers.get_quotas(authz.account)  # type: ignore
-
-
-@router.get("/findings/certificate",
-            response_model=list[models.EvaluationItem],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            responses={
-                204: {"description": "No scan data is present for this account"},
-                401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-                403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-                500: {"description": "An unhandled error occured during an AWS request for data access"},
-            },
-            tags=["Scan Reports"],
-            )
-@cachier(
-    stale_after=timedelta(minutes=5),
-    cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("limit"))
-)
-def certificate_issues(
-    request: Request,
-    response: Response,
-    limit: int = 20,
-    authorization: Union[str, None] = Header(default=None),
-):
-    """
-    Retrieves a collection of your own Trivial Scanner reports, providing
-    a list of certificate issues filtered to include only the hightest risk
-    and ordered by last seen
-    """
-    if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -164,7 +133,65 @@ def certificate_issues(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
+        return
+    scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
+    if scanner_record:
+        return services.helpers.get_quotas(account=authz.account, scanner_record=scanner_record)  # type: ignore
+
+
+@router.get(
+    "/findings/certificate",
+    response_model=list[models.EvaluationItem],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Scan Reports"],
+)
+@cachier(
+    stale_after=timedelta(minutes=5),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"]
+    + str(kw.get("limit")),
+)
+def certificate_issues(
+    request: Request,
+    response: Response,
+    limit: int = 20,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Retrieves a collection of your own Trivial Scanner reports, providing
+    a list of certificate issues filtered to include only the highest risk
+    and ordered by last seen
+    """
+    if not authorization:
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
     object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-certificates.json"  # type: ignore
@@ -178,7 +205,9 @@ def certificate_issues(
         for _item in latest_data:
             item = models.EvaluationItem(**_item)
             if not item.description:
-                item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
+                item.description = config.get_rule_desc(
+                    f"{item.group_id}.{item.rule_id}"
+                )
             enriched_data.append(item)
         sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))  # type: ignore
 
@@ -190,23 +219,33 @@ def certificate_issues(
     return
 
 
-@router.get("/findings/latest",
-            response_model=list[models.EvaluationItem],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            responses={
-                204: {"description": "No scan data is present for this account"},
-                401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-                403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-                500: {"description": "An unhandled error occured during an AWS request for data access"},
-            },
-            tags=["Scan Reports"],
-            )
+@router.get(
+    "/findings/latest",
+    response_model=list[models.EvaluationItem],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Scan Reports"],
+)
 @cachier(
     stale_after=timedelta(minutes=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]+str(kw.get("limit"))
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"]
+    + str(kw.get("limit")),
 )
 def latest_findings(
     request: Request,
@@ -216,11 +255,11 @@ def latest_findings(
 ):
     """
     Retrieves a collection of your own Trivial Scanner reports, providing
-    a list of host findings filtered to include only the hightest risk issues
+    a list of host findings filtered to include only the highest risk issues
     and ordered by last seen
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -231,7 +270,7 @@ def latest_findings(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
     object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-findings.json"  # type: ignore
@@ -245,22 +284,47 @@ def latest_findings(
         for _item in latest_data:
             item = models.EvaluationItem(**_item)
             if not item.description:
-                item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
+                item.description = config.get_rule_desc(
+                    f"{item.group_id}.{item.rule_id}"
+                )
 
             for group in item.compliance or []:
-                if config.pcidss4 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '4.0':
+                if (
+                    config.pcidss4
+                    and group.compliance == models.ComplianceName.PCI_DSS
+                    and group.version == "4.0"
+                ):
                     pci4_items = []
                     for compliance in group.items or []:
-                        compliance.description = None if not compliance.requirement else config.pcidss4.requirements.get(compliance.requirement, '')
+                        compliance.description = (
+                            None
+                            if not compliance.requirement
+                            else config.pcidss4.requirements.get(
+                                compliance.requirement, ""
+                            )
+                        )
                         pci4_items.append(compliance)
                     group.items = pci4_items
-                if config.pcidss3 and group.compliance == models.ComplianceName.PCI_DSS and group.version == '3.2.1':
+                if (
+                    config.pcidss3
+                    and group.compliance == models.ComplianceName.PCI_DSS
+                    and group.version == "3.2.1"
+                ):
                     pci3_items = []
                     for compliance in group.items or []:
-                        compliance.description = None if not compliance.requirement else config.pcidss3.requirements.get(compliance.requirement, '')
+                        compliance.description = (
+                            None
+                            if not compliance.requirement
+                            else config.pcidss3.requirements.get(
+                                compliance.requirement, ""
+                            )
+                        )
                         pci3_items.append(compliance)
                     group.items = pci3_items
-                if group.compliance in [models.ComplianceName.NIST_SP800_131A, models.ComplianceName.FIPS_140_2]:
+                if group.compliance in [
+                    models.ComplianceName.NIST_SP800_131A,
+                    models.ComplianceName.FIPS_140_2,
+                ]:
                     group.items = None
 
             if config.mitre_attack:
@@ -279,7 +343,9 @@ def latest_findings(
                             threat.technique_description = technique.description
                         for sub_technique in technique.sub_techniques or []:
                             if sub_technique.id == threat.sub_technique_id:
-                                threat.sub_technique_description = sub_technique.description
+                                threat.sub_technique_description = (
+                                    sub_technique.description
+                                )
 
             enriched_data.append(item)
         sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))  # type: ignore
@@ -292,23 +358,32 @@ def latest_findings(
     return
 
 
-@router.get("/reports",
-            response_model=list[models.ReportSummary],
-            response_model_exclude_unset=True,
-            response_model_exclude_none=True,
-            status_code=status.HTTP_200_OK,
-            responses={
-                204: {"description": "No scan data is present for this account"},
-                401: {"description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"},
-                403: {"description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"},
-                500: {"description": "An unhandled error occured during an AWS request for data access"},
-            },
-            tags=["Scan Reports"],
-            )
+@router.get(
+    "/reports",
+    response_model=list[models.ReportSummary],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Scan Reports"],
+)
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(kw["authorization"])["id"]
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"],
 )
 def retrieve_reports(
     request: Request,
@@ -319,7 +394,7 @@ def retrieve_reports(
     Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
     """
     if not authorization:
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     event = request.scope.get("aws.event", {})
@@ -330,39 +405,10 @@ def retrieve_reports(
     )
     if not authz.is_valid:
         response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers['WWW-Authenticate'] = 'HMAC realm="trivialscan"'
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
-    summaries = []
-    data = []
-    raw = None
-    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/summaries.json"  # type: ignore
-    try:
-        raw = services.aws.get_s3(path_key=object_key)
+    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+        return scanner_record.history
 
-    except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        internals.logger.exception(err)
-        return []
-
-    if not raw:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    cache_data = {}
-    summaries = json.loads(raw)
-    for item in summaries:
-        report = models.ReportSummary(**item)
-        if report.client_name in cache_data:
-            report.client = cache_data[report.client_name]
-            data.append(report)
-            continue
-        if report.client_name:
-            if client := models.Client(account=authz.account, name=report.client_name).load():  # type: ignore
-                report.client = client.client_info
-                cache_data[report.client_name] = client.client_info
-        data.append(report)
-
-    if not data:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    return data
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

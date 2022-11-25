@@ -18,26 +18,36 @@ JITTER_SECONDS = int(getenv("JITTER_SECONDS", "30"))
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
-ALLOWED_ORIGINS = [
-    "https://dev.trivialsec.com",
-    "http://localhost:5173",
-    "http://100.73.142.90:5173",
-] if APP_ENV == "Dev" else [
-    "https://www.trivialsec.com",
-]
-DASHBOARD_URL = "https://dev.trivialsec.com" if APP_ENV == "Dev" else "https://www.trivialsec.com"
+ALLOWED_ORIGINS = (
+    [
+        "https://dev.trivialsec.com",
+        "http://localhost:5173",
+        "http://100.73.142.90:5173",
+    ]
+    if APP_ENV == "Dev"
+    else [
+        "https://www.trivialsec.com",
+    ]
+)
+DASHBOARD_URL = (
+    "https://dev.trivialsec.com" if APP_ENV == "Dev" else "https://www.trivialsec.com"
+)
+AUTHZ_REALM = 'HMAC realm="trivialscan"'
+ERR_INVALID_AUTHORIZATION = "Invalid Authorization"
+
 logger = logging.getLogger()
 
+
 class HMAC:
-    default_algorithm = 'sha512'
+    default_algorithm = "sha512"
     supported_algorithms = {
-        'sha256': hashlib.sha256,
-        'sha384': hashlib.sha384,
-        'sha512': hashlib.sha512,
-        'sha3_256': hashlib.sha3_256,
-        'sha3_384': hashlib.sha3_384,
-        'sha3_512': hashlib.sha3_512,
-        'blake2b512': hashlib.blake2b,
+        "sha256": hashlib.sha256,
+        "sha384": hashlib.sha384,
+        "sha512": hashlib.sha512,
+        "sha3_256": hashlib.sha3_256,
+        "sha3_384": hashlib.sha3_384,
+        "sha3_512": hashlib.sha3_512,
+        "blake2b512": hashlib.blake2b,
     }
     server_mac: str
     parsed_header: dict = dict()
@@ -46,23 +56,23 @@ class HMAC:
 
     @property
     def scheme(self):
-        return self.parsed_header.get('scheme')
+        return self.parsed_header.get("scheme")
 
     @property
     def id(self):
-        return self.parsed_header.get('id')
+        return self.parsed_header.get("id")
 
     @property
     def sesh(self):
-        return self.parsed_header.get('sesh')
+        return self.parsed_header.get("sesh")
 
     @property
     def ts(self):
-        return int(self.parsed_header.get('ts'))  # type: ignore
+        return int(self.parsed_header.get("ts"))  # type: ignore
 
     @property
     def mac(self):
-        return self.parsed_header.get('mac')
+        return self.parsed_header.get("mac")
 
     @property
     def canonical_string(self) -> str:
@@ -75,18 +85,19 @@ class HMAC:
         bits.append(parsed_url.path)
         bits.append(str(self.ts))
         if self.raw:
-            bits.append(b64encode(self.raw.encode('utf8')).decode('utf8'))
+            bits.append(b64encode(self.raw.encode("utf8")).decode("utf8"))
         return "\n".join(bits)
 
-    def __init__(self,
-            authorization_header: str,
-            request_url: str,
-            method: str = "GET",
-            raw_body: Union[str, None] = None,  # type: ignore
-            algorithm: Union[str, None] = None,  # type: ignore
-            not_before_seconds: int = JITTER_SECONDS,
-            expire_after_seconds: int = JITTER_SECONDS,
-        ):
+    def __init__(
+        self,
+        authorization_header: str,
+        request_url: str,
+        method: str = "GET",
+        raw_body: Union[str, None] = None,  # type: ignore
+        algorithm: Union[str, None] = None,  # type: ignore
+        not_before_seconds: int = JITTER_SECONDS,
+        expire_after_seconds: int = JITTER_SECONDS,
+    ):
         self.authorization_header = authorization_header
         self.raw = raw_body
         self.request_method = method
@@ -96,11 +107,14 @@ class HMAC:
         self.algorithm = algorithm
         self._expire_after_seconds = expire_after_seconds
         self._not_before_seconds = not_before_seconds
-        from services.helpers import parse_authorization_header  # pylint: disable=import-outside-toplevel
+        from services.helpers import (
+            parse_authorization_header,
+        )  # pylint: disable=import-outside-toplevel
+
         self.parsed_header = parse_authorization_header(authorization_header)
 
     def is_valid_scheme(self) -> bool:
-        return self.authorization_header.startswith('HMAC')
+        return self.authorization_header.startswith("HMAC")
 
     def is_valid_timestamp(self) -> bool:
         # not_before prevents replay attacks
@@ -110,8 +124,12 @@ class HMAC:
         expire_after = now + timedelta(seconds=self._expire_after_seconds)
         # expire_after can assist with support for offline/aeroplane mode
         if compare_date < not_before or compare_date > expire_after:
-            logger.info(f'now {now} compare_date {compare_date} not_before {not_before} expire_after {expire_after}')
-            logger.info(f'compare_date < not_before {compare_date < not_before} compare_date > expire_after {compare_date > expire_after}')
+            logger.info(
+                f"now {now} compare_date {compare_date} not_before {not_before} expire_after {expire_after}"
+            )
+            logger.info(
+                f"compare_date < not_before {compare_date < not_before} compare_date > expire_after {compare_date > expire_after}"
+            )
             return False
         return True
 
@@ -123,14 +141,17 @@ class HMAC:
         """
         # In Python 3, if we have a bytes object, iterating it will already get the integer value
         def chk_bytes(val):
-            return ord(val if isinstance(val, (bytes, bytearray)) else val.encode('utf8'))
+            return ord(
+                val if isinstance(val, (bytes, bytearray)) else val.encode("utf8")
+            )
+
         result = 0
         for index, this in enumerate(values):
             if index == 0:  # first index has nothing to compare
                 continue
             # use the index variable i to locate prev
-            prev = values[index-1]
-            # Constant time string comparision, mitigates side channel attacks.
+            prev = values[index - 1]
+            # Constant time string comparison, mitigates side channel attacks.
             if len(prev) != len(this):
                 return False
             for _x, _y in zip(chk_bytes(prev), chk_bytes(this)):  # type: ignore
@@ -140,27 +161,33 @@ class HMAC:
     def validate(self, secret_key: str):
         if not self.is_valid_scheme():
             logger.error(
-                'incompatible authorization scheme, expected "Authorization: HMAC ..."')
+                'incompatible authorization scheme, expected "Authorization: HMAC ..."'
+            )
             return False
         if not self.is_valid_timestamp():
-            logger.error(f'jitter detected {self.ts}')
+            logger.error(f"jitter detected {self.ts}")
             return False
         if not self.supported_algorithms.get(self.algorithm):  # type: ignore
-            logger.error(f'algorithm {self.algorithm} is not supported')
+            logger.error(f"algorithm {self.algorithm} is not supported")
             return False
 
         digestmod = self.supported_algorithms.get(self.algorithm)  # type: ignore
         # Sign HMAC using server-side secret (not provided by client)
-        digest = hmac.new(secret_key.encode(
-            'utf8'), self.canonical_string.encode('utf8'), digestmod).hexdigest()  # type: ignore
+        digest = hmac.new(
+            secret_key.encode("utf8"), self.canonical_string.encode("utf8"), digestmod
+        ).hexdigest()  # type: ignore
         self.server_mac = digest
         # Compare server-side HMAC with client provided HMAC
         if invalid := not hmac.compare_digest(digest, self.mac):  # type: ignore
-            logger.error(f'server_mac {self.server_mac} canonical_string {self.canonical_string}')
+            logger.error(
+                f"server_mac {self.server_mac} canonical_string {self.canonical_string}"
+            )
         return not invalid
 
+
 class Authorization:
-    def __init__(self,
+    def __init__(
+        self,
         request: Request,
         user_agent: Union[str, None] = None,
         ip_addr: Union[IPvAnyAddress, None] = None,
@@ -171,9 +198,10 @@ class Authorization:
         raw_body: Union[str, None] = None,
     ):
         import models  # pylint: disable=import-outside-toplevel
+
         if postman_token := request.headers.get("Postman-Token"):
             logger.info(f"Postman-Token: {postman_token}")
-        if not raw_body and hasattr(request, '_body'):
+        if not raw_body and hasattr(request, "_body"):
             raw_body = request._body.decode("utf8")  # pylint: disable=protected-access
         self._hmac = HMAC(
             authorization_header=request.headers.get("Authorization"),
@@ -184,10 +212,20 @@ class Authorization:
             not_before_seconds=not_before_seconds,
             expire_after_seconds=expire_after_seconds,
         )
-        self.ip_addr = ip_addr if ip_addr else request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP"))
-        self.user_agent = user_agent if user_agent else request.headers.get("User-Agent")
+        self.ip_addr = (
+            ip_addr
+            if ip_addr
+            else request.headers.get(
+                "X-Forwarded-For", request.headers.get("X-Real-IP")
+            )
+        )
+        self.user_agent = (
+            user_agent if user_agent else request.headers.get("User-Agent")
+        )
         if not self.ip_addr:
-            logger.warning("IP Address not determined, potential conflict if not deliberate or is running locally")
+            logger.warning(
+                "IP Address not determined, potential conflict if not deliberate or is running locally"
+            )
 
         self.is_valid: bool = False
         self.account: Union[models.MemberAccount, None] = None
@@ -212,21 +250,34 @@ class Authorization:
                 logger.critical(f"DENY missing MemberProfile {self._hmac.id}")
                 return
             self.account = self.member.account  # type: ignore
-            logger.info(f'Session inputs; {self.member.email} | {ua.get_browser()} | {ua.get_os()} | {ua.get_device()}')
-            session_token = hashlib.sha224(bytes(f'{self.member.email}{ua.get_browser()}{ua.get_os()}{ua.get_device()}', 'ascii')).hexdigest()
-            logger.info(f"Session HMAC-based Authorization: session_token {session_token}")
+            logger.info(
+                f"Session inputs; {self.member.email} | {ua.get_browser()} | {ua.get_os()} | {ua.get_device()}"
+            )
+            session_token = hashlib.sha224(
+                bytes(
+                    f"{self.member.email}{ua.get_browser()}{ua.get_os()}{ua.get_device()}",
+                    "ascii",
+                )
+            ).hexdigest()
+            logger.info(
+                f"Session HMAC-based Authorization: session_token {session_token}"
+            )
             self.session = models.MemberSession(member=self.member, session_token=session_token).load()  # type: ignore
             if not self.session:
                 logger.critical(f"DENY missing MemberSession {self._hmac.id}")
                 return
             secret_key = self.session.access_token  # type: ignore
         elif account_name is None or self._hmac.id == account_name:
-            logger.info(f"Secret Key HMAC-based Authorization: account_name {account_name}")
+            logger.info(
+                f"Secret Key HMAC-based Authorization: account_name {account_name}"
+            )
             self.account = models.MemberAccount(name=self._hmac.id).load()  # type: ignore
             if self.account:
                 secret_key = self.account.api_key
         elif account_name:
-            logger.info(f"Client Token HMAC-based Authorization: client_name {self._hmac.id}")
+            logger.info(
+                f"Client Token HMAC-based Authorization: client_name {self._hmac.id}"
+            )
             self.client = models.Client(name=self._hmac.id).load(account_name=account_name)  # type: ignore
             if self.client:
                 self.account = self.client.account
