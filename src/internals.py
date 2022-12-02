@@ -22,7 +22,7 @@ ALLOWED_ORIGINS = (
     [
         "https://dev.trivialsec.com",
         "http://localhost:5173",
-        "http://100.73.142.90:5173",
+        "http://jager:5173",
     ]
     if APP_ENV == "Dev"
     else [
@@ -171,7 +171,7 @@ class HMAC:
             logger.error(f"algorithm {self.algorithm} is not supported")
             return False
 
-        digestmod = self.supported_algorithms.get(self.algorithm)  # type: ignore
+        digestmod = self.supported_algorithms.get(self.algorithm, self.default_algorithm)  # type: ignore
         # Sign HMAC using server-side secret (not provided by client)
         digest = hmac.new(
             secret_key.encode("utf8"), self.canonical_string.encode("utf8"), digestmod

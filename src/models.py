@@ -601,7 +601,7 @@ class MemberAccountRedacted(MemberAccount):
         return None
 
 
-class MemberProfile(BaseModel, DAL):
+class MemberProfile(BaseModel):
     account: Optional[MemberAccount]
     email: EmailStr
     email_md5: Optional[str]

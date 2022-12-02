@@ -9,7 +9,7 @@ import services.stripe
 
 router = APIRouter()
 
-@router.post("/stripe/webhook",
+@router.post("/webhook",
     status_code=status.HTTP_200_OK,
     include_in_schema=False,
 )

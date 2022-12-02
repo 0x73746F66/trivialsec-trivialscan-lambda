@@ -4,4 +4,4 @@ This is most commonly done using HTTPS, which uses the Transport Layer Security 
 
 By default, most servers still support outdated and known vulnerable protocols, typically for backwards compatibility with equally outdated web browser software
 
-This is known as an insecure default and could lead to trivial attacks against default or misconfigured servers
+This is known as an insecure default and could lead to trivial attacks against default or miss-configured servers
