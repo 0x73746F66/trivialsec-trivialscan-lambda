@@ -18,7 +18,7 @@ stages:
 swagger validation:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - pre-commit run swagger-validation --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
@@ -30,7 +30,7 @@ swagger validation:
 terraform validate:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - |+
@@ -47,7 +47,7 @@ terraform validate:
 sast docker:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - pre-commit run dockerfilelint --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
@@ -59,7 +59,7 @@ sast docker:
 sast black:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - pre-commit run black --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
@@ -71,7 +71,7 @@ sast black:
 sast flake8:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - pre-commit run flake8 --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
@@ -83,7 +83,7 @@ sast flake8:
 sast pylint:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - pre-commit run pylint --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
@@ -95,7 +95,7 @@ sast pylint:
 sca pip-audit:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - pre-commit run pip-audit --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
@@ -107,7 +107,7 @@ sca pip-audit:
 secrets scanning:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - |+
@@ -124,7 +124,7 @@ secrets scanning:
 repo checks:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   script:
     - echo $CI_COMMIT_MESSAGE > commit-msg.txt
     - pre-commit run conventional-pre-commit --hook-stage commit-msg --commit-msg-filename commit-msg.txt --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
@@ -142,7 +142,7 @@ repo checks:
 python syntax:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - |+
@@ -159,7 +159,7 @@ python syntax:
 whitespace:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - |+
@@ -176,7 +176,7 @@ whitespace:
 yaml json py linting:
   stage: tests
   tags:
-    - trivialscan
+    - jager
   allow_failure: true
   script:
     - |+
@@ -193,7 +193,7 @@ yaml json py linting:
 tf:plan:
   retry: 2
   tags:
-    - trivialscan
+    - jager
   stage: pre-deploy
   script:
     - make -B build init plan
@@ -214,7 +214,7 @@ tf:plan:
 tf:apply:
   retry: 2
   tags:
-    - trivialscan
+    - jager
   stage: deploy
   script:
     - make apply
@@ -235,7 +235,7 @@ tf:destroy:
   variables:
     GIT_STRATEGY: none
   tags:
-    - trivialscan
+    - jager
   script:
     - make destroy
   when: manual
