@@ -1,1 +1,1 @@
-This will lead to a communication channel establised over an insecure network connection
+This will lead to a communication channel established over an insecure network connection

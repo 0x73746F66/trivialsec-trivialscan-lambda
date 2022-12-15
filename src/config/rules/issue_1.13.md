@@ -4,4 +4,4 @@ They are used during the negotiation of security settings for a TLS/SSL connecti
 
 By default, most servers still support outdated and known vulnerable ciphers
 
-This is known as an insecure default and could lead to trivial attacks against default or misconfigured servers
+This is known as an insecure default and could lead to trivial attacks against default or miss-configured servers

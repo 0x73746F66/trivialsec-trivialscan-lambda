@@ -21,10 +21,8 @@ export TF_VAR_aws_secret_access_key=${TF_VAR_aws_secret_access_key:-$AWS_SECRET_
 aws sts get-caller-identity
 readonly default_env=Dev
 readonly default_name=$(id -nu)-$(cat /etc/hostname)
-readonly prod_api_url=$(aws ssm get-parameter --name "/Prod/trivialscan-lambda/trivialscan_lambda_url" --output text --with-decryption --query 'Parameter.Value' 2>/dev/null)
 export APP_ENV=${APP_ENV:-${default_env}}
 export APP_NAME=${APP_NAME:-${default_name}}
-export API_URL=${APP_URL:-${prod_api_url}}
 export TF_VAR_app_env=${APP_ENV}
 export TF_VAR_app_name=${APP_NAME}
 git fetch

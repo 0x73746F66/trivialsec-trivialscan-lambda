@@ -1,3 +1,3 @@
-The lack of any CAA records authorizes normal unrestricted issuance.
+The lack of any CAA records authorises normal unrestricted issuance.
 
-It is recommended that you create CAA records for your approved CAs to minimize business impact. With CAA, you can minimize the risk of certificate issuance by unauthorized CAs and help create a more secure and transparent online ecosystem.
+It is recommended that you create CAA records for your approved CAs to minimise business impact. With CAA, you can minimise the risk of certificate issuance by unauthorised CAs and help create a more secure and transparent online ecosystem.

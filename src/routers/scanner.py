@@ -233,6 +233,7 @@ async def queue_hostname(
                     hostname=hostname,
                     timestamp=round(time() * 1000),  # JavaScript support
                     http_paths=["/"],
+                    queued_by=authz.member.email,  # type: ignore
                 )
             )
     else:
@@ -243,6 +244,7 @@ async def queue_hostname(
                 hostname=hostname,
                 http_paths=["/"],
                 timestamp=round(time() * 1000),  # JavaScript support
+                queued_by=authz.member.email,  # type: ignore
             )
         )
     if changed:

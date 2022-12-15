@@ -40,15 +40,11 @@ router = APIRouter()
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda _, kw: services.helpers.parse_authorization_header(
         kw["authorization"]
-    )["id"]
-    + str(kw.get("return_details")),
+    )["id"],
 )
 def retrieve_hosts(
     request: Request,
     response: Response,
-    return_details: bool = Query(
-        default=False, description="Returns the full record for this hostname"
-    ),
     authorization: Union[str, None] = Header(default=None),
 ):
     """
@@ -129,7 +125,7 @@ def retrieve_host(
     ),
     last_updated: Union[datetime, None] = Query(
         default=None,
-        description="Return the result for specific date rather than the latest (default) Host information",
+        description="Return the result for specific date rather than the latest (default) Host information. Represented in ISO 8601 format; 2008-09-15T15:53:00+05:00",
     ),
     authorization: Union[str, None] = Header(default=None),
 ):

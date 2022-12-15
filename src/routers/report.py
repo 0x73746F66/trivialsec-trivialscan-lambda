@@ -270,18 +270,16 @@ async def store(
     if file.filename.endswith(".json"):
         data: dict = json.loads(contents.decode("utf8"))
     if isinstance(data, dict):
-        data["version"] = x_trivialscan_version
-        if data.get("config", {}).get("token"):
+        data["version"] = data.get("version", x_trivialscan_version)
+        if "token" in data.get("config", {}):
             del data["config"]["token"]
-        if data.get("config", {}).get("dashboard_api_url"):
+        if "dashboard_api_url" in data.get("config", {}):
             del data["config"]["dashboard_api_url"]
 
     if report_type is models.ReportType.REPORT:
-        report_id = token_urlsafe(56)
-        results_uri = f"/result/{report_id}/detail"
+        data["report_id"] = token_urlsafe(56)
+        data["results_uri"] = f'/result/{data["report_id"]}/detail'
         report = models.ReportSummary(
-            report_id=report_id,
-            results_uri=results_uri,
             type=models.ScanRecordType.SELF_MANAGED,
             category=models.ScanRecordCategory.RECONNAISSANCE,
             is_passive=True,
@@ -292,31 +290,23 @@ async def store(
             scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
         scanner_record.history.append(report)
         if scanner_record.save():
-            return {"results_uri": results_uri}
+            return {"results_uri": data["results_uri"]}
 
     if report_type is models.ReportType.EVALUATIONS:
-        report_id = file.filename.replace(".json", "")
-        scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
-        if not scanner_record:
-            response.status_code = status.HTTP_412_PRECONDITION_FAILED
-            return
-        _report = None
-        for summary in scanner_record.history:
-            if summary.report_id == report_id:
-                _report = summary
-        if not _report:
+        full_report = models.FullReport(**data)
+        if not full_report:
             response.status_code = status.HTTP_412_PRECONDITION_FAILED
             return
         items = []
-        certs = {}
+        certs = {cert.sha1_fingerprint: cert for cert in full_report.certificates}  # type: ignore
         for _item in data["evaluations"]:
             item = models.EvaluationItem(
-                generator=_report.generator,
-                version=_report.version,
+                generator=full_report.generator,
+                version=full_report.version,
                 account_name=authz.account.name,  # type: ignore
-                client_name=_report.client_name,
-                report_id=report_id,
-                observed_at=_report.date,
+                client_name=full_report.client_name,
+                report_id=full_report.report_id,
+                observed_at=full_report.date,
                 rule_id=_item["rule_id"],
                 group=_item["group"],
                 group_id=_item["group_id"],
@@ -353,32 +343,20 @@ async def store(
                 threats=[
                     models.ThreatItem(**threat) for threat in _item.get("threats", [])
                 ],
-                transport=models.HostTransport(**data["transport"]),
-                certificate=None
-                if not _item.get("certificate")
-                else models.Certificate(**_item["certificate"]),
+                transport=models.HostTransport(**_item["transport"]),
+                certificate=certs.get(_item.get("metadata", {}).get("sha1_fingerprint"))
+                if _item.get("group") == "certificate"
+                else None,
             )
-            if item.group == "certificate" and item.metadata.get("sha1_fingerprint"):
-                if item.metadata.get("sha1_fingerprint") not in certs:
-                    certs[item.metadata.get("sha1_fingerprint")] = models.Certificate(sha1_fingerprint=item.metadata.get("sha1_fingerprint")).load()  # type: ignore
-                item.certificate = certs[item.metadata.get("sha1_fingerprint")]
             items.append(item)
-        report = models.FullReport(**_report.dict())  # type: ignore
-        report.evaluations = items
-        if report.save():
-            return {"results_uri": f"/result/{report_id}/details"}
 
-    if report_type is models.ReportType.HOST:
-        report = models.Host(**data)  # type: ignore
-        if report.save():
-            return {
-                "results_uri": f"/host/{report.transport.hostname}/{report.transport.port}"
-            }
-
-    if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".json"):
-        report = models.Certificate(**data)  # type: ignore
-        if report.save():
-            return {"results_uri": f"/certificate/{report.sha1_fingerprint}"}
+        full_report.evaluations = items
+        if full_report.save():
+            for cert in certs.values():
+                cert.save()
+            for host in full_report.targets:  # type: ignore
+                host.save()
+            return {"results_uri": f"/result/{full_report.report_id}/details"}
 
     if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".pem"):
         sha1_fingerprint = file.filename.replace(".pem", "")
@@ -389,4 +367,3 @@ async def store(
             return {"results_uri": f"/certificate/{sha1_fingerprint}"}
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return

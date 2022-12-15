@@ -237,7 +237,10 @@ def load_descriptions(
             item.references.append(models.ReferenceItem(name=f"CVSSv3.1 {item.cvss3}", url=f"https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator?version=3.1&vector={item.cvss3}"))  # type: ignore
         if item.cve:
             for cve in item.cve:
-                item.references.append(models.ReferenceItem(name=cve, url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
+                item.references.append(models.ReferenceItem(name=cve.upper(), url=f"https://nvd.nist.gov/vuln/detail/{cve}"))  # type: ignore
+                gsd = cve.upper().replace("CVE", "GSD")
+                item.references.append(models.ReferenceItem(name=gsd, url=f"https://gsd.id/{gsd}"))  # type: ignore
+                item.references.append(models.ReferenceItem(name=gsd, type=models.ReferenceType.JSON, url=f"https://api.gsd.id/{gsd}"))  # type: ignore
         if not item.description:
             item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
 

@@ -2,4 +2,4 @@ The server sent a response header that prevents a document from loading any cros
 
 The default configuration when this is not sent allows the document to fetch cross-origin resources which leaves users' vulnerable to cross-site scripting (XSS) attacks.
 
-**Note** this feature has no impact where malicious actors have full contorl over client requests to simply ignore server response headers it does not want to process or adhere to.
+**Note** this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.

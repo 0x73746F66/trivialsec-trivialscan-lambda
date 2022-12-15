@@ -8,4 +8,4 @@ The added security is provided only if the user accessing the document is using 
 
 **Note:** Setting X-Frame-Options inside the [`<meta>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta) element is useless, `<meta http-equiv="X-Frame-Options" content="deny">` has no effect.
 
-**Note** this feature has no impact where malicious actors have full contorl over client requests to simply ignore server response headers it does not want to process or adhere to.
+**Note** this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.

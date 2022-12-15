@@ -1253,9 +1253,15 @@ class ThreatItem(BaseModel):
     data_source_description: Union[str, None] = Field(default=None)
 
 
+class ReferenceType(str, Enum):
+    WEBSITE = "website"
+    JSON = "json"
+
+
 class ReferenceItem(BaseModel):
     name: str
-    url: Union[AnyHttpUrl, None]
+    url: AnyHttpUrl
+    type: Optional[ReferenceType] = Field(default=ReferenceType.WEBSITE)
 
 
 class ScanRecordType(str, Enum):
@@ -1488,6 +1494,7 @@ class QueueHostname(BaseModel):
     hostname: str
     port: int = Field(default=443)
     http_paths: list[str]
+    queued_by: str
 
 
 class MonitorHostname(BaseModel):

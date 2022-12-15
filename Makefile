@@ -29,11 +29,6 @@ endif
 ifndef RUNNER_NAME
 RUNNER_NAME=$(shell basename $(shell pwd))
 endif
-ifndef API_URL
-API_HOSTNAME=localhost
-API_PORT=8080
-API_URL=http://${API_HOSTNAME}:${API_PORT}
-endif
 ifndef TEST_HOSTNAME
 TEST_HOSTNAME=jupiterbroadcasting.com
 endif
@@ -61,7 +56,6 @@ env:
 	@echo -e $(bold)$(primary)BUILD_ENV$(clear) = $(BUILD_ENV)
 	@echo -e $(bold)$(primary)APP_ENV$(clear) = $(APP_ENV)
 	@echo -e $(bold)$(primary)CI_BUILD_REF$(clear) = $(CI_BUILD_REF)
-	@echo -e $(bold)$(primary)API_URL$(clear) = $(API_URL)
 
 output: env init
 	@echo -e $(bold)$(primary)trivialscan_arn$(clear) = $(shell terraform -chdir=plans output trivialscan_arn)
@@ -108,25 +102,6 @@ unit-test: ## run unit tests with coverage
 
 run-local: env ## A local server interfacing with Lambda URL
 	(cd src; uvicorn app:app --reload --port 8080 --host 0.0.0.0)
-
-curl-check-token: _validate _validate_token ## GET /check-token
-	$(eval UNIX_TS := $(shell date +'%s'))
-	$(eval SIG := $(shell .${BUILD_ENV}/bin/sign-get /check-token $(UNIX_TS) ${API_HOSTNAME} ${API_PORT}))
-	@curl -s --compressed \
-	 --trace-ascii .${BUILD_ENV}/latest-req-headers.log \
-     --dump-header .${BUILD_ENV}/latest-resp-headers.log \
-	 -H "X-Trivialscan-Account: ${TRIVIALSCAN_ACCOUNT_NAME}" \
-	 -H "X-Trivialscan-Version: ${TRIVIALSCAN_CLI_VERSION}" \
-	 -H "Authorization: HMAC id=\"${TRIVIALSCAN_CLIENT_NAME}\", mac=\"$(SIG)\", ts=\"$(UNIX_TS)\"" \
-	"${API_URL}/check-token" | jq
-
-_validate_token:
-	@echo $(shell [ -z "${TRIVIALSCAN_TOKEN}" ] && echo -e $(err)TRIVIALSCAN_TOKEN missing$(clear) )
-_validate:
-	@echo $(shell [ -z "${BUILD_ENV}" ] && echo -e $(err)BUILD_ENV missing$(clear) )
-	@echo $(shell [ -z "${TRIVIALSCAN_CLIENT_NAME}" ] && echo -e $(err)TRIVIALSCAN_CLIENT_NAME missing$(clear) )
-	@echo $(shell [ -z "${TRIVIALSCAN_ACCOUNT_NAME}" ] && echo -e $(err)TRIVIALSCAN_ACCOUNT_NAME missing$(clear) )
-	@echo $(shell [ -z "${TRIVIALSCAN_CLI_VERSION}" ] && echo -e $(err)TRIVIALSCAN_CLI_VERSION missing$(clear) )
 
 local-runner: ## local setup for a gitlab runner
 	@docker volume create --name=gitlab-cache 2>/dev/null || true
