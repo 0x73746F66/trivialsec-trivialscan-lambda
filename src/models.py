@@ -704,7 +704,7 @@ class Client(BaseModel, DAL):
     ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
     user_agent: Union[str, None] = Field(default=None)
     timestamp: Optional[int]
-    active: bool = Field(default=False)
+    active: Optional[bool] = Field(default=False)
 
     def exists(
         self,

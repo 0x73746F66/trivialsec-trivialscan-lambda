@@ -18,6 +18,61 @@ router = APIRouter()
 
 
 @router.get(
+    "/reports",
+    response_model=list[models.ReportSummary],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No scan data is present for this account"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Scan Reports"],
+)
+@cachier(
+    stale_after=timedelta(seconds=30),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
+        kw["authorization"]
+    )["id"],
+)
+def retrieve_reports(
+    request: Request,
+    response: Response,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
+    """
+    if not authorization:
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
+        return
+
+    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+        return sorted(scanner_record.history, key=lambda x: x.date, reverse=True)  # type: ignore
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.get(
     "/summary/{report_id}",
     response_model=models.ReportSummary,
     response_model_exclude_unset=True,
@@ -279,10 +334,14 @@ async def store(
     if report_type is models.ReportType.REPORT:
         data["report_id"] = token_urlsafe(56)
         data["results_uri"] = f'/result/{data["report_id"]}/detail'
+        client_info = None
+        if client := models.Client(account=authz.account, name=data.get('client_name')).load():  # type: ignore
+            client_info = client.client_info
         report = models.ReportSummary(
             type=models.ScanRecordType.SELF_MANAGED,
             category=models.ScanRecordCategory.RECONNAISSANCE,
             is_passive=True,
+            client=client_info,
             **data,
         )
         scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
@@ -297,6 +356,9 @@ async def store(
         if not full_report:
             response.status_code = status.HTTP_412_PRECONDITION_FAILED
             return
+        if full_report.client_name:
+            if client := models.Client(account=authz.account, name=full_report.client_name).load():  # type: ignore
+                full_report.client = client.client_info
         items = []
         certs = {cert.sha1_fingerprint: cert for cert in full_report.certificates}  # type: ignore
         for _item in data["evaluations"]:
@@ -367,3 +429,59 @@ async def store(
             return {"results_uri": f"/certificate/{sha1_fingerprint}"}
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+@router.delete(
+    "/report/{report_id}",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Scan Reports"],
+)
+async def delete_report(
+    request: Request,
+    response: Response,
+    report_id: str,
+    authorization: Union[str, None] = Header(default=None),
+):
+    """
+    Deletes a specific ReportSummary within the ScannerRecord, the accompanying FullReport file, and eventually any aggregate evaluation records will be computed out also
+    (as they are triggered from the deleted report file)
+    """
+    if not authorization:
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    event = request.scope.get("aws.event", {})
+    authz = internals.Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+    )
+    if not authz.is_valid:
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
+        return
+
+    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+        found = False
+        history = []
+        for summary in scanner_record.history:
+            if summary.report_id == report_id:
+                found = True
+                continue
+            history.append(summary)
+        if found:
+            scanner_record.history = history
+            scanner_record.save()
+
+    if report := models.FullReport(report_id=report_id, account_name=authz.account.name).load():  # type: ignore
+        report.delete()
