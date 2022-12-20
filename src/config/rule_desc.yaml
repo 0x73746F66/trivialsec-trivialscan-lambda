@@ -101,7 +101,7 @@
     <p>If a connection is established and the TLS server was miss-configured the TLS connection should be distrusted as it may be compromised, ineffective at providing the intended security characteristics, or simply not meet the requirements for TLS which is designed to have a chain of trust that relies on Certificate issuers to follow the specification when issuing Certificates and also TLS servers configured per the specification.</p>
 "1.7":
   issue: |-
-    <p>A client Certificate was presented and Mutual Authentication (M/TLS) expected, if the presented client Certificate did not match the server sent subjects or the </p>
+    <p>A client Certificate was presented and Mutual Authentication (M/TLS) expected, if the presented client Certificate did not match the server sent subjects or the</p>
     <p>Certificate was not issued by a trusted Root Certificate Authority this connection attempt should not be considered secure.</p>
     <p>If a connection is established and the TLS server was miss-configured the TLS connection should be distrusted as it may be compromised, ineffetive at providing the intended security characteristics, or simply not meet the requirements for TLS which is designed to have a chain of trust that relies on Certificate issuers to follow the specification when issuing Certificates and also TLS servers configured per the specification.</p>
 "1.8":
@@ -374,7 +374,7 @@
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.14":
   issue: |-
-    <p>The Referrer-Policy HTTP header controls how much referrer information (sent with the Referer header) should be included with requests.</p>
+    <p>The Referrer-Policy HTTP header controls how much referrer information (sent with the Referrer header) should be included with requests.</p>
     <p>This policy will leak potentially-private information from HTTPS resource URLs to insecure origins. Carefully consider the impact of this setting.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.15":

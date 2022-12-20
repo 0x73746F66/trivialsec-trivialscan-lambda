@@ -1,6 +1,8 @@
+import json
 from os import getenv
 from enum import Enum
-from typing import Any
+from hashlib import sha256
+from typing import Any, Union
 
 import boto3
 from retry.api import retry
@@ -17,6 +19,7 @@ import internals
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
 ssm_client = boto3.client(service_name="ssm")
 s3_client = boto3.client(service_name="s3")
+sqs_client = boto3.client(service_name="sqs")
 
 
 class StorageClass(str, Enum):
@@ -288,6 +291,89 @@ def store_s3(
             raise RuntimeError(
                 "Platform is exhausted and unable to respond, please try again soon"
             ) from err
+        else:
+            internals.logger.exception(err)
+    return False
+
+
+def _message_attributes(data: dict):
+    attributes = {}
+    _defaults = {"DataType": "String", "StringValue": ""}
+    for key, item in data.items():
+        if item is None:
+            continue
+        attributes[key] = _defaults.copy()
+        if isinstance(item, (bool, int)):
+            attributes[key]["DataType"] = "Number"
+        if isinstance(item, bool):
+            attributes[key]["StringValue"] = "1" if item else "0"
+        elif isinstance(item, int):
+            attributes[key]["StringValue"] = str(item)
+        elif isinstance(item, str):
+            attributes[key]["StringValue"] = item
+        elif isinstance(item, list):
+            attributes[key]["StringValue"] = ",".join(
+                [str(_item) for _item in item if _item is not None]
+            )
+        elif isinstance(item, dict):
+            attributes[key]["StringValue"] = json.dumps(item, default=str)
+
+    return attributes
+
+
+@retry(
+    (
+        ConnectionClosedError,
+        ReadTimeoutError,
+        ConnectTimeoutError,
+        CapacityNotAvailableError,
+    ),
+    tries=3,
+    delay=1.5,
+    backoff=1,
+)
+def store_sqs(
+    queue_name: str,
+    message_body: str,
+    deduplicate: bool = False,
+    deduplication_id: Union[str, None] = None,
+    message_group_id: Union[str, None] = None,
+    **kwargs,
+) -> bool:
+    internals.logger.info(f"storing {queue_name} message {message_body}")
+    if queue_name.endswith(".fifo"):
+        if deduplicate and not deduplication_id:
+            deduplication_id = sha256(message_body.encode()).hexdigest()
+        if not message_group_id:
+            message_group_id = deduplication_id
+    try:
+        queue = sqs_client.get_queue_url(QueueName=queue_name)
+        if not queue.get("QueueUrl"):
+            internals.logger.error(f"no queue with name {queue_name}")
+            return False
+
+        params: dict[str, Any] = {
+            "QueueUrl": queue.get("QueueUrl"),
+            "MessageBody": message_body,
+        }
+        if kwargs:
+            params["MessageAttributes"] = _message_attributes({**kwargs})
+        if deduplicate:
+            params["MessageDeduplicationId"] = deduplication_id
+        if message_group_id:
+            params["MessageGroupId"] = message_group_id
+
+        response = sqs_client.send_message(**params)
+        return (
+            False
+            if not isinstance(response, dict)
+            else response.get("MessageId") is not None
+        )
+    except ClientError as err:
+        if err.response["Error"]["Code"] == "InvalidMessageContents":  # type: ignore
+            internals.logger.error(f"InvalidMessageContents: {message_body}")
+        elif err.response["Error"]["Code"] == "UnsupportedOperation":  # type: ignore
+            internals.logger.error(f"UnsupportedOperation: {err}")
         else:
             internals.logger.exception(err)
     return False

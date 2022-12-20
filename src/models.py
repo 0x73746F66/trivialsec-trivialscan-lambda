@@ -1083,7 +1083,7 @@ class Host(BaseModel, DAL):
     transport: HostTransport
     tls: Optional[HostTLS]
     http: Optional[list[HostHTTP]]
-    scanning_status: Union[dict[str, Any], None] = Field(default=None)
+    monitoring_enabled: Optional[bool] = Field(default=False)
 
     def exists(
         self,
@@ -1488,15 +1488,6 @@ class SearchResult(BaseModel):
     reports: Optional[list[str]]
 
 
-class QueueHostname(BaseModel):
-    timestamp: int
-    scan_timestamp: Union[int, None] = Field(default=None)
-    hostname: str
-    port: int = Field(default=443)
-    http_paths: list[str]
-    queued_by: str
-
-
 class MonitorHostname(BaseModel):
     hostname: str
     timestamp: int
@@ -1505,7 +1496,6 @@ class MonitorHostname(BaseModel):
 
 class ScannerRecord(BaseModel, DAL):
     account: MemberAccountRedacted
-    queue_targets: list[QueueHostname] = Field(default=[])
     monitored_targets: list[MonitorHostname] = Field(default=[])
     history: list[ReportSummary] = Field(default=[])
 

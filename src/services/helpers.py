@@ -185,28 +185,6 @@ def retrieve_ip_for_host(hostname: str) -> list[IPvAnyAddress]:
     return list(results)
 
 
-def host_scanning_status(
-    hostname: str,
-    scanner_record: models.ScannerRecord,
-) -> Union[dict[str, Any], None]:
-    response = {
-        "monitoring": False,
-        "queued_timestamp": None,
-        "queue_status": None,
-    }
-    for target in scanner_record.monitored_targets:
-        if target.hostname == hostname:
-            response["monitoring"] = target.enabled
-    for target in scanner_record.queue_targets:
-        if target.hostname == hostname:
-            response["queued_timestamp"] = target.timestamp
-            response["queue_status"] = "Queued"
-            if target.scan_timestamp:
-                response["queue_status"] = "Processing"
-
-    return response
-
-
 def load_descriptions(
     report: Union[models.FullReport, dict, None],
     evaluations: Union[list[Union[models.EvaluationItem, dict]], None] = None,

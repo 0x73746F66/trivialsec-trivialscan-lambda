@@ -155,13 +155,6 @@ async def search_hostname(
             if target.hostname in domain_map:
                 domain_map[target.hostname]["monitoring"] = target.enabled
 
-        for target in scanner_record.queue_targets:
-            if target.hostname in domain_map:
-                domain_map[target.hostname]["queued_timestamp"] = target.timestamp
-                domain_map[target.hostname]["queue_status"] = "Queued"
-                if target.scan_timestamp:
-                    domain_map[target.hostname]["queue_status"] = "Processing"
-
     results: list[models.SearchResult] = []
     for host, data in domain_map.items():
         results.append(

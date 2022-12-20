@@ -72,6 +72,7 @@ def retrieve_reports(
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
+
 @router.get(
     "/summary/{report_id}",
     response_model=models.ReportSummary,
@@ -191,11 +192,10 @@ def retrieve_full_report(
 
     report.evaluations = services.helpers.load_descriptions(report)
     scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
-    hosts = []
     for host in report.targets:  # type: ignore
-        host.scanning_status = services.helpers.host_scanning_status(host.transport.hostname, scanner_record)  # type: ignore
-        hosts.append(host)
-    report.targets = hosts
+        for target in scanner_record.monitored_targets:  # type: ignore
+            if target.hostname == host.transport.hostname:
+                host.monitoring_enabled = target.enabled
 
     return report
 
@@ -335,7 +335,7 @@ async def store(
         data["report_id"] = token_urlsafe(56)
         data["results_uri"] = f'/result/{data["report_id"]}/detail'
         client_info = None
-        if client := models.Client(account=authz.account, name=data.get('client_name')).load():  # type: ignore
+        if client := models.Client(account=authz.account, name=data.get("client_name")).load():  # type: ignore
             client_info = client.client_info
         report = models.ReportSummary(
             type=models.ScanRecordType.SELF_MANAGED,
@@ -429,6 +429,7 @@ async def store(
             return {"results_uri": f"/certificate/{sha1_fingerprint}"}
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
 
 @router.delete(
     "/report/{report_id}",

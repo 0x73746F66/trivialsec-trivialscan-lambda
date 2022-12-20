@@ -1,3 +1,4 @@
+import json
 from time import time
 from typing import Union
 
@@ -7,6 +8,7 @@ from starlette.requests import Request
 import internals
 import models
 import services.helpers
+import services.aws
 
 router = APIRouter()
 
@@ -178,7 +180,7 @@ async def deactivate_monitoring(
 
 @router.get(
     "/queue/{hostname}",
-    response_model=models.ScannerRecord,
+    response_model=bool,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -219,35 +221,20 @@ async def queue_hostname(
         response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
 
-    changed = False
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
-        found = False
-        for _host in scanner_record.queue_targets:
-            if _host.hostname == hostname:
-                found = True
-                break
-        if not found:
-            changed = True
-            scanner_record.queue_targets.append(
-                models.QueueHostname(
-                    hostname=hostname,
-                    timestamp=round(time() * 1000),  # JavaScript support
-                    http_paths=["/"],
-                    queued_by=authz.member.email,  # type: ignore
-                )
-            )
-    else:
-        changed = True
-        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
-        scanner_record.queue_targets.append(
-            models.QueueHostname(
-                hostname=hostname,
-                http_paths=["/"],
-                timestamp=round(time() * 1000),  # JavaScript support
-                queued_by=authz.member.email,  # type: ignore
-            )
-        )
-    if changed:
-        scanner_record.save()
-
-    return scanner_record
+    queue_name = f"{internals.APP_ENV.lower()}-reconnaissance"
+    return services.aws.store_sqs(
+        queue_name=queue_name,
+        message_body=json.dumps(
+            {
+                "hostname": hostname,
+                "port": 443,
+                "type": models.ScanRecordType.ONDEMAND,
+            },
+            default=str,
+        ),
+        deduplicate=False,
+        http_paths=["/"],
+        account=authz.account.name,  # type: ignore
+        queued_by=authz.member.email,  # type: ignore
+        queued_timestamp=round(time() * 1000),  # JavaScript support
+    )

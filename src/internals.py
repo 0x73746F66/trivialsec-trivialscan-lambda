@@ -14,7 +14,7 @@ from starlette.requests import Request
 from pydantic import IPvAnyAddress
 
 CACHE_DIR = getenv("CACHE_DIR", "/tmp")
-JITTER_SECONDS = int(getenv("JITTER_SECONDS", "30"))
+JITTER_SECONDS = int(getenv("JITTER_SECONDS", default="30"))
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
