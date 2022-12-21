@@ -51,6 +51,17 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
       "arn:aws:ssm:${local.aws_default_region}:${local.aws_master_account_id}:parameter/${var.app_env}/${var.app_name}/*",
     ]
   }
+  statement {
+    sid = "${var.app_env}TrivialScannerLambdaSQS"
+    actions   = [
+      "sqs:SendMessage",
+      "sqs:ChangeMessageVisibility",
+      "sqs:Get*",
+    ]
+    resources = [
+      data.terraform_remote_state.trivialscan_sqs.outputs.reconnaissance_queue_arn
+    ]
+  }
 }
 resource "aws_iam_role" "trivialscan_role" {
   name               = "${lower(var.app_env)}_trivialscan_api_lambda_role"
