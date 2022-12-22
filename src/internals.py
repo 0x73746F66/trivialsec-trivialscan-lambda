@@ -63,10 +63,6 @@ class HMAC:
         return self.parsed_header.get("id")
 
     @property
-    def sesh(self):
-        return self.parsed_header.get("sesh")
-
-    @property
     def ts(self):
         return int(self.parsed_header.get("ts"))  # type: ignore
 
@@ -278,10 +274,11 @@ class Authorization:
             logger.info(
                 f"Client Token HMAC-based Authorization: client_name {self._hmac.id}"
             )
-            self.client = models.Client(name=self._hmac.id).load(account_name=account_name)  # type: ignore
-            if self.client:
-                self.account = self.client.account
-                secret_key = self.client.access_token
+            if client := models.Client(name=self._hmac.id).load(account_name=account_name):  # type: ignore
+                self.client = client
+                self.account = client.account
+                if client.active:
+                    secret_key = self.client.access_token
         if not secret_key:
             logger.critical("Unhandled validation")
             return

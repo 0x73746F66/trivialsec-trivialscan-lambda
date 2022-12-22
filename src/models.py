@@ -722,6 +722,8 @@ class Client(BaseModel, DAL):
             self.name = client_name
         if account_name:
             self.account = MemberAccount(name=account_name).load()  # type: ignore
+        if not isinstance(self.account, MemberAccount):
+            return
         object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/client-tokens/{self.name}.json"  # type: ignore
         raw = services.aws.get_s3(path_key=object_key)
         if not raw:
@@ -885,18 +887,18 @@ class MemberSessionRedacted(MemberSession):
 
 
 class CheckToken(BaseModel):
-    version: Union[str, None] = Field(default=None)
-    session: Union[MemberSessionRedacted, None] = Field(default=None)
-    client: Union[ClientRedacted, None] = Field(default=None)
-    account: Union[MemberAccountRedacted, None] = Field(default=None)
-    member: Union[MemberProfileRedacted, None] = Field(default=None)
+    version: Optional[str]
+    session: Optional[MemberSessionRedacted]
+    client: Optional[ClientRedacted]
+    account: Optional[MemberAccountRedacted]
+    member: Optional[MemberProfileRedacted]
     authorisation_valid: bool = Field(
         default=False,
         title="HMAC Signature validation",
         description="Provides verifiable proof the client has possession of the Registration Token (without exposing/transmitting the token), using SHA256 hashing of the pertinent request information",
     )
-    ip_addr: Union[str, None] = Field(default=None, description="Source IP Address")
-    user_agent: Union[str, None] = Field(default=None, description="Source HTTP Client")
+    ip_addr: Optional[str] = Field(description="Source IP Address")
+    user_agent: Optional[str] = Field(description="Source HTTP Client")
 
 
 class SupportRequest(BaseModel):
@@ -1486,6 +1488,7 @@ class SearchResult(BaseModel):
     resolved_ip: Optional[list[IPvAnyAddress]]
     ports: Optional[list[int]]
     reports: Optional[list[str]]
+    scanned: Optional[bool] = Field(default=False)
 
 
 class MonitorHostname(BaseModel):

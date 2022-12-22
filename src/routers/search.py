@@ -157,6 +157,12 @@ async def search_hostname(
 
     results: list[models.SearchResult] = []
     for host, data in domain_map.items():
+        exists = False
+        for port in data.get("ports", [443]) or [443]:
+            if exists := services.aws.object_exists(
+                file_path=f"{internals.APP_ENV}/hosts/{host}/{port}/latest.json"
+            ):
+                break
         results.append(
             models.SearchResult(
                 ip_addr=data["ip_addr"],
@@ -172,6 +178,7 @@ async def search_hostname(
                 monitoring=data["monitoring"],
                 queue_status=data.get("queue_status"),
                 queued_timestamp=data.get("queued_timestamp"),
+                scanned=exists,
             )
         )  # type: ignore
 
