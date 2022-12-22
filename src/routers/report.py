@@ -374,7 +374,7 @@ async def store(
                 group_id=_item["group_id"],
                 key=_item["key"],
                 name=_item["name"],
-                result_value=_item["result_value"],
+                result_value=_item.get("result_value"),
                 result_label=_item["result_label"],
                 result_text=_item["result_text"],
                 result_level=_item["result_level"],
@@ -384,9 +384,9 @@ async def store(
                     config.get_rule_desc(f"{_item['rule_id']}.{_item['group_id']}"),
                 ),
                 metadata=_item.get("metadata", {}),
-                cve=_item.get("cve", []),
-                cvss2=_item.get("cvss2"),
-                cvss3=_item.get("cvss3"),
+                cve=_item.get("cve", []) or [],
+                cvss2=_item.get("cvss2", []) or [],
+                cvss3=_item.get("cvss3", []) or [],
                 references=[
                     models.ReferenceItem(name=ref["name"], url=ref["url"])
                     for ref in _item.get("references", []) or []
