@@ -306,6 +306,7 @@ async def revoke_session(
     status_code=status.HTTP_202_ACCEPTED,
     responses={
         400: {"description": "Not a valid email address"},
+        412: {"description": "The email address is not confirmed"},
         424: {"description": "The email address is not registered"},
         500: {
             "description": "An unhandled error occurred during an AWS request for data access"
@@ -342,6 +343,9 @@ async def magic_link(
     login_url = f"{internals.DASHBOARD_URL}/login/{magic_token}"
     try:
         if member := models.MemberProfile(email=data.email).load():
+            if not member.confirmed:
+                response.status_code = status.HTTP_412_PRECONDITION_FAILED
+                return
             sendgrid_message_id = None
             if not request.headers.get("Postman-Token"):
                 sendgrid = services.sendgrid.send_email(
