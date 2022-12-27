@@ -1543,3 +1543,8 @@ class ScannerRecord(BaseModel, DAL):
 class HostResponse(BaseModel):
     host: Host
     reports: list[ReportSummary]
+
+
+class CertificateResponse(BaseModel):
+    certificate: Certificate
+    reports: list[ReportSummary]

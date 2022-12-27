@@ -8,7 +8,7 @@ from mangum import Mangum
 import boto3
 
 import internals
-from routers import account, member, report, host, dashboard, stripe, scanner, search, client, sendgrid
+from routers import account, member, report, host, certificate, dashboard, stripe, scanner, search, client, sendgrid
 
 DEFAULT_LOG_LEVEL = "WARNING"
 LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
@@ -37,6 +37,7 @@ app.include_router(account.router)
 app.include_router(member.router)
 app.include_router(report.router)
 app.include_router(host.router)
+app.include_router(certificate.router, prefix='/certificate')
 app.include_router(stripe.router, include_in_schema=False, prefix='/stripe')
 app.include_router(dashboard.router)
 app.include_router(scanner.router, prefix='/scanner')
