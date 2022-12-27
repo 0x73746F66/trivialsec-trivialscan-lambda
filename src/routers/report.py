@@ -169,7 +169,7 @@ def retrieve_full_report(
     authorization: Union[str, None] = Header(default=None),
 ):
     """
-    Retrieves a full Trivial Scanner report for the provided report identiffier
+    Retrieves a full Trivial Scanner report for the provided report identifier
     """
     if not authorization:
         response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM

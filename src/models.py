@@ -1282,7 +1282,7 @@ class ScanRecordCategory(str, Enum):
 class ReportSummary(DefaultInfo):
     report_id: str
     project_name: Union[str, None]
-    targets: Optional[list[Host]] = Field(default=[])
+    targets: list[Host] = Field(default=[])
     date: Optional[datetime]
     execution_duration_seconds: Union[PositiveFloat, None] = Field(default=None)
     score: int = Field(default=0)
@@ -1538,3 +1538,8 @@ class ScannerRecord(BaseModel, DAL):
 
     def delete(self) -> bool:
         return services.aws.delete_s3(self.object_key)
+
+
+class HostResponse(BaseModel):
+    host: Host
+    reports: list[ReportSummary]

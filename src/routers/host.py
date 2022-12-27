@@ -88,7 +88,7 @@ def retrieve_hosts(
 
 @router.get(
     "/host/{hostname}",
-    response_model=models.Host,
+    response_model=models.HostResponse,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -170,10 +170,19 @@ def retrieve_host(
         ret = services.aws.get_s3(object_key)
         if not ret:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
+        host = models.Host(**json.loads(ret))
+        reports = []
+        if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+            for target in scanner_record.monitored_targets:  # type: ignore
+                if target.hostname == hostname:
+                    host.monitoring_enabled = target.enabled
+            for record in scanner_record.history:
+                for _host in record.targets:
+                    if _host.transport.hostname == hostname and _host.transport.port == port:
+                        reports.append(record)
 
-        return json.loads(ret)
+        return models.HostResponse(host=host, reports=sorted(reports, key=lambda x: x.date, reverse=True))  # type: ignore
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
-    return
