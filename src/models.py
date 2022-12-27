@@ -1543,6 +1543,8 @@ class ScannerRecord(BaseModel, DAL):
 class HostResponse(BaseModel):
     host: Host
     reports: list[ReportSummary]
+    versions: list[str]
+    external_refs: dict[str, Union[AnyHttpUrl, str]]
 
 
 class CertificateResponse(BaseModel):

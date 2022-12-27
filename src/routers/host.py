@@ -148,12 +148,21 @@ def retrieve_host(
         return
 
     prefix_key = path.join(internals.APP_ENV, "hosts", hostname)
+    versions = ["latest"]
+    matches = services.aws.list_s3(prefix_key=prefix_key)
+    for match in matches:
+        if match.endswith("latest.json"):
+            continue
+        _port, _, date = (
+            match.replace(".json", "").replace(f"{prefix_key}/", "").split("/")
+        )
+        versions.append(f"{_port}/{date}")
+
     if last_updated:
         object_key = None
         scan_date = last_updated.strftime("%Y%m%d")  # type: ignore
         if port:
             prefix_key = path.join(prefix_key, str(port))
-        matches = services.aws.list_s3(prefix_key=prefix_key)
         for match in matches:
             if match.endswith("latest.json"):
                 continue
@@ -166,6 +175,7 @@ def retrieve_host(
         if not port:
             port = 443
         object_key = path.join(prefix_key, str(port), "latest.json")
+
     try:
         ret = services.aws.get_s3(object_key)
         if not ret:
@@ -178,10 +188,48 @@ def retrieve_host(
                     host.monitoring_enabled = target.enabled
             for record in scanner_record.history:
                 for _host in record.targets:
-                    if _host.transport.hostname == hostname and _host.transport.port == port:
+                    if (
+                        _host.transport.hostname == hostname
+                        and _host.transport.port == port
+                    ):
                         reports.append(record)
 
-        return models.HostResponse(host=host, reports=sorted(reports, key=lambda x: x.date, reverse=True))  # type: ignore
+        return models.HostResponse(
+            host=host,
+            versions=versions,
+            reports=sorted(reports, key=lambda x: x.date, reverse=True),  # type: ignore
+            external_refs={
+                "AlienVault OTX": f"https://otx.alienvault.com/indicator/domain/{hostname}",
+                "HypeStat": f"https://hypestat.com/info/{hostname}",
+                "VirusTotal": f"https://www.virustotal.com/gui/domain/{hostname}/detection.json",
+                "Threat Intelligence Platform": f"https://threatintelligenceplatform.com/report/{hostname}",
+                "ViewDNS": f"https://viewdns.info/reversewhois/?q={hostname}",
+                "TrustScam": f"https://trustscam.com/{hostname}",
+                "URLScan": f"https://urlscan.io/search/#page.domain%3A{hostname}",
+                "Layered Domains App": f"https://dmns.app/domains?q={hostname}",
+                "Whoisology": f"https://whoisology.com/{hostname}",
+                "archive.org": f"http://web.archive.org/web/*/{hostname}",
+                "Google Cache": f"https://webcache.googleusercontent.com/search?q=cache:{hostname}",
+                "Shodan": f"https://www.shodan.io/domain/{hostname}",
+                "DomainIQ": f"https://www.domainiq.com/snapshot_history?data={hostname}",
+                "Moonsearch": f"https://moonsearch.com/report/{hostname}.html",
+                "BuiltWith": f"https://builtwith.com/{hostname}",
+                "DNSlytics": f"https://dnslytics.com/domain/{hostname}",
+                "Webmaster Tips": f"https://www.wmtips.com/tools/info/{hostname}",
+                "Robtex": f"https://www.robtex.com/dns-lookup/{hostname}",
+                "Domain Codex": f"https://www.domaincodex.com/search.php?q={hostname}",
+                "Website Informer": f"https://website.informer.com/{hostname}",
+                "Similarweb": f"https://www.similarweb.com/website/{hostname}/",
+                "Moz": f"https://moz.com/domain-analysis?site={hostname}",
+                "SpyFu": f"https://www.spyfu.com/overview/domain?query={hostname}",
+                "Linkody Backlinks": f"http://bc.linkody.com/en/seo-tools/free-backlink-checker/{hostname}",
+                "Censys": f"https://search.censys.io/search?resource=hosts&sort=RELEVANCE&per_page=100&virtual_hosts=INCLUDE&q={hostname}",
+                "SecurityTrails": f"https://securitytrails.com/list/apex_domain/{hostname}",
+                "Blacklight": f"https://themarkup.org/blacklight?url={hostname}",
+                "LeakIX": f"https://leakix.net/domain/{hostname}",
+                "Intelligence X": f"https://intelx.io/?s={hostname}",
+            },
+        )
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
