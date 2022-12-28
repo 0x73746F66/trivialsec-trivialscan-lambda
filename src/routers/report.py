@@ -7,6 +7,7 @@ from datetime import timedelta
 from fastapi import Header, APIRouter, Response, File, UploadFile, status
 from starlette.requests import Request
 from cachier import cachier
+from pusher import Pusher
 
 import internals
 import models
@@ -344,6 +345,50 @@ async def store(
 
         full_report.evaluations = items
         if full_report.save():
+            pusher_client = Pusher(
+                app_id=services.aws.get_ssm(
+                    f"/{internals.APP_ENV}/{internals.APP_NAME}/Pusher/app-id"
+                ),
+                key=services.aws.get_ssm(
+                    f"/{internals.APP_ENV}/{internals.APP_NAME}/Pusher/key"
+                ),
+                secret=services.aws.get_ssm(
+                    f"/{internals.APP_ENV}/{internals.APP_NAME}/Pusher/secret",
+                    WithDecryption=True,
+                ),
+                cluster="ap4",
+                ssl=True,
+                json_encoder=internals.JSONEncoder,
+            )
+            internals.logger.info("Push result")
+            pusher_client.trigger(
+                full_report.account_name,
+                "trivial-scanner-status",
+                {
+                    "status": "Complete",
+                    "client_name": full_report.client_name,
+                    "generator": full_report.generator,
+                    "version": full_report.version,
+                    "report_id": full_report.report_id,
+                    "targets": [
+                        {
+                            "transport": {
+                                "hostname": _target.transport.hostname,
+                                "port": _target.transport.port,
+                            }
+                        }
+                        for _target in full_report.targets
+                    ],
+                    "date": full_report.date,
+                    "results": full_report.results,
+                    "certificates": [cert.sha1_fingerprint for cert in full_report.certificates],  # type: ignore
+                    "results_uri": full_report.results_uri,
+                    "type": models.ScanRecordType.SELF_MANAGED,
+                    "category": models.ScanRecordCategory.RECONNAISSANCE,
+                    "is_passive": full_report.is_passive,
+                    "client": authz.client.client_info.dict(),  # type: ignore
+                },
+            )
             for cert in certs.values():
                 cert.save()
             for host in full_report.targets:  # type: ignore

@@ -27,3 +27,11 @@ variable "jitter_seconds" {
   type        = string
   default     = "10"
 }
+variable "pusher_app_id" {
+  description = "PUSHER_APP_ID"
+  type        = string
+}
+variable "pusher_key" {
+  description = "PUSHER_KEY"
+  type        = string
+}

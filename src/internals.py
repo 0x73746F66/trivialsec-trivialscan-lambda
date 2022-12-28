@@ -1,4 +1,5 @@
 # pylint: disable=line-too-long
+import json
 import logging
 import hmac
 import hashlib
@@ -7,11 +8,22 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from os import getenv
 from typing import Union
+from ipaddress import (
+    IPv4Address,
+    IPv6Address,
+)
 
 import validators
 from user_agents import parse as ua_parser
 from starlette.requests import Request
-from pydantic import IPvAnyAddress
+from pydantic import (
+    IPvAnyAddress,
+    AnyHttpUrl,
+    PositiveInt,
+    PositiveFloat,
+    EmailStr,
+)
+
 
 CACHE_DIR = getenv("CACHE_DIR", "/tmp")
 JITTER_SECONDS = int(getenv("JITTER_SECONDS", default="30"))
@@ -283,3 +295,31 @@ class Authorization:
             logger.critical("Unhandled validation")
             return
         self.is_valid = self._hmac.validate(secret_key)
+
+
+class JSONEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, datetime):
+            return o.isoformat()
+        if isinstance(
+            o,
+            (
+                PositiveInt,
+                PositiveFloat,
+            ),
+        ):
+            return int(o)
+        if isinstance(
+            o,
+            (
+                AnyHttpUrl,
+                IPv4Address,
+                IPv6Address,
+                EmailStr,
+            ),
+        ):
+            return str(o)
+        if hasattr(o, "dict"):
+            return json.dumps(o.dict(), cls=JSONEncoder)
+
+        return super().default(o)
