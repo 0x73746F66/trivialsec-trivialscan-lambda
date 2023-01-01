@@ -1,9 +1,7 @@
 import json
 from time import time
-from typing import Union
 
-from fastapi import Header, APIRouter, Response, status
-from starlette.requests import Request
+from fastapi import APIRouter, Response, status, Depends
 
 import internals
 import models
@@ -36,28 +34,13 @@ router = APIRouter()
     tags=["Scanner"],
 )
 async def enable_monitoring(
-    request: Request,
     response: Response,
     hostname: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Adds and enables host monitoring
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
     changed = False
     if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
         quotas = services.helpers.get_quotas(
@@ -121,28 +104,12 @@ async def enable_monitoring(
     tags=["Scanner"],
 )
 async def deactivate_monitoring(
-    request: Request,
-    response: Response,
     hostname: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Adds and enables host monitoring
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
     changed = False
     if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
         found = False
@@ -198,29 +165,12 @@ async def deactivate_monitoring(
     tags=["Scanner"],
 )
 async def queue_hostname(
-    request: Request,
-    response: Response,
     hostname: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Adds a host for on-demand scanning
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     queue_name = f"{internals.APP_ENV.lower()}-reconnaissance"
     return services.aws.store_sqs(
         queue_name=queue_name,

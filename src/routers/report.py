@@ -4,8 +4,7 @@ from secrets import token_urlsafe
 from typing import Union
 from datetime import timedelta
 
-from fastapi import Header, APIRouter, Response, File, UploadFile, status
-from starlette.requests import Request
+from fastapi import Header, APIRouter, Response, File, UploadFile, status, Depends
 from cachier import cachier
 from pusher import Pusher
 
@@ -41,33 +40,14 @@ router = APIRouter()
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"],
+    hash_params=lambda _, kw: kw["authz"].account.name,
 )
 def retrieve_reports(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
         return sorted(scanner_record.history, key=lambda x: x.date, reverse=True)  # type: ignore
 
@@ -97,34 +77,15 @@ def retrieve_reports(
 @cachier(
     stale_after=timedelta(hours=1),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"]
-    + kw.get("report_id"),
+    hash_params=lambda _, kw: kw["authz"].account.name + kw.get("report_id"),
 )
 def retrieve_summary(
-    request: Request,
-    response: Response,
     report_id: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a summary of a Trivial Scanner report for the provided report identifier
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
     if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
         for summary in scanner_record.history:
             if summary.report_id == report_id:
@@ -156,37 +117,18 @@ def retrieve_summary(
 @cachier(
     stale_after=timedelta(minutes=15),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"]
+    hash_params=lambda _, kw: kw["authz"].account.name
     + str(kw.get("report_id"))
     + str(kw.get("full_certs"))
     + str(kw.get("full_hosts")),
 )
 def retrieve_full_report(
-    request: Request,
-    response: Response,
     report_id: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a full Trivial Scanner report for the provided report identifier
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     report = models.FullReport(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
     if not report:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -219,16 +161,14 @@ def retrieve_full_report(
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Scan Reports"],
+    tags=["Scan Reports", "CLI"],
 )
 async def store(
-    request: Request,
     response: Response,
     report_type: models.ReportType,
-    files: list[UploadFile] = File(...),
-    authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
     x_trivialscan_version: Union[str, None] = Header(default=None),
+    files: list[UploadFile] = File(...),
 ):
     """
     Stores various client report data generated by Trivial Scanner CLI
@@ -236,23 +176,6 @@ async def store(
     file = files[0]
     data = {}
     contents = await file.read()
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-        account_name=x_trivialscan_account,
-        raw_body=contents.decode("utf8"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     if file.filename.endswith(".json"):
         data: dict = json.loads(contents.decode("utf8"))
     if isinstance(data, dict):
@@ -423,30 +346,13 @@ async def store(
     tags=["Scan Reports"],
 )
 async def delete_report(
-    request: Request,
-    response: Response,
     report_id: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Deletes a specific ReportSummary within the ScannerRecord, the accompanying FullReport file, and eventually any aggregate evaluation records will be computed out also
     (as they are triggered from the deleted report file)
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
         found = False
         history = []

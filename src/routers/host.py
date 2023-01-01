@@ -3,8 +3,7 @@ from os import path
 from typing import Union
 from datetime import datetime, timedelta
 
-from fastapi import Header, Query, APIRouter, Response, status
-from starlette.requests import Request
+from fastapi import Query, APIRouter, Response, status, Depends
 from cachier import cachier
 
 import internals
@@ -38,35 +37,16 @@ router = APIRouter()
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"],
+    hash_params=lambda _, kw: kw["authz"].account.name,
 )
 def retrieve_hosts(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a collection of your own Trivial Scanner reports, providing
     a distinct list of hosts and ports, optionally returning the latest host
     full record
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
     if not scanner_record:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -109,14 +89,11 @@ def retrieve_hosts(
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"]
+    hash_params=lambda _, kw: kw["authz"].account.name
     + str(kw.get("port", ""))
     + str(kw.get("last_updated", "")),
 )
 def retrieve_host(
-    request: Request,
     response: Response,
     hostname: str,
     port: Union[int, None] = Query(
@@ -127,26 +104,11 @@ def retrieve_host(
         default=None,
         description="Return the result for specific date rather than the latest (default) Host information. Represented in ISO 8601 format; 2008-09-15T15:53:00+05:00",
     ),
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves TLS data on any hostname, providing an optional port number
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     prefix_key = path.join(internals.APP_ENV, "hosts", hostname)
     versions = ["latest"]
     matches = services.aws.list_s3(prefix_key=prefix_key)

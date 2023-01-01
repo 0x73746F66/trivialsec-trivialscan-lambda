@@ -1,11 +1,9 @@
 import json
 import socket
-from typing import Union
 from datetime import datetime
 
-from fastapi import Header, APIRouter, Response, status
+from fastapi import APIRouter, Response, status, Depends
 from pydantic import IPvAnyAddress
-from starlette.requests import Request
 from tldextract.tldextract import TLDExtract
 
 import internals
@@ -37,29 +35,12 @@ router = APIRouter()
     tags=["Search"],
 )
 async def search_hostname(
-    request: Request,
-    response: Response,
     hostname: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Search matching hostname, returning exact matches and knowm (scanned, if any) subdomains
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     resolved_ip = services.helpers.retrieve_ip_for_host(hostname)
     if len(resolved_ip) == 0:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -206,29 +187,12 @@ async def search_hostname(
     tags=["Search"],
 )
 async def search_ipaddr(
-    request: Request,
-    response: Response,
     ip_addr: IPvAnyAddress,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Search matching hostname, returning exact matches and knowm (scanned, if any) subdomains
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     scans_map = {}
     prefix_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/results/"  # type: ignore
     matches = services.aws.list_s3(prefix_key=prefix_key)

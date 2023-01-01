@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from os import getenv
 from typing import Union
+from enum import Enum
 from ipaddress import (
     IPv4Address,
     IPv6Address,
@@ -16,6 +17,7 @@ from ipaddress import (
 import validators
 from user_agents import parse as ua_parser
 from starlette.requests import Request
+from fastapi import Header, HTTPException, status, File, UploadFile
 from pydantic import (
     IPvAnyAddress,
     AnyHttpUrl,
@@ -193,7 +195,91 @@ class HMAC:
         return not invalid
 
 
+class TokenTypes(str, Enum):
+    SESSION_TOKEN = "session_token"
+    CLIENT_TOKEN = "client_token"
+    SECRET_KEY = "secret_token"
+
+
+class AuthorizationRoute(str, Enum):
+    REPORT_STORE = "/report/store"
+    LIST_REPORTS = "/reports"
+    FULL_REPORT = "/report/"
+    REPORT_SUMMARY = "/summary/"
+    DASHBOARD_COMPLIANCE = "/dashboard/compliance"
+    DASHBOARD_CERTIFICATE_ISSUES = "/findings/certificate"
+    DASHBOARD_LATEST_ISSUES = "/findings/latest"
+    DASHBOARD_QUOTAS = "/dashboard/quotas"
+    SEARCH_HOST = "/search/host/"
+    SEARCH_IP = "/search/ip/"
+    CERTIFICATE_SHA1 = "/certificate/"
+    ENABLE_MONITOR = "/scanner/monitor/"
+    DEACTIVATE_MONITOR = "/scanner/deactivate/"
+    SCANNER_QUEUE = "/scanner/queue/"
+    VALIDATE = "/validate"
+    ME = "/me"
+    LIST_SESSIONS = "/sessions"
+    LIST_MEMBERS = "/members"
+    INVITE_MEMBER = "/member/invite"
+    DELETE_MEMBER = "/member/"
+    REVOKE_SESSION = "/revoke/"
+    MAGIC_LINK_LOGIN = "/magic-link/"
+    MAGIC_LINK_GENERATION = "/magic-link"
+    CHANGE_MEMBER_EMAIL = "/member/email"
+    ACCEPT_CHANGE_REQUEST = "/accept/"
+    LIST_HOSTS = "/hosts"
+    GET_HOST = "/host/"
+    LIST_CLIENTS = "/clients"
+    GET_CLIENT = "/client/"
+    CLAIM_CLIENT = "/claim/"
+    CLIENT_AUTH = "/auth/"
+    CLIENT_ACTIVATE = "/activate/"
+    CLIENT_DEACTIVATE = "/deactivate/"
+    SUPPORT = "/support"
+
+
 class Authorization:
+    client_allow: list[AuthorizationRoute] = [
+        AuthorizationRoute.REPORT_STORE,
+        AuthorizationRoute.VALIDATE,
+        AuthorizationRoute.CLAIM_CLIENT,
+        AuthorizationRoute.CLIENT_AUTH,
+    ]
+    session_allow: list[AuthorizationRoute] = [
+        AuthorizationRoute.LIST_REPORTS,
+        AuthorizationRoute.FULL_REPORT,
+        AuthorizationRoute.REPORT_SUMMARY,
+        AuthorizationRoute.DASHBOARD_COMPLIANCE,
+        AuthorizationRoute.DASHBOARD_QUOTAS,
+        AuthorizationRoute.DASHBOARD_CERTIFICATE_ISSUES,
+        AuthorizationRoute.DASHBOARD_LATEST_ISSUES,
+        AuthorizationRoute.SEARCH_HOST,
+        AuthorizationRoute.SEARCH_IP,
+        AuthorizationRoute.CERTIFICATE_SHA1,
+        AuthorizationRoute.ENABLE_MONITOR,
+        AuthorizationRoute.DEACTIVATE_MONITOR,
+        AuthorizationRoute.SCANNER_QUEUE,
+        AuthorizationRoute.ME,
+        AuthorizationRoute.CLAIM_CLIENT,
+        AuthorizationRoute.LIST_CLIENTS,
+        AuthorizationRoute.LIST_MEMBERS,
+        AuthorizationRoute.INVITE_MEMBER,
+        AuthorizationRoute.DELETE_MEMBER,
+        AuthorizationRoute.LIST_SESSIONS,
+        AuthorizationRoute.REVOKE_SESSION,
+        AuthorizationRoute.MAGIC_LINK_LOGIN,
+        AuthorizationRoute.MAGIC_LINK_GENERATION,
+        AuthorizationRoute.CHANGE_MEMBER_EMAIL,
+        AuthorizationRoute.ACCEPT_CHANGE_REQUEST,
+        AuthorizationRoute.LIST_HOSTS,
+        AuthorizationRoute.GET_HOST,
+        AuthorizationRoute.CLIENT_ACTIVATE,
+        AuthorizationRoute.CLIENT_DEACTIVATE,
+        AuthorizationRoute.GET_CLIENT,
+        AuthorizationRoute.SUPPORT,
+    ]
+    secret_allow: list[AuthorizationRoute] = []
+
     def __init__(
         self,
         request: Request,
@@ -207,10 +293,22 @@ class Authorization:
     ):
         import models  # pylint: disable=import-outside-toplevel
 
+        self.token_type: TokenTypes
+        self.route: AuthorizationRoute
+        self.is_valid: bool = False
+        self.is_authorized: bool = False
+        self.account: Union[models.MemberAccount, None] = None
+        self.session: Union[models.MemberSession, None] = None
+        self.client: Union[models.Client, None] = None
+        self.member: Union[models.MemberProfile, None] = None
+        self.ip_addr: Union[IPvAnyAddress, None] = None
+        self.user_agent: str
+
         if postman_token := request.headers.get("Postman-Token"):
             logger.info(f"Postman-Token: {postman_token}")
         if not raw_body and hasattr(request, "_body"):
             raw_body = request._body.decode("utf8")  # pylint: disable=protected-access
+
         self._hmac = HMAC(
             authorization_header=request.headers.get("Authorization"),
             request_url=str(request.url),
@@ -235,11 +333,6 @@ class Authorization:
                 "IP Address not determined, potential conflict if not deliberate or is running locally"
             )
 
-        self.is_valid: bool = False
-        self.account: Union[models.MemberAccount, None] = None
-        self.session: Union[models.MemberSession, None] = None
-        self.client: Union[models.Client, None] = None
-        self.member: Union[models.MemberProfile, None] = None
         logger.info(f"Authorization validation id {self._hmac.id}")
         secret_key = None
         if validators.email(self._hmac.id) is True:  # type: ignore
@@ -254,10 +347,13 @@ class Authorization:
                 logger.critical(f"DENY unrecognisable User-Agent {self.user_agent}")
                 return
             self.member = models.MemberProfile(email=self._hmac.id).load()
-            if not self.member:
+            if not isinstance(self.member, models.MemberProfile):
                 logger.critical(f"DENY missing MemberProfile {self._hmac.id}")
                 return
             self.account = self.member.account  # type: ignore
+            if not isinstance(self.account, models.MemberAccount):
+                logger.critical(f"DENY missing MemberAccount {self._hmac.id}")
+                return
             logger.info(
                 f"Session inputs; {self.member.email} | {ua.get_browser()} | {ua.get_os()} | {ua.get_device()}"
             )
@@ -268,33 +364,85 @@ class Authorization:
                 )
             ).hexdigest()
             logger.info(
-                f"Session HMAC-based Authorization: session_token {session_token}"
+                f"AUTH_FLOW Session HMAC-based Authorization: session_token {session_token}"
             )
             self.session = models.MemberSession(member=self.member, session_token=session_token).load()  # type: ignore
-            if not self.session:
+            if not isinstance(self.session, models.MemberSession):
                 logger.critical(f"DENY missing MemberSession {self._hmac.id}")
                 return
             secret_key = self.session.access_token  # type: ignore
+            self.token_type = TokenTypes.SESSION_TOKEN
         elif account_name is None or self._hmac.id == account_name:
             logger.info(
-                f"Secret Key HMAC-based Authorization: account_name {account_name}"
+                f"AUTH_FLOW Secret Key HMAC-based Authorization: account_name {account_name}"
             )
             self.account = models.MemberAccount(name=self._hmac.id).load()  # type: ignore
-            if self.account:
-                secret_key = self.account.api_key
+            if not isinstance(self.account, models.MemberAccount):
+                logger.critical(f"DENY missing MemberAccount {self._hmac.id}")
+                return
+            secret_key = self.account.api_key  # type: ignore pylint: disable=no-member
+            self.token_type = TokenTypes.SECRET_KEY
         elif account_name:
             logger.info(
-                f"Client Token HMAC-based Authorization: client_name {self._hmac.id}"
+                f"AUTH_FLOW Client Token HMAC-based Authorization: client_name {self._hmac.id}"
             )
-            if client := models.Client(name=self._hmac.id).load(account_name=account_name):  # type: ignore
-                self.client = client
-                self.account = client.account
-                if client.active:
-                    secret_key = self.client.access_token
+            self.client = models.Client(name=self._hmac.id).load(account_name=account_name)  # type: ignore
+            if not isinstance(self.client, models.Client):
+                logger.critical(f"DENY missing Client {self._hmac.id}")
+                return
+            self.account = self.client.account
+            if not isinstance(self.account, models.MemberAccount):
+                logger.critical(f"DENY missing MemberAccount {self._hmac.id}")
+            if self.client.active:
+                secret_key = self.client.access_token
+                self.token_type = TokenTypes.CLIENT_TOKEN
         if not secret_key:
             logger.critical("Unhandled validation")
             return
+
         self.is_valid = self._hmac.validate(secret_key)
+        self.is_authorized = self.is_valid and self.authorized(request.url.path)
+
+    def authorized(self, request_url_path: str) -> bool:
+        """
+        Based on the authentication type, what endpoints should be allowed
+        """
+        if self.token_type == TokenTypes.CLIENT_TOKEN:
+            for route in self.client_allow:
+                if request_url_path.startswith(route.value):
+                    self.route = route
+        if self.token_type == TokenTypes.SECRET_KEY:
+            for route in self.secret_allow:
+                if request_url_path.startswith(route.value):
+                    self.route = route
+        if self.token_type == TokenTypes.SESSION_TOKEN:
+            for route in self.session_allow:
+                if request_url_path.startswith(route.value):
+                    self.route = route
+
+        return isinstance(self.route, AuthorizationRoute)
+
+    def dict(self):
+        return {
+            "token_type": self.token_type,
+            "route": self.route,
+            "is_valid": self.is_valid,
+            "is_authorized": self.is_authorized,
+            "account": None
+            if not hasattr(self, "account") or not self.account
+            else self.account.dict(),
+            "session": None
+            if not hasattr(self, "session") or not self.session
+            else self.session.dict(),
+            "client": None
+            if not hasattr(self, "client") or not self.client
+            else self.client.dict(),
+            "member": None
+            if not hasattr(self, "member") or not self.member
+            else self.member.dict(),
+            "ip_addr": self.ip_addr,
+            "user_agent": self.user_agent,
+        }
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -323,3 +471,35 @@ class JSONEncoder(json.JSONEncoder):
             return json.dumps(o.dict(), cls=JSONEncoder)
 
         return super().default(o)
+
+
+async def auth_required(
+    request: Request,
+    authorization: str = Header(
+        alias="Authorization", title="HMAC-SHA512 Signed Request"
+    ),
+    x_trivialscan_account: Union[str, None] = Header(
+        default=None, alias="X-Trivialscan-Account", title="CLI Client Token hint"
+    ),
+):
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="",
+            headers={"WWW-Authenticate": AUTHZ_REALM},
+        )
+    event = request.scope.get("aws.event", {})
+    authz = Authorization(
+        request=request,
+        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+        account_name=x_trivialscan_account,
+    )
+    if not authz.is_authorized:
+        logger.error(ERR_INVALID_AUTHORIZATION)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="",
+            headers={"WWW-Authenticate": AUTHZ_REALM},
+        )
+    return authz

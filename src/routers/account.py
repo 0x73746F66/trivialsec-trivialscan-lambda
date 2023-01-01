@@ -3,9 +3,8 @@ import json
 from time import time
 from random import random
 from secrets import token_urlsafe
-from typing import Union
 
-from fastapi import Header, APIRouter, Response, status
+from fastapi import APIRouter, Response, status, Depends
 from starlette.requests import Request
 import validators
 
@@ -161,29 +160,13 @@ async def account_register(
     tags=["Member Account"],
 )
 async def support_request(
-    request: Request,
     response: Response,
     data: models.SupportRequest,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Generates a support request for the logged in member.
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        internals.logger.error(internals.ERR_INVALID_AUTHORIZATION)
-        return
     try:
         sendgrid = services.sendgrid.send_email(
             subject=f"Support | {data.subject}",
@@ -244,31 +227,15 @@ async def support_request(
     tags=["Member Account"],
 )
 async def update_billing_email(
-    request: Request,
     response: Response,
     data: models.EmailEditRequest,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Updates the billing email address for the logged in members account.
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
     if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        internals.logger.error(internals.ERR_INVALID_AUTHORIZATION)
         return
     try:
         sendgrid = services.sendgrid.send_email(
@@ -332,31 +299,15 @@ async def update_billing_email(
     tags=["Member Account"],
 )
 async def update_primary_email(
-    request: Request,
     response: Response,
     data: models.EmailEditRequest,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Updates the primary contact email address for the account.
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
     if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        internals.logger.error(internals.ERR_INVALID_AUTHORIZATION)
         return
     try:
         sendgrid = services.sendgrid.send_email(
@@ -414,29 +365,13 @@ async def update_primary_email(
     tags=["Member Account"],
 )
 async def update_account_display_name(
-    request: Request,
     response: Response,
     data: models.NameEditRequest,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Updates the display name for the account.
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        internals.logger.error(internals.ERR_INVALID_AUTHORIZATION)
-        return
     try:
         authz.account.display = data.name  # type: ignore
         if not authz.account.save() or not authz.account.update_members():  # type: ignore

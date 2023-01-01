@@ -1,10 +1,8 @@
 import json
 from os import path
-from typing import Union
 from datetime import timedelta
 
-from fastapi import Header, APIRouter, Response, status
-from starlette.requests import Request
+from fastapi import Depends, APIRouter, Response, status
 from cachier import cachier
 
 import internals
@@ -22,7 +20,9 @@ router = APIRouter()
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
-        204: {"description": "No Certificate using this SHA1 fingerprint found in our scan data"},
+        204: {
+            "description": "No Certificate using this SHA1 fingerprint found in our scan data"
+        },
         401: {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
         },
@@ -38,37 +38,19 @@ router = APIRouter()
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"]
+    hash_params=lambda _, kw: kw["authz"].account.name
     + kw.get("sha1_fingerprint")
     + str(kw.get("include_pem")),
 )
 def retrieve_certificate(
-    request: Request,
     response: Response,
     sha1_fingerprint: str,
     include_pem: bool = False,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves TLS Certificate data by SHA1 fingerprint, optionally provides the PEM encoded certificate
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     pem_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem")
     cert_key = path.join(internals.APP_ENV, "certificates", f"{sha1_fingerprint}.json")
     try:

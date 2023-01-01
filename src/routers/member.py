@@ -9,9 +9,8 @@ from secrets import token_urlsafe
 import geocoder
 import validators
 from user_agents import parse as ua_parser
-from fastapi import Header, APIRouter, Response, status
+from fastapi import Header, APIRouter, Response, status, Depends
 from starlette.requests import Request
-from pydantic import EmailStr
 from cachier import cachier
 
 import internals
@@ -35,29 +34,15 @@ router = APIRouter()
             "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
         },
     },
-    tags=["Debug"],
+    tags=["CLI"],
 )
 async def validate_authorization(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
     x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Checks registration status of the provided account name, client name, and access token (or API key)
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-        account_name=x_trivialscan_account,
-    )
     return {
         "version": x_trivialscan_version,
         "account": authz.account,
@@ -92,34 +77,14 @@ async def validate_authorization(
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"],
+    hash_params=lambda _, kw: kw["authz"].account.name,
 )
 def member_profile(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Return Member Profile for authorized user
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     authz.session.member.account.load_billing()  # type: ignore
     return authz.session
 
@@ -145,28 +110,11 @@ def member_profile(
     tags=["Member Profile"],
 )
 async def member_sessions(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Return active sessions for the current authorized user
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/{authz.member.email}/sessions/"  # type: ignore
     sessions: list[models.MemberSession] = []
     prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
@@ -206,33 +154,14 @@ async def member_sessions(
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"],
+    hash_params=lambda _, kw: kw["authz"].account.name,
 )
 def list_members(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Return registered members
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account.name}/members/"  # type: ignore
     members: list[models.MemberProfile] = []
     prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
@@ -272,28 +201,13 @@ def list_members(
     tags=["Member Profile"],
 )
 async def revoke_session(
-    request: Request,
     response: Response,
     session_token: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Revoke an active login session
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
     session = models.MemberSession(member=authz.member, session_token=session_token).load()  # type: ignore
     if not session:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -495,33 +409,18 @@ async def login(
     tags=["Member Profile"],
 )
 async def update_email(
-    request: Request,
     response: Response,
     data: models.EmailEditRequest,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Updates the login email address for the current logged in member.
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
     if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     if models.MemberProfile(email=data.email).exists():
         response.status_code = status.HTTP_409_CONFLICT
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_401_UNAUTHORIZED
         return
     try:
         token = hashlib.sha224(bytes(str(random()), "ascii")).hexdigest()
@@ -587,31 +486,16 @@ async def update_email(
     tags=["Member Profile"],
 )
 async def accept_token(
-    request: Request,
     response: Response,
     token: str,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Login for members with magic link emailed to them
     """
-    event = request.scope.get("aws.event", {})
-    ip_addr = (
-        event.get("requestContext", {})
-        .get("http", {})
-        .get(
-            "sourceIp",
-            request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")),
-        )
-    )
-    user_agent = (
-        event.get("requestContext", {})
-        .get("http", {})
-        .get("userAgent", request.headers.get("User-Agent"))
-    )
     try:
         link = models.AcceptEdit(accept_token=token).load()  # type: ignore
         if not link:
-            internals.logger.info(f'"","","{ip_addr}","{user_agent}",""')
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         _cls: models.DAL = getattr(models, link.change_model, None)  # type: ignore
         if not _cls:
@@ -659,31 +543,15 @@ async def accept_token(
     tags=["Member Profile"],
 )
 async def send_member_invitation(
-    request: Request,
     response: Response,
     data: models.MemberInvitationRequest,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Invites a member to join the organisation
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
     if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        internals.logger.error(internals.ERR_INVALID_AUTHORIZATION)
         return
     try:
         if models.MemberProfile(email=data.email).exists():
@@ -757,30 +625,15 @@ async def send_member_invitation(
     tags=["Member Profile"],
 )
 async def delete_member(
-    request: Request,
     response: Response,
     email: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Deletes a specific MemberProfile within the same account as the authorized requester
     """
     if validators.email(email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
         return
     member = models.MemberProfile(email=email).load()
     if not member:

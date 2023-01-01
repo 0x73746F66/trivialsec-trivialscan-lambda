@@ -653,7 +653,7 @@ class MemberProfile(BaseModel):
         return self
 
     def save(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"  # type: ignore
+        object_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/profile.json"  # type: ignore pylint: disable=no-member
         return services.aws.store_s3(
             object_key,
             json.dumps(self.dict(), default=str),
@@ -661,7 +661,7 @@ class MemberProfile(BaseModel):
         )
 
     def delete(self) -> bool:
-        prefix_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/"  # type: ignore
+        prefix_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/"  # type: ignore pylint: disable=no-member
         prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
         if len(prefix_matches) == 0:
             return False
@@ -934,7 +934,7 @@ class Support(SupportRequest, DAL):
             for e in "-".join(self.subject.split()).replace("/", "-").lower()
             if e.isalnum() or e == "-"
         )
-        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore pylint: disable=no-member
         raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing Support {object_key}")
@@ -956,7 +956,7 @@ class Support(SupportRequest, DAL):
             for e in "-".join(self.subject.split()).replace("/", "-").lower()
             if e.isalnum() or e == "-"
         )
-        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore pylint: disable=no-member
         return services.aws.store_s3(object_key, json.dumps(self.dict(), default=str))
 
     def delete(self) -> bool:
@@ -965,7 +965,7 @@ class Support(SupportRequest, DAL):
             for e in "-".join(self.subject.split()).replace("/", "-").lower()
             if e.isalnum() or e == "-"
         )
-        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore
+        object_key = f"{internals.APP_ENV}/accounts/{self.member.account.name}/members/{self.member.email}/support/{clean_subject}.json"  # type: ignore pylint: disable=no-member
         return services.aws.delete_s3(object_key)
 
 
