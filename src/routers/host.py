@@ -90,6 +90,7 @@ def retrieve_hosts(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda _, kw: kw["authz"].account.name
+    + str(kw.get("hostname", ""))
     + str(kw.get("port", ""))
     + str(kw.get("last_updated", "")),
 )
