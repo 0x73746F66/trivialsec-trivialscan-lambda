@@ -277,9 +277,9 @@ class Authorization:
         AuthorizationRoute.CLIENT_DEACTIVATE,
         AuthorizationRoute.GET_CLIENT,
         AuthorizationRoute.SUPPORT,
+        AuthorizationRoute.CLAIM_CLIENT,
     ]
     secret_allow: list[AuthorizationRoute] = [
-        AuthorizationRoute.CLAIM_CLIENT,
     ]
 
     def __init__(
