@@ -3,7 +3,7 @@ import json
 import logging
 import hmac
 import hashlib
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from os import getenv
@@ -48,6 +48,7 @@ DASHBOARD_URL = (
 )
 AUTHZ_REALM = 'HMAC realm="trivialscan"'
 ERR_INVALID_AUTHORIZATION = "Invalid Authorization"
+ERR_MISSING_AUTHORIZATION = "Missing Authorization header"
 
 logger = logging.getLogger()
 
@@ -63,26 +64,24 @@ class HMAC:
         "sha3_512": hashlib.sha3_512,
         "blake2b512": hashlib.blake2b,
     }
-    server_mac: str
-    parsed_header: dict = dict()
     _not_before_seconds: int = JITTER_SECONDS
     _expire_after_seconds: int = JITTER_SECONDS
 
     @property
-    def scheme(self):
-        return self.parsed_header.get("scheme")
+    def scheme(self) -> Union[str, None]:
+        return None if not hasattr(self, 'parsed_header') else self.parsed_header.get("scheme")
 
     @property
-    def id(self):
-        return self.parsed_header.get("id")
+    def id(self) -> Union[str, None]:
+        return None if not hasattr(self, 'parsed_header') else self.parsed_header.get("id")
 
     @property
-    def ts(self):
-        return int(self.parsed_header.get("ts"))  # type: ignore
+    def ts(self) -> Union[int, None]:
+        return None if not hasattr(self, 'parsed_header') else int(self.parsed_header.get("ts"))  # type: ignore
 
     @property
-    def mac(self):
-        return self.parsed_header.get("mac")
+    def mac(self) -> Union[str, None]:
+        return None if not hasattr(self, 'parsed_header') else self.parsed_header.get("mac")
 
     @property
     def canonical_string(self) -> str:
@@ -94,8 +93,8 @@ class HMAC:
         bits.append(str(port))
         bits.append(parsed_url.path)
         bits.append(str(self.ts))
-        if self.raw:
-            bits.append(b64encode(self.raw.encode("utf8")).decode("utf8"))
+        if self.contents:
+            bits.append(b64encode(self.contents.encode("utf8")).decode("utf8"))
         return "\n".join(bits)
 
     def __init__(
@@ -108,27 +107,25 @@ class HMAC:
         not_before_seconds: int = JITTER_SECONDS,
         expire_after_seconds: int = JITTER_SECONDS,
     ):
-        self.authorization_header = authorization_header
-        self.raw = raw_body
-        self.request_method = method
-        self.request_url = request_url
-        if not self.supported_algorithms.get(algorithm):  # type: ignore
-            algorithm = self.default_algorithm
-        self.algorithm = algorithm
-        self._expire_after_seconds = expire_after_seconds
-        self._not_before_seconds = not_before_seconds
+        self.server_mac: str = ""
+        self.authorization_header: str = authorization_header
+        self.contents = raw_body
+        self.request_method: str = method
+        self.request_url: str = request_url
+        self.algorithm: str = self.default_algorithm if not self.supported_algorithms.get(algorithm) else algorithm  # type: ignore
+        self._expire_after_seconds: int = expire_after_seconds
+        self._not_before_seconds: int = not_before_seconds
         from services.helpers import (
             parse_authorization_header,
         )  # pylint: disable=import-outside-toplevel
-
-        self.parsed_header = parse_authorization_header(authorization_header)
+        self.parsed_header: dict[str, str] = parse_authorization_header(authorization_header)
 
     def is_valid_scheme(self) -> bool:
         return self.authorization_header.startswith("HMAC")
 
     def is_valid_timestamp(self) -> bool:
         # not_before prevents replay attacks
-        compare_date = datetime.fromtimestamp(self.ts, tz=timezone.utc)
+        compare_date = datetime.fromtimestamp(float(self.ts), tz=timezone.utc)  # type: ignore
         now = datetime.now(tz=timezone.utc)
         not_before = now - timedelta(seconds=self._not_before_seconds)
         expire_after = now + timedelta(seconds=self._expire_after_seconds)
@@ -202,7 +199,9 @@ class TokenTypes(str, Enum):
 
 
 class AuthorizationRoute(str, Enum):
-    REPORT_STORE = "/report/store"
+    STORE_SUMMARY = "/store/report"
+    STORE_REPORT = "/store/evaluations"
+    STORE_CERTIFICATE = "/store/certificate"
     LIST_REPORTS = "/reports"
     FULL_REPORT = "/report/"
     REPORT_SUMMARY = "/summary/"
@@ -240,7 +239,9 @@ class AuthorizationRoute(str, Enum):
 
 class Authorization:
     client_allow: list[AuthorizationRoute] = [
-        AuthorizationRoute.REPORT_STORE,
+        AuthorizationRoute.STORE_SUMMARY,
+        AuthorizationRoute.STORE_REPORT,
+        AuthorizationRoute.STORE_CERTIFICATE,
         AuthorizationRoute.VALIDATE,
         AuthorizationRoute.CLAIM_CLIENT,
         AuthorizationRoute.CLIENT_AUTH,
@@ -260,7 +261,6 @@ class Authorization:
         AuthorizationRoute.DEACTIVATE_MONITOR,
         AuthorizationRoute.SCANNER_QUEUE,
         AuthorizationRoute.ME,
-        AuthorizationRoute.CLAIM_CLIENT,
         AuthorizationRoute.LIST_CLIENTS,
         AuthorizationRoute.LIST_MEMBERS,
         AuthorizationRoute.INVITE_MEMBER,
@@ -278,7 +278,9 @@ class Authorization:
         AuthorizationRoute.GET_CLIENT,
         AuthorizationRoute.SUPPORT,
     ]
-    secret_allow: list[AuthorizationRoute] = []
+    secret_allow: list[AuthorizationRoute] = [
+        AuthorizationRoute.CLAIM_CLIENT,
+    ]
 
     def __init__(
         self,
@@ -292,7 +294,7 @@ class Authorization:
         raw_body: Union[str, None] = None,
     ):
         import models  # pylint: disable=import-outside-toplevel
-
+        self.hmac: HMAC
         self.token_type: TokenTypes
         self.route: AuthorizationRoute
         self.is_valid: bool = False
@@ -306,10 +308,8 @@ class Authorization:
 
         if postman_token := request.headers.get("Postman-Token"):
             logger.info(f"Postman-Token: {postman_token}")
-        if not raw_body and hasattr(request, "_body"):
-            raw_body = request._body.decode("utf8")  # pylint: disable=protected-access
 
-        self._hmac = HMAC(
+        self.hmac = HMAC(
             authorization_header=request.headers.get("Authorization"),
             request_url=str(request.url),
             method=request.method.upper(),
@@ -333,9 +333,9 @@ class Authorization:
                 "IP Address not determined, potential conflict if not deliberate or is running locally"
             )
 
-        logger.info(f"Authorization validation id {self._hmac.id}")
+        logger.info(f"Authorization validation id {self.hmac.id}")
         secret_key = None
-        if validators.email(self._hmac.id) is True:  # type: ignore
+        if validators.email(self.hmac.id) is True:  # type: ignore
             if not self.user_agent:
                 logger.critical("Missing User-Agent")
                 return
@@ -346,13 +346,13 @@ class Authorization:
             if not any([ua.is_mobile, ua.is_tablet, ua.is_pc]) and not postman_token:
                 logger.critical(f"DENY unrecognisable User-Agent {self.user_agent}")
                 return
-            self.member = models.MemberProfile(email=self._hmac.id).load()
+            self.member = models.MemberProfile(email=self.hmac.id).load()
             if not isinstance(self.member, models.MemberProfile):
-                logger.critical(f"DENY missing MemberProfile {self._hmac.id}")
+                logger.critical(f"DENY missing MemberProfile {self.hmac.id}")
                 return
             self.account = self.member.account  # type: ignore
             if not isinstance(self.account, models.MemberAccount):
-                logger.critical(f"DENY missing MemberAccount {self._hmac.id}")
+                logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
                 return
             logger.info(
                 f"Session inputs; {self.member.email} | {ua.get_browser()} | {ua.get_os()} | {ua.get_device()}"
@@ -368,31 +368,31 @@ class Authorization:
             )
             self.session = models.MemberSession(member=self.member, session_token=session_token).load()  # type: ignore
             if not isinstance(self.session, models.MemberSession):
-                logger.critical(f"DENY missing MemberSession {self._hmac.id}")
+                logger.critical(f"DENY missing MemberSession {self.hmac.id}")
                 return
             secret_key = self.session.access_token  # type: ignore
             self.token_type = TokenTypes.SESSION_TOKEN
-        elif account_name is None or self._hmac.id == account_name:
+        elif account_name is None or self.hmac.id == account_name:
             logger.info(
                 f"AUTH_FLOW Secret Key HMAC-based Authorization: account_name {account_name}"
             )
-            self.account = models.MemberAccount(name=self._hmac.id).load()  # type: ignore
+            self.account = models.MemberAccount(name=self.hmac.id).load()  # type: ignore
             if not isinstance(self.account, models.MemberAccount):
-                logger.critical(f"DENY missing MemberAccount {self._hmac.id}")
+                logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
                 return
             secret_key = self.account.api_key  # type: ignore pylint: disable=no-member
             self.token_type = TokenTypes.SECRET_KEY
         elif account_name:
             logger.info(
-                f"AUTH_FLOW Client Token HMAC-based Authorization: client_name {self._hmac.id}"
+                f"AUTH_FLOW Client Token HMAC-based Authorization: client_name {self.hmac.id}"
             )
-            self.client = models.Client(name=self._hmac.id).load(account_name=account_name)  # type: ignore
+            self.client = models.Client(name=self.hmac.id).load(account_name=account_name)  # type: ignore
             if not isinstance(self.client, models.Client):
-                logger.critical(f"DENY missing Client {self._hmac.id}")
+                logger.critical(f"DENY missing Client {self.hmac.id}")
                 return
             self.account = self.client.account
             if not isinstance(self.account, models.MemberAccount):
-                logger.critical(f"DENY missing MemberAccount {self._hmac.id}")
+                logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
             if self.client.active:
                 secret_key = self.client.access_token
                 self.token_type = TokenTypes.CLIENT_TOKEN
@@ -400,7 +400,8 @@ class Authorization:
             logger.critical("Unhandled validation")
             return
 
-        self.is_valid = self._hmac.validate(secret_key)
+        self.is_valid = self.hmac.validate(secret_key)
+        logger.info(f"is_valid {self.is_valid}")
         self.is_authorized = self.is_valid and self.authorized(request.url.path)
 
     def authorized(self, request_url_path: str) -> bool:
@@ -408,19 +409,25 @@ class Authorization:
         Based on the authentication type, what endpoints should be allowed
         """
         if self.token_type == TokenTypes.CLIENT_TOKEN:
+            logger.info(f"request_url_path {request_url_path}")
             for route in self.client_allow:
+                logger.info(f"startswith {route.value}")
                 if request_url_path.startswith(route.value):
+                    logger.info("break")
                     self.route = route
+                    break
         if self.token_type == TokenTypes.SECRET_KEY:
             for route in self.secret_allow:
                 if request_url_path.startswith(route.value):
                     self.route = route
+                    break
         if self.token_type == TokenTypes.SESSION_TOKEN:
             for route in self.session_allow:
                 if request_url_path.startswith(route.value):
                     self.route = route
+                    break
 
-        return isinstance(self.route, AuthorizationRoute)
+        return hasattr(self, 'route') and isinstance(self.route, AuthorizationRoute)
 
     def dict(self):
         return {
@@ -473,6 +480,23 @@ class JSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
+async def get_contents(
+    request: Request,
+    raw_body: Union[str, None] = None,
+) -> Union[str, None]:
+    if not raw_body and hasattr(request, 'form'):
+        if form := await request.form():
+            if upload := form.get("files"):
+                raw_body = upload.file.read().decode()
+                upload.file.seek(0)
+    if not raw_body and hasattr(request, "_body"):
+        raw_body = request._body.decode("utf8")  # pylint: disable=protected-access
+    if not raw_body:
+        if event := request.scope.get("aws.event", {}):
+            raw_body = b64decode(event.get("body", '')).decode() if event.get("isBase64Encoded") else event.get("body")
+
+    return raw_body
+
 async def auth_required(
     request: Request,
     authorization: str = Header(
@@ -485,21 +509,23 @@ async def auth_required(
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="",
+            detail=ERR_MISSING_AUTHORIZATION,
             headers={"WWW-Authenticate": AUTHZ_REALM},
         )
     event = request.scope.get("aws.event", {})
+    raw_body = await get_contents(request)
     authz = Authorization(
         request=request,
         user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
         ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
         account_name=x_trivialscan_account,
+        raw_body=raw_body
     )
     if not authz.is_authorized:
         logger.error(ERR_INVALID_AUTHORIZATION)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="",
+            detail=ERR_INVALID_AUTHORIZATION,
             headers={"WWW-Authenticate": AUTHZ_REALM},
         )
     return authz
