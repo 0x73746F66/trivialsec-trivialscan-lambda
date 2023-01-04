@@ -69,19 +69,29 @@ class HMAC:
 
     @property
     def scheme(self) -> Union[str, None]:
-        return None if not hasattr(self, 'parsed_header') else self.parsed_header.get("scheme")
+        return (
+            None
+            if not hasattr(self, "parsed_header")
+            else self.parsed_header.get("scheme")
+        )
 
     @property
     def id(self) -> Union[str, None]:
-        return None if not hasattr(self, 'parsed_header') else self.parsed_header.get("id")
+        return (
+            None if not hasattr(self, "parsed_header") else self.parsed_header.get("id")
+        )
 
     @property
     def ts(self) -> Union[int, None]:
-        return None if not hasattr(self, 'parsed_header') else int(self.parsed_header.get("ts"))  # type: ignore
+        return None if not hasattr(self, "parsed_header") else int(self.parsed_header.get("ts"))  # type: ignore
 
     @property
     def mac(self) -> Union[str, None]:
-        return None if not hasattr(self, 'parsed_header') else self.parsed_header.get("mac")
+        return (
+            None
+            if not hasattr(self, "parsed_header")
+            else self.parsed_header.get("mac")
+        )
 
     @property
     def canonical_string(self) -> str:
@@ -118,7 +128,10 @@ class HMAC:
         from services.helpers import (
             parse_authorization_header,
         )  # pylint: disable=import-outside-toplevel
-        self.parsed_header: dict[str, str] = parse_authorization_header(authorization_header)
+
+        self.parsed_header: dict[str, str] = parse_authorization_header(
+            authorization_header
+        )
 
     def is_valid_scheme(self) -> bool:
         return self.authorization_header.startswith("HMAC")
@@ -233,7 +246,7 @@ class AuthorizationRoute(str, Enum):
     CLAIM_CLIENT = "/claim/"
     CLIENT_AUTH = "/auth/"
     CLIENT_ACTIVATE = "/activate/"
-    CLIENT_DEACTIVATE = "/deactivate/"
+    CLIENT_DEACTIVATE = "/deactivated/"
     SUPPORT = "/support"
 
 
@@ -279,8 +292,7 @@ class Authorization:
         AuthorizationRoute.SUPPORT,
         AuthorizationRoute.CLAIM_CLIENT,
     ]
-    secret_allow: list[AuthorizationRoute] = [
-    ]
+    secret_allow: list[AuthorizationRoute] = []
 
     def __init__(
         self,
@@ -294,6 +306,7 @@ class Authorization:
         raw_body: Union[str, None] = None,
     ):
         import models  # pylint: disable=import-outside-toplevel
+
         self.hmac: HMAC
         self.token_type: TokenTypes
         self.route: AuthorizationRoute
@@ -427,7 +440,7 @@ class Authorization:
                     self.route = route
                     break
 
-        return hasattr(self, 'route') and isinstance(self.route, AuthorizationRoute)
+        return hasattr(self, "route") and isinstance(self.route, AuthorizationRoute)
 
     def dict(self):
         return {
@@ -484,7 +497,7 @@ async def get_contents(
     request: Request,
     raw_body: Union[str, None] = None,
 ) -> Union[str, None]:
-    if not raw_body and hasattr(request, 'form'):
+    if not raw_body and hasattr(request, "form"):
         if form := await request.form():
             if upload := form.get("files"):
                 raw_body = upload.file.read().decode()
@@ -493,9 +506,14 @@ async def get_contents(
         raw_body = request._body.decode("utf8")  # pylint: disable=protected-access
     if not raw_body:
         if event := request.scope.get("aws.event", {}):
-            raw_body = b64decode(event.get("body", '')).decode() if event.get("isBase64Encoded") else event.get("body")
+            raw_body = (
+                b64decode(event.get("body", "")).decode()
+                if event.get("isBase64Encoded")
+                else event.get("body")
+            )
 
     return raw_body
+
 
 async def auth_required(
     request: Request,
@@ -519,7 +537,7 @@ async def auth_required(
         user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
         ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
         account_name=x_trivialscan_account,
-        raw_body=raw_body
+        raw_body=raw_body,
     )
     if not authz.is_authorized:
         logger.error(ERR_INVALID_AUTHORIZATION)

@@ -664,7 +664,7 @@ class MemberProfile(BaseModel):
         prefix_key = f"{internals.APP_ENV}/accounts/{self.account.name}/members/{self.email}/"  # type: ignore pylint: disable=no-member
         prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
         if len(prefix_matches) == 0:
-            return False
+            return True
         results: list[bool] = []
         for object_key in prefix_matches:
             results.append(services.aws.delete_s3(object_key))

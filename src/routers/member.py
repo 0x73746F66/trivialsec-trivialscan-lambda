@@ -635,11 +635,7 @@ async def delete_member(
     if validators.email(email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
-    member = models.MemberProfile(email=email).load()
-    if not member:
-        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    if authz.account.name != member.account.name:  # type: ignore
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        return
-
+    # specifying the account here enforces only deletion of account linked members
+    member = models.MemberProfile(email=email, account=authz.account)
+    # returns True if member doesn't exist
     return member.delete()
