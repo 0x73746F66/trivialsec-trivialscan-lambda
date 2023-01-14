@@ -19,6 +19,7 @@ import services.aws
 import services.sendgrid
 import services.stripe
 import services.helpers
+import services.webhook
 
 router = APIRouter()
 
@@ -43,6 +44,21 @@ async def validate_authorization(
     """
     Checks registration status of the provided account name, client name, and access token (or API key)
     """
+    services.webhook.send(
+        event_name=models.WebhookEvent.CLIENT_ACTIVITY,
+        account=authz.account,
+        body={
+            "type": "client_info",
+            "timestamp": round(time() * 1000),
+            "account": authz.account.name,
+            "member": None
+            if not hasattr(authz.member, "email")
+            else authz.member.email,
+            "client": None if not hasattr(authz.client, "name") else authz.client.name,
+            "ip_addr": authz.ip_addr,
+            "user_agent": authz.user_agent,
+        },
+    )
     return {
         "version": x_trivialscan_version,
         "account": authz.account,
@@ -75,7 +91,7 @@ async def validate_authorization(
     tags=["Member Profile"],
 )
 @cachier(
-    stale_after=timedelta(seconds=30),
+    stale_after=timedelta(seconds=5),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda _, kw: kw["authz"].account.name,
 )
@@ -96,7 +112,7 @@ def member_profile(
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
-        204: {"description": "No sesson data available, this is probably an error"},
+        204: {"description": "No session data available, this is probably an error"},
         401: {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
         },
@@ -213,6 +229,19 @@ async def revoke_session(
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     if not session.delete():
         response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+    services.webhook.send(
+        event_name=models.WebhookEvent.MEMBER_ACTIVITY,
+        account=authz.account,
+        body={
+            "type": "revoke_session",
+            "timestamp": round(time() * 1000),
+            "account": authz.account.name,
+            "member": authz.member.email,
+            "session_token": session_token,
+            "ip_addr": authz.ip_addr,
+            "user_agent": authz.user_agent,
+        },
+    )
 
 
 @router.post(
@@ -379,6 +408,21 @@ async def login(
         if member.confirmation_token == magic_token:
             member.confirmed = True
         if member.save() and link.delete():
+            services.webhook.send(
+                event_name=models.WebhookEvent.MEMBER_ACTIVITY,
+                account=session.member.account.load(),
+                body={
+                    "type": "login",
+                    "timestamp": round(time() * 1000),
+                    "account": session.member.account.name,
+                    "member": session.member.email,
+                    "session_token": session_token,
+                    "ip_addr": ip_addr,
+                    "user_agent": user_agent,
+                    "browser": session.browser,
+                    "platform": session.platform,
+                },
+            )
             return session
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     except RuntimeError as err:
@@ -459,6 +503,18 @@ async def update_email(
             sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
         )
         if link.save():
+            services.webhook.send(
+                event_name=models.WebhookEvent.MEMBER_ACTIVITY,
+                account=authz.account,
+                body={
+                    "type": "change_member_email_request",
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "member": authz.member.email,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent,
+                },
+            )
             return link
     except RuntimeError as err:
         internals.logger.exception(err)
@@ -486,14 +542,30 @@ async def update_email(
     tags=["Member Profile"],
 )
 async def accept_token(
+    request: Request,
     response: Response,
     token: str,
-    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Login for members with magic link emailed to them
     """
     try:
+        event = request.scope.get("aws.event", {})
+        ip_addr = (
+            event.get("requestContext", {})
+            .get("http", {})
+            .get(
+                "sourceIp",
+                request.headers.get(
+                    "X-Forwarded-For", request.headers.get("X-Real-IP")
+                ),
+            )
+        )
+        user_agent = (
+            event.get("requestContext", {})
+            .get("http", {})
+            .get("userAgent", request.headers.get("User-Agent"))
+        )
         link = models.AcceptEdit(accept_token=token).load()  # type: ignore
         if not link:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -502,6 +574,9 @@ async def accept_token(
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
             return
         model: models.DAL = _cls(**{link.model_key: link.model_value}).load()  # type: ignore
+        if not model:
+            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            return
         old_value = getattr(model, link.change_prop)  # type: ignore
         if link.old_value != old_value:
             response.status_code = status.HTTP_208_ALREADY_REPORTED
@@ -513,6 +588,19 @@ async def accept_token(
         if link.change_model == "MemberProfile" and link.model_key == "email":
             if old_member := models.MemberProfile(email=link.old_value).load():
                 old_member.delete()
+                services.webhook.send(
+                    event_name=models.WebhookEvent.MEMBER_ACTIVITY,
+                    account=old_member.account.load(),
+                    body={
+                        "type": "change_member_email_confirm",
+                        "timestamp": round(time() * 1000),
+                        "account": old_member.account.name,
+                        "old_member": link.old_value,
+                        "new_member": link.model_value,
+                        "ip_addr": ip_addr,
+                        "user_agent": user_agent,
+                    },
+                )
         return link.delete()
 
     except RuntimeError as err:
@@ -599,6 +687,19 @@ async def send_member_invitation(
             sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
         )
         if link.save():
+            services.webhook.send(
+                event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
+                account=authz.account,
+                body={
+                    "type": "member_invitation",
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "member": authz.member.email,
+                    "invitee": member.email,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent,
+                },
+            )
             return member
     except RuntimeError as err:
         internals.logger.exception(err)
@@ -609,6 +710,7 @@ async def send_member_invitation(
 
 @router.delete(
     "/member/{email}",
+    response_model=bool,
     status_code=status.HTTP_202_ACCEPTED,
     responses={
         400: {"description": "The email address is not valid"},
@@ -634,8 +736,22 @@ async def delete_member(
     """
     if validators.email(email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return False
     # specifying the account here enforces only deletion of account linked members
     member = models.MemberProfile(email=email, account=authz.account)
     # returns True if member doesn't exist
-    return member.delete()
+    if member.delete():
+        services.webhook.send(
+            event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
+            account=authz.account,
+            body={
+                "type": "member_deleted",
+                "timestamp": round(time() * 1000),
+                "account": authz.account.name,
+                "member": authz.member.email,
+                "deleted": member.email,
+                "ip_addr": authz.ip_addr,
+                "user_agent": authz.user_agent,
+            },
+        )
+        return True

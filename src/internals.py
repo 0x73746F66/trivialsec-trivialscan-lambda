@@ -3,6 +3,7 @@ import json
 import logging
 import hmac
 import hashlib
+import threading
 from base64 import b64encode, b64decode
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
@@ -15,11 +16,13 @@ from ipaddress import (
 )
 
 import validators
+import requests
 from user_agents import parse as ua_parser
 from starlette.requests import Request
-from fastapi import Header, HTTPException, status, File, UploadFile
+from fastapi import Header, HTTPException, status
 from pydantic import (
     IPvAnyAddress,
+    HttpUrl,
     AnyHttpUrl,
     PositiveInt,
     PositiveFloat,
@@ -225,6 +228,7 @@ class AuthorizationRoute(str, Enum):
     SEARCH_HOST = "/search/host/"
     SEARCH_IP = "/search/ip/"
     CERTIFICATE_SHA1 = "/certificate/"
+    SCANNER_CONFIG = "/scanner/config"
     ENABLE_MONITOR = "/scanner/monitor/"
     DEACTIVATE_MONITOR = "/scanner/deactivate/"
     SCANNER_QUEUE = "/scanner/queue/"
@@ -248,6 +252,11 @@ class AuthorizationRoute(str, Enum):
     CLIENT_ACTIVATE = "/activate/"
     CLIENT_DEACTIVATE = "/deactivated/"
     SUPPORT = "/support"
+    NOTIFICATION_DISABLE = "/notification/disable/"
+    NOTIFICATION_ENABLE = "/notification/enable/"
+    WEBHOOK_DISABLE = "/webhook/disable/"
+    WEBHOOK_ENABLE = "/webhook/enable/"
+    WEBHOOK_ENDPOINT = "/webhook/endpoint"
 
 
 class Authorization:
@@ -270,6 +279,7 @@ class Authorization:
         AuthorizationRoute.SEARCH_HOST,
         AuthorizationRoute.SEARCH_IP,
         AuthorizationRoute.CERTIFICATE_SHA1,
+        AuthorizationRoute.SCANNER_CONFIG,
         AuthorizationRoute.ENABLE_MONITOR,
         AuthorizationRoute.DEACTIVATE_MONITOR,
         AuthorizationRoute.SCANNER_QUEUE,
@@ -291,6 +301,11 @@ class Authorization:
         AuthorizationRoute.GET_CLIENT,
         AuthorizationRoute.SUPPORT,
         AuthorizationRoute.CLAIM_CLIENT,
+        AuthorizationRoute.NOTIFICATION_DISABLE,
+        AuthorizationRoute.NOTIFICATION_ENABLE,
+        AuthorizationRoute.WEBHOOK_ENABLE,
+        AuthorizationRoute.WEBHOOK_DISABLE,
+        AuthorizationRoute.WEBHOOK_ENDPOINT,
     ]
     secret_allow: list[AuthorizationRoute] = []
 
@@ -363,7 +378,7 @@ class Authorization:
             if not isinstance(self.member, models.MemberProfile):
                 logger.critical(f"DENY missing MemberProfile {self.hmac.id}")
                 return
-            self.account = self.member.account  # type: ignore
+            self.account = self.member.account.load()  # type: ignore
             if not isinstance(self.account, models.MemberAccount):
                 logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
                 return
@@ -383,8 +398,10 @@ class Authorization:
             if not isinstance(self.session, models.MemberSession):
                 logger.critical(f"DENY missing MemberSession {self.hmac.id}")
                 return
-            secret_key = self.session.access_token  # type: ignore
-            self.token_type = TokenTypes.SESSION_TOKEN
+            self.session.member = self.member
+            if self.session.save():
+                secret_key = self.session.access_token  # type: ignore
+                self.token_type = TokenTypes.SESSION_TOKEN
         elif account_name is None or self.hmac.id == account_name:
             logger.info(
                 f"AUTH_FLOW Secret Key HMAC-based Authorization: account_name {account_name}"
@@ -399,11 +416,12 @@ class Authorization:
             logger.info(
                 f"AUTH_FLOW Client Token HMAC-based Authorization: client_name {self.hmac.id}"
             )
-            self.client = models.Client(name=self.hmac.id).load(account_name=account_name)  # type: ignore
+            self.account = models.MemberAccount(name=account_name).load()  # type: ignore
+            self.client = models.Client(account=self.account, name=self.hmac.id).load()  # type: ignore
             if not isinstance(self.client, models.Client):
                 logger.critical(f"DENY missing Client {self.hmac.id}")
                 return
-            self.account = self.client.account
+            self.client.account = self.account
             if not isinstance(self.account, models.MemberAccount):
                 logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
             if self.client.active:
@@ -414,7 +432,6 @@ class Authorization:
             return
 
         self.is_valid = self.hmac.validate(secret_key)
-        logger.info(f"is_valid {self.is_valid}")
         self.is_authorized = self.is_valid and self.authorized(request.url.path)
 
     def authorized(self, request_url_path: str) -> bool:
@@ -422,11 +439,8 @@ class Authorization:
         Based on the authentication type, what endpoints should be allowed
         """
         if self.token_type == TokenTypes.CLIENT_TOKEN:
-            logger.info(f"request_url_path {request_url_path}")
             for route in self.client_allow:
-                logger.info(f"startswith {route.value}")
                 if request_url_path.startswith(route.value):
-                    logger.info("break")
                     self.route = route
                     break
         if self.token_type == TokenTypes.SECRET_KEY:
@@ -547,3 +561,26 @@ async def auth_required(
             headers={"WWW-Authenticate": AUTHZ_REALM},
         )
     return authz
+
+
+def _request_task(url, body, headers):
+    try:
+        requests.post(
+            url,
+            data=json.dumps(body, cls=JSONEncoder),
+            headers=headers,
+            timeout=(5, 15),
+        )
+    except requests.exceptions.ConnectionError:
+        pass
+
+
+def post_beacon(
+    url: HttpUrl, body: dict, headers: dict = {"Content-Type": "application/json"}
+):
+    """
+    A beacon is a fire and forget HTTP POST, the response is not
+    needed so we do not even wait for one, so there is no
+    response to discard because it was never received
+    """
+    threading.Thread(target=_request_task, args=(url, body, headers)).start()

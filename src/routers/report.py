@@ -3,6 +3,7 @@ from os import path
 from secrets import token_urlsafe
 from typing import Union
 from datetime import timedelta
+from time import time
 
 from fastapi import Header, APIRouter, Response, File, UploadFile, status, Depends
 from cachier import cachier
@@ -13,6 +14,8 @@ import models
 import config
 import services.aws
 import services.helpers
+import services.sendgrid
+import services.webhook
 
 router = APIRouter()
 
@@ -203,6 +206,19 @@ async def store(
             scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
         scanner_record.history.append(report)
         if scanner_record.save():
+            services.webhook.send(
+                event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
+                account=authz.account,
+                body={
+                    "type": models.ScanRecordType.SELF_MANAGED,
+                    "status": "report",
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "report_id": report.report_id,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent,
+                },
+            )
             return {"results_uri": data["results_uri"]}
 
     if report_type is models.ReportType.EVALUATIONS:
@@ -312,10 +328,80 @@ async def store(
                     "client": authz.client.client_info.dict(),  # type: ignore
                 },
             )
+            services.webhook.send(
+                event_name=models.WebhookEvent.REPORT_CREATED,
+                account=authz.account,
+                body={
+                    "report_id": full_report.report_id,
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "member": authz.member.email,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent,
+                },
+            )
+            if authz.account.notifications.self_hosted_uploads:  # type: ignore
+                internals.logger.info("Emailing result")
+                first_hostname = full_report.targets[0].transport.hostname
+                first_port = full_report.targets[0].transport.port
+                suffix = ""
+                if len(full_report.targets) > 1:
+                    suffix = f" +{len(full_report.targets)} hosts"
+                email_subject = f"Customer-managed scanner upload {first_hostname}:{first_port}{suffix}"
+                sendgrid = services.sendgrid.send_email(
+                    subject=email_subject,
+                    recipient=authz.account.primary_email,  # type: ignore
+                    template="scan_completed",
+                    data={
+                        "hostname": first_hostname,
+                        "port": first_port,
+                        "results_uri": full_report.results_uri,
+                        "score": full_report.score,
+                        "pass_result": full_report.results.get("pass", 0),  # type: ignore
+                        "info_result": full_report.results.get("info", 0),  # type: ignore
+                        "warn_result": full_report.results.get("warn", 0),  # type: ignore
+                        "fail_result": full_report.results.get("fail", 0),  # type: ignore
+                    },
+                )
+                if sendgrid._content:  # pylint: disable=protected-access
+                    res = json.loads(
+                        sendgrid._content.decode()  # pylint: disable=protected-access
+                    )
+                    if isinstance(res, dict) and res.get("errors"):
+                        internals.logger.error(res.get("errors"))
+
             for cert in certs.values():
                 cert.save()
+                services.webhook.send(
+                    event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
+                    account=authz.account,
+                    body={
+                        "type": models.ScanRecordType.SELF_MANAGED,
+                        "status": "certificate",
+                        "timestamp": round(time() * 1000),
+                        "account": authz.account.name,
+                        "sha1_fingerprint": cert.sha1_fingerprint,
+                        "ip_addr": authz.ip_addr,
+                        "user_agent": authz.user_agent,
+                    },
+                )
             for host in full_report.targets:  # type: ignore
                 host.save()
+                services.webhook.send(
+                    event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
+                    account=authz.account,
+                    body={
+                        "type": models.ScanRecordType.SELF_MANAGED,
+                        "status": "host_version",
+                        "timestamp": round(time() * 1000),
+                        "account": authz.account.name,
+                        "ip_addr": authz.ip_addr,
+                        "user_agent": authz.user_agent,
+                        "last_updated": host.last_updated,
+                        "hostname": host.transport.hostname,
+                        "port": host.transport.port,
+                    },
+                )
             return {"results_uri": f"/result/{full_report.report_id}/details"}
 
     if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".pem"):
@@ -324,6 +410,20 @@ async def store(
             internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem"
         )
         if services.aws.store_s3(object_key, contents):  # type: ignore
+            services.webhook.send(
+                event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
+                account=authz.account,
+                body={
+                    "type": models.ScanRecordType.SELF_MANAGED,
+                    "status": "certificate",
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "sha1_fingerprint": sha1_fingerprint,
+                    "pem": contents,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent,
+                },
+            )
             return {"results_uri": f"/certificate/{sha1_fingerprint}"}
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -367,3 +467,15 @@ async def delete_report(
 
     if report := models.FullReport(report_id=report_id, account_name=authz.account.name).load():  # type: ignore
         report.delete()
+        services.webhook.send(
+            event_name=models.WebhookEvent.REPORT_DELETED,
+            account=authz.account,
+            body={
+                "report_id": report.report_id,
+                "timestamp": round(time() * 1000),
+                "account": authz.account.name,
+                "member": authz.member.email,
+                "ip_addr": authz.ip_addr,
+                "user_agent": authz.user_agent,
+            },
+        )

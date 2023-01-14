@@ -475,13 +475,74 @@ class Billing(BaseModel):
     has_invoice: bool = Field(default=False)
 
 
+class AccountNotifications(BaseModel):
+    scan_completed: Optional[bool] = Field(default=False)
+    monitor_completed: Optional[bool] = Field(default=False)
+    self_hosted_uploads: Optional[bool] = Field(default=False)
+    early_warning: Optional[bool] = Field(default=False)
+    new_findings_certificates: Optional[bool] = Field(default=False)
+    new_findings_domains: Optional[bool] = Field(default=False)
+    include_warning: Optional[bool] = Field(default=False)
+    include_info: Optional[bool] = Field(default=False)
+
+
+class Webhooks(BaseModel):
+    webhook_endpoint: Union[AnyHttpUrl, None] = Field(default=None)
+    hosted_monitoring: Optional[bool] = Field(default=False)
+    hosted_scanner: Optional[bool] = Field(default=False)
+    self_hosted_uploads: Optional[bool] = Field(default=False)
+    early_warning_email: Optional[bool] = Field(default=False)
+    early_warning_domain: Optional[bool] = Field(default=False)
+    early_warning_ip: Optional[bool] = Field(default=False)
+    new_findings_certificates: Optional[bool] = Field(default=False)
+    new_findings_domains: Optional[bool] = Field(default=False)
+    include_warning: Optional[bool] = Field(default=False)
+    include_info: Optional[bool] = Field(default=False)
+    client_status: Optional[bool] = Field(default=False)
+    client_activity: Optional[bool] = Field(default=False)
+    scanner_configurations: Optional[bool] = Field(default=False)
+    report_created: Optional[bool] = Field(default=False)
+    report_deleted: Optional[bool] = Field(default=False)
+    account_activity: Optional[bool] = Field(default=False)
+    member_activity: Optional[bool] = Field(default=False)
+
+
+class Webauthn(BaseModel):
+    id: str
+    public_key: str
+    challenge: str
+    alias: str
+    created_at: datetime
+
+
+class Totp(BaseModel):
+    assertion_response_raw_id: str
+    public_key: str
+    challenge: str
+    alias: Optional[str] = Field(default="")
+    active: Optional[bool] = Field(default=True)
+    created_at: datetime
+
+
+class MfaSetting(str, Enum):
+    ENROLL = "enroll"
+    OPT_OUT = "opt_out"
+    TOTP = "totp"
+    WEBAUTHN = "webauthn"
+
+
 class MemberAccount(AccountRegistration, DAL):
     billing_email: Optional[EmailStr]
     api_key: Optional[str]
     ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
     user_agent: Union[str, None] = Field(default=None)
     timestamp: Optional[int]
+    # mfa: Optional[MfaSetting] = Field(default=MfaSetting.ENROLL)
     billing: Union[Billing, None] = Field(default=None)
+    notifications: Optional[AccountNotifications] = Field(
+        default=AccountNotifications()
+    )
+    webhooks: Optional[Webhooks] = Field(default=Webhooks())
 
     def load_billing(self):
         if sub := SubscriptionAddon().load(self.name):  # type: ignore
@@ -623,6 +684,7 @@ class MemberProfile(BaseModel):
         if member_email:
             self.email = member_email
         if validators.email(self.email) is False:  # type: ignore
+            internals.logger.warning(f"Invalid email: {self.email}")
             return
         suffix = f"/members/{self.email}/profile.json"
         prefix_matches = services.aws.list_s3(
@@ -1065,10 +1127,11 @@ class HostTLS(BaseModel):
 
 
 class HostHTTP(BaseModel):
-    title: str
-    status_code: conint(ge=100, le=599)  # type: ignore
-    headers: dict[str, str]
-    body_hash: str
+    title: Optional[str]
+    status_code: Optional[conint(ge=100, le=599)]  # type: ignore
+    headers: Optional[dict[str, str]]
+    body_hash: Optional[str]
+    request_url: Optional[str]
 
 
 class HostTransport(BaseModel):
@@ -1314,6 +1377,7 @@ class EvaluationItem(DefaultInfo):
     result_level: Union[str, None] = Field(default=None)
     score: int = Field(default=0)
     description: Optional[str]
+    recommendation: Optional[str]
     metadata: dict[str, Any] = Field(default={})
     cve: Union[list[str], None] = Field(default=[])
     cvss2: Union[str, Any] = Field(default=None)
@@ -1493,8 +1557,10 @@ class SearchResult(BaseModel):
 
 class MonitorHostname(BaseModel):
     hostname: str
+    ports: Optional[list[int]] = Field(default=[443])
     timestamp: int
     enabled: bool = Field(default=False)
+    path_names: Optional[list[str]] = Field(default=["/"])
 
 
 class ScannerRecord(BaseModel, DAL):
@@ -1550,3 +1616,40 @@ class HostResponse(BaseModel):
 class CertificateResponse(BaseModel):
     certificate: Certificate
     reports: list[ReportSummary]
+
+
+class WebhookEndpointRequest(BaseModel):
+    endpoint: Union[AnyHttpUrl, None] = Field(default=None)
+
+
+class WebhookEvent(str, Enum):
+    HOSTED_MONITORING = "hosted_monitoring"
+    HOSTED_SCANNER = "hosted_scanner"
+    SELF_HOSTED_UPLOADS = "self_hosted_uploads"
+    EARLY_WARNING_EMAIL = "early_warning_email"
+    EARLY_WARNING_DOMAIN = "early_warning_domain"
+    EARLY_WARNING_IP = "early_warning_ip"
+    NEW_FINDINGS_CERTIFICATES = "new_findings_certificates"
+    NEW_FINDINGS_DOMAINS = "new_findings_domains"
+    INCLUDE_WARNING = "include_warning"
+    INCLUDE_INFO = "include_info"
+    CLIENT_STATUS = "client_status"
+    CLIENT_ACTIVITY = "client_activity"
+    SCANNER_CONFIGURATIONS = "scanner_configurations"
+    REPORT_CREATED = "report_created"
+    REPORT_DELETED = "report_deleted"
+    ACCOUNT_ACTIVITY = "account_activity"
+    MEMBER_ACTIVITY = "member_activity"
+
+
+class WebhookPayload(BaseModel):
+    event_name: WebhookEvent
+    timestamp: datetime
+    body: dict
+
+
+class ConfigUpdateRequest(BaseModel):
+    hostname: str
+    enabled: Optional[bool]
+    http_paths: Optional[list[str]]
+    ports: Optional[list[PositiveInt]]

@@ -15,6 +15,7 @@ import services.sendgrid
 import services.stripe
 import services.aws
 import services.helpers
+import services.webhook
 
 router = APIRouter()
 
@@ -72,6 +73,21 @@ async def claim_client(
             timestamp=round(time() * 1000),  # JavaScript support
         )
         if client.save():
+            services.webhook.send(
+                event_name=models.WebhookEvent.CLIENT_ACTIVITY,
+                account=authz.account,
+                body={
+                    "type": "client_token",
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "member": None
+                    if not hasattr(authz.member, "email")
+                    else authz.member.email,
+                    "client": client,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent,
+                },
+            )
             return client
     except RuntimeError as err:
         internals.logger.exception(err)
@@ -119,14 +135,25 @@ async def auth_client(
         authz.client.ip_addr = authz.ip_addr  # type: ignore
         authz.client.user_agent = authz.user_agent  # type: ignore
         if authz.client.save():  # type: ignore
+            services.webhook.send(
+                event_name=models.WebhookEvent.CLIENT_ACTIVITY,
+                account=authz.account,
+                body={
+                    "type": "client_auth",
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "authorisation_valid": authz.is_valid,
+                    "client": authz.client,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent,
+                },
+            )
             return {
                 "client": authz.client,
                 "authorisation_valid": authz.is_valid,
             }
     except RuntimeError as err:
         internals.logger.exception(err)
-
-    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 @router.get(
@@ -218,7 +245,7 @@ async def activate_client(
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
-    Activate a activated client
+    Activate a client
     """
     client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
     if not client:
@@ -228,6 +255,18 @@ async def activate_client(
         if not client.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
+    services.webhook.send(
+        event_name=models.WebhookEvent.CLIENT_STATUS,
+        account=authz.account,
+        body={
+            "type": "activated",
+            "timestamp": round(time() * 1000),
+            "account": authz.account.name,
+            "member": authz.member.email,
+            "ip_addr": authz.ip_addr,
+            "user_agent": authz.user_agent,
+        },
+    )
 
     return client
 
@@ -268,6 +307,18 @@ async def deactivated_client(
         if not client.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
+    services.webhook.send(
+        event_name=models.WebhookEvent.CLIENT_STATUS,
+        account=authz.account,
+        body={
+            "type": "deactivated",
+            "timestamp": round(time() * 1000),
+            "account": authz.account.name,
+            "member": authz.member.email,
+            "ip_addr": authz.ip_addr,
+            "user_agent": authz.user_agent,
+        },
+    )
 
     return client
 
@@ -306,5 +357,17 @@ async def delete_client(
     if authz.account.name != client.account.name:  # type: ignore
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return
+    services.webhook.send(
+        event_name=models.WebhookEvent.CLIENT_STATUS,
+        account=authz.account,
+        body={
+            "type": "deleted",
+            "timestamp": round(time() * 1000),
+            "account": authz.account.name,
+            "member": authz.member.email,
+            "ip_addr": authz.ip_addr,
+            "user_agent": authz.user_agent,
+        },
+    )
 
     return client.delete()

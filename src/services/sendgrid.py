@@ -41,7 +41,7 @@ try:
         requests.get(
             url="https://api.sendgrid.com/v3/user/webhooks/event/settings/signed",
             headers=SendGridAPIClient(SENDGRID_API_KEY).client.request_headers,
-            timeout=3,
+            timeout=(5, 15),
         )
         .json()
         .get("public_key")
@@ -67,7 +67,7 @@ def send_email(
     )  # pylint: disable=protected-access
     personalization = {
         "subject": subject,
-        "dynamic_template_data": {**data, **{"email": recipient}},
+        "dynamic_template_data": {**data, **{"email": recipient, "subject": subject}},
         "to": [{"email": recipient}],
     }
     mail_settings = {
@@ -92,7 +92,10 @@ def send_email(
         "personalizations": [personalization],
     }
     res = requests.post(
-        url=tmp_url, json=req_body, headers=sendgrid.client.request_headers, timeout=10
+        url=tmp_url,
+        json=req_body,
+        headers=sendgrid.client.request_headers,
+        timeout=(5, 15),
     )
     logger.info(res.__dict__)
     return res
@@ -107,7 +110,7 @@ def upsert_contact(recipient_email: str, list_name: str = "subscribers"):
             "contacts": [{"email": recipient_email}],
         },
         headers=sendgrid.client.request_headers,
-        timeout=10,
+        timeout=(5, 15),
     )
     logger.debug(res.__dict__)
     return res

@@ -14,6 +14,7 @@ import services.sendgrid
 import services.stripe
 import services.aws
 import services.helpers
+import services.webhook
 
 router = APIRouter()
 
@@ -267,8 +268,20 @@ async def update_billing_email(
             return
         try:
             services.stripe.create_customer(email=authz.account.billing_email)  # type: ignore
-        except:
-            pass  # pylint: disable=bare-except
+        except:  # pylint: disable=bare-except
+            pass
+        services.webhook.send(
+            event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
+            account=authz.account,
+            body={
+                "type": "update_billing_email",
+                "timestamp": round(time() * 1000),
+                "account": authz.account.name,
+                "member": authz.member.email,
+                "ip_addr": authz.ip_addr,
+                "user_agent": authz.user_agent,
+            },
+        )
         return authz.account
 
     except RuntimeError as err:
@@ -337,12 +350,22 @@ async def update_primary_email(
         if not authz.account.save() or not authz.account.update_members():  # type: ignore
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
+        services.webhook.send(
+            event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
+            account=authz.account,
+            body={
+                "type": "update_primary_email",
+                "timestamp": round(time() * 1000),
+                "account": authz.account.name,
+                "member": authz.member.email,
+                "ip_addr": authz.ip_addr,
+                "user_agent": authz.user_agent,
+            },
+        )
         return authz.account
 
     except RuntimeError as err:
         internals.logger.exception(err)
-
-    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 @router.post(
@@ -377,9 +400,208 @@ async def update_account_display_name(
         if not authz.account.save() or not authz.account.update_members():  # type: ignore
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
+        services.webhook.send(
+            event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
+            account=authz.account,
+            body={
+                "type": "update_account_name",
+                "timestamp": round(time() * 1000),
+                "account": authz.account.name,
+                "member": authz.member.email,
+                "ip_addr": authz.ip_addr,
+                "user_agent": authz.user_agent,
+            },
+        )
         return authz.account
 
     except RuntimeError as err:
         internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@router.get(
+    "/notification/enable/{event_type}",
+    response_model=models.AccountNotifications,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Account"],
+)
+async def enable_notification(
+    response: Response,
+    event_type: str,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Enables an email notification event type
+    """
+    try:
+        setattr(authz.account.notifications, event_type, True)  # type: ignore
+        if authz.account.save():  # type: ignore
+            return authz.account.notifications  # type: ignore
+    except AttributeError:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return
+
+
+@router.get(
+    "/notification/disable/{event_type}",
+    response_model=models.AccountNotifications,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Account"],
+)
+async def disable_notification(
+    response: Response,
+    event_type: str,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Disables an email notification event type
+    """
+    try:
+        setattr(authz.account.notifications, event_type, False)  # type: ignore
+        if authz.account.save():  # type: ignore
+            return authz.account.notifications  # type: ignore
+    except AttributeError:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return
+
+
+@router.get(
+    "/webhook/enable/{event_type}",
+    response_model=models.Webhooks,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Account"],
+)
+async def enable_webhook(
+    response: Response,
+    event_type: str,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Enables an webhook event type
+    """
+    try:
+        setattr(authz.account.webhooks, event_type, True)  # type: ignore
+        if authz.account.save():  # type: ignore
+            return authz.account.webhooks  # type: ignore
+    except AttributeError:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return
+
+
+@router.get(
+    "/webhook/disable/{event_type}",
+    response_model=models.Webhooks,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Account"],
+)
+async def disable_webhook(
+    response: Response,
+    event_type: str,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Disables an webhook event type
+    """
+    try:
+        setattr(authz.account.webhooks, event_type, False)  # type: ignore
+        if authz.account.save():  # type: ignore
+            return authz.account.webhooks  # type: ignore
+    except AttributeError:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return
+
+
+@router.post(
+    "/webhook/endpoint",
+    response_model=models.Webhooks,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        208: {"description": "The account is already registered"},
+        400: {
+            "description": "The display name was not provided or email address is not valid"
+        },
+        409: {"description": "The email address has already been registered"},
+        424: {"description": "Email sending errors were logged"},
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Account"],
+)
+async def webhook_endpoint(
+    response: Response,
+    data: models.WebhookEndpointRequest,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Manages the webhook endpoint URL
+    """
+    try:
+        authz.account.webhooks.webhook_endpoint = data.endpoint  # type: ignore
+        if authz.account.save():  # type: ignore
+            services.webhook.send(
+                event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
+                account=authz.account,
+                body={
+                    "type": "update_webhook_endpoint",
+                    "webhook_endpoint": data.endpoint,
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "member": authz.member.email,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent,
+                },
+            )
+            return authz.account.webhooks  # type: ignore
+    except AttributeError:
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return
