@@ -209,11 +209,12 @@ async def store(
             services.webhook.send(
                 event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
                 account=authz.account,
-                body={
+                data={
                     "type": models.ScanRecordType.SELF_MANAGED,
                     "status": "report",
                     "timestamp": round(time() * 1000),
                     "account": authz.account.name,
+                    "client": authz.client.name,
                     "report_id": report.report_id,
                     "ip_addr": authz.ip_addr,
                     "user_agent": authz.user_agent,
@@ -331,11 +332,11 @@ async def store(
             services.webhook.send(
                 event_name=models.WebhookEvent.REPORT_CREATED,
                 account=authz.account,
-                body={
+                data={
                     "report_id": full_report.report_id,
                     "timestamp": round(time() * 1000),
                     "account": authz.account.name,
-                    "member": authz.member.email,
+                    "client": authz.client.name,
                     "ip_addr": authz.ip_addr,
                     "user_agent": authz.user_agent,
                 },
@@ -375,11 +376,12 @@ async def store(
                 services.webhook.send(
                     event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
                     account=authz.account,
-                    body={
+                    data={
                         "type": models.ScanRecordType.SELF_MANAGED,
                         "status": "certificate",
                         "timestamp": round(time() * 1000),
                         "account": authz.account.name,
+                        "client": authz.client.name,
                         "sha1_fingerprint": cert.sha1_fingerprint,
                         "ip_addr": authz.ip_addr,
                         "user_agent": authz.user_agent,
@@ -390,11 +392,12 @@ async def store(
                 services.webhook.send(
                     event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
                     account=authz.account,
-                    body={
+                    data={
                         "type": models.ScanRecordType.SELF_MANAGED,
                         "status": "host_version",
                         "timestamp": round(time() * 1000),
                         "account": authz.account.name,
+                        "client": authz.client.name,
                         "ip_addr": authz.ip_addr,
                         "user_agent": authz.user_agent,
                         "last_updated": host.last_updated,
@@ -413,13 +416,14 @@ async def store(
             services.webhook.send(
                 event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
                 account=authz.account,
-                body={
+                data={
                     "type": models.ScanRecordType.SELF_MANAGED,
                     "status": "certificate",
                     "timestamp": round(time() * 1000),
                     "account": authz.account.name,
+                    "client": authz.client.name,
                     "sha1_fingerprint": sha1_fingerprint,
-                    "pem": contents,
+                    "pem": contents.decode(),
                     "ip_addr": authz.ip_addr,
                     "user_agent": authz.user_agent,
                 },
@@ -470,7 +474,7 @@ async def delete_report(
         services.webhook.send(
             event_name=models.WebhookEvent.REPORT_DELETED,
             account=authz.account,
-            body={
+            data={
                 "report_id": report.report_id,
                 "timestamp": round(time() * 1000),
                 "account": authz.account.name,

@@ -273,7 +273,7 @@ async def update_billing_email(
         services.webhook.send(
             event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
             account=authz.account,
-            body={
+            data={
                 "type": "update_billing_email",
                 "timestamp": round(time() * 1000),
                 "account": authz.account.name,
@@ -353,7 +353,7 @@ async def update_primary_email(
         services.webhook.send(
             event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
             account=authz.account,
-            body={
+            data={
                 "type": "update_primary_email",
                 "timestamp": round(time() * 1000),
                 "account": authz.account.name,
@@ -403,7 +403,7 @@ async def update_account_display_name(
         services.webhook.send(
             event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
             account=authz.account,
-            body={
+            data={
                 "type": "update_account_name",
                 "timestamp": round(time() * 1000),
                 "account": authz.account.name,
@@ -591,7 +591,7 @@ async def webhook_endpoint(
             services.webhook.send(
                 event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
                 account=authz.account,
-                body={
+                data={
                     "type": "update_webhook_endpoint",
                     "webhook_endpoint": data.endpoint,
                     "timestamp": round(time() * 1000),

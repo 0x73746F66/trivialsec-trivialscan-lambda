@@ -76,7 +76,7 @@ async def claim_client(
             services.webhook.send(
                 event_name=models.WebhookEvent.CLIENT_ACTIVITY,
                 account=authz.account,
-                body={
+                data={
                     "type": "client_token",
                     "timestamp": round(time() * 1000),
                     "account": authz.account.name,
@@ -138,7 +138,7 @@ async def auth_client(
             services.webhook.send(
                 event_name=models.WebhookEvent.CLIENT_ACTIVITY,
                 account=authz.account,
-                body={
+                data={
                     "type": "client_auth",
                     "timestamp": round(time() * 1000),
                     "account": authz.account.name,
@@ -258,7 +258,7 @@ async def activate_client(
     services.webhook.send(
         event_name=models.WebhookEvent.CLIENT_STATUS,
         account=authz.account,
-        body={
+        data={
             "type": "activated",
             "timestamp": round(time() * 1000),
             "account": authz.account.name,
@@ -310,7 +310,7 @@ async def deactivated_client(
     services.webhook.send(
         event_name=models.WebhookEvent.CLIENT_STATUS,
         account=authz.account,
-        body={
+        data={
             "type": "deactivated",
             "timestamp": round(time() * 1000),
             "account": authz.account.name,
@@ -360,7 +360,7 @@ async def delete_client(
     services.webhook.send(
         event_name=models.WebhookEvent.CLIENT_STATUS,
         account=authz.account,
-        body={
+        data={
             "type": "deleted",
             "timestamp": round(time() * 1000),
             "account": authz.account.name,

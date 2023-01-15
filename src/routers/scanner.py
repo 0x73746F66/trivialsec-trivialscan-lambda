@@ -121,7 +121,7 @@ async def enable_monitoring(
         services.webhook.send(
             event_name=models.WebhookEvent.SCANNER_CONFIGURATIONS,
             account=authz.account,
-            body={
+            data={
                 "hostname": hostname,
                 "type": "configuration",
                 "status": "update",
@@ -201,7 +201,7 @@ async def deactivate_monitoring(
         services.webhook.send(
             event_name=models.WebhookEvent.SCANNER_CONFIGURATIONS,
             account=authz.account,
-            body={
+            data={
                 "hostname": hostname,
                 "type": "configuration",
                 "status": "update",
@@ -266,7 +266,7 @@ async def queue_hostname(
     services.webhook.send(
         event_name=models.WebhookEvent.HOSTED_SCANNER,
         account=authz.account,
-        body={
+        data={
             "hostname": hostname,
             "port": 443,
             "http_paths": ["/"],
@@ -326,7 +326,7 @@ async def delete_config(
         services.webhook.send(
             event_name=models.WebhookEvent.SCANNER_CONFIGURATIONS,
             account=authz.account,
-            body={
+            data={
                 "hostname": hostname,
                 "type": "configuration",
                 "status": "deleted",
@@ -399,7 +399,7 @@ async def update_config(
         services.webhook.send(
             event_name=models.WebhookEvent.SCANNER_CONFIGURATIONS,
             account=authz.account,
-            body={
+            data={
                 "hostname": data.hostname,
                 "type": "configuration",
                 "status": "update",

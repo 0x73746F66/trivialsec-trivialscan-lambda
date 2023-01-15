@@ -1645,7 +1645,7 @@ class WebhookEvent(str, Enum):
 class WebhookPayload(BaseModel):
     event_name: WebhookEvent
     timestamp: datetime
-    body: dict
+    payload: dict
 
 
 class ConfigUpdateRequest(BaseModel):

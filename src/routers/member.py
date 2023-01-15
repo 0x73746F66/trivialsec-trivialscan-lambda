@@ -47,7 +47,7 @@ async def validate_authorization(
     services.webhook.send(
         event_name=models.WebhookEvent.CLIENT_ACTIVITY,
         account=authz.account,
-        body={
+        data={
             "type": "client_info",
             "timestamp": round(time() * 1000),
             "account": authz.account.name,
@@ -232,7 +232,7 @@ async def revoke_session(
     services.webhook.send(
         event_name=models.WebhookEvent.MEMBER_ACTIVITY,
         account=authz.account,
-        body={
+        data={
             "type": "revoke_session",
             "timestamp": round(time() * 1000),
             "account": authz.account.name,
@@ -411,7 +411,7 @@ async def login(
             services.webhook.send(
                 event_name=models.WebhookEvent.MEMBER_ACTIVITY,
                 account=session.member.account.load(),
-                body={
+                data={
                     "type": "login",
                     "timestamp": round(time() * 1000),
                     "account": session.member.account.name,
@@ -506,7 +506,7 @@ async def update_email(
             services.webhook.send(
                 event_name=models.WebhookEvent.MEMBER_ACTIVITY,
                 account=authz.account,
-                body={
+                data={
                     "type": "change_member_email_request",
                     "timestamp": round(time() * 1000),
                     "account": authz.account.name,
@@ -591,7 +591,7 @@ async def accept_token(
                 services.webhook.send(
                     event_name=models.WebhookEvent.MEMBER_ACTIVITY,
                     account=old_member.account.load(),
-                    body={
+                    data={
                         "type": "change_member_email_confirm",
                         "timestamp": round(time() * 1000),
                         "account": old_member.account.name,
@@ -690,7 +690,7 @@ async def send_member_invitation(
             services.webhook.send(
                 event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
                 account=authz.account,
-                body={
+                data={
                     "type": "member_invitation",
                     "timestamp": round(time() * 1000),
                     "account": authz.account.name,
@@ -744,7 +744,7 @@ async def delete_member(
         services.webhook.send(
             event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
             account=authz.account,
-            body={
+            data={
                 "type": "member_deleted",
                 "timestamp": round(time() * 1000),
                 "account": authz.account.name,

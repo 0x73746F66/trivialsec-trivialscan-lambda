@@ -219,13 +219,11 @@ def load_descriptions(
                 gsd = cve.upper().replace("CVE", "GSD")
                 item.references.append(models.ReferenceItem(name=gsd, url=f"https://gsd.id/{gsd}"))  # type: ignore
                 item.references.append(models.ReferenceItem(name=gsd, type=models.ReferenceType.JSON, url=f"https://api.gsd.id/{gsd}"))  # type: ignore
-        if not item.description:
-            item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
-        if not item.recommendation:
-            item.recommendation = config.get_rule_recommendation(
-                f"{item.group_id}.{item.rule_id}"
-            )
 
+        item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
+        item.recommendation = config.get_rule_recommendation(
+            f"{item.group_id}.{item.rule_id}"
+        )
         for group in item.compliance or []:
             if (
                 config.pcidss4
