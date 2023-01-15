@@ -16,9 +16,7 @@ def send(event_name: models.WebhookEvent, account: models.MemberAccount, data: d
     if getattr(account.webhooks, event_name.value) is True:
         internals.logger.info(f"Sending webhook event {event_name}")
         payload = models.WebhookPayload(
-            event_name=event_name,
-            timestamp=datetime.utcnow(),
-            payload=data
+            event_name=event_name, timestamp=datetime.utcnow(), payload=data
         )
         internals.post_beacon(
             url=account.webhooks.webhook_endpoint,  # type: ignore
