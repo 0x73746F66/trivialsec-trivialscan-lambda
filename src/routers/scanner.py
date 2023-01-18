@@ -1,7 +1,7 @@
 import json
 from time import time
 
-from fastapi import APIRouter, Response, status, Depends
+from fastapi import APIRouter, Response, status, Depends, Query
 import validators
 
 import internals
@@ -34,15 +34,18 @@ router = APIRouter()
     tags=["Scanner"],
 )
 async def scanner_config(
-    response: Response,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Fetches host monitoring configuration
     """
     if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+        if len(scanner_record.monitored_targets) == 0:
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
         return scanner_record.monitored_targets
-    response.status_code = status.HTTP_204_NO_CONTENT
+    scanner_record = models.ScannerRecord(account=authz.account)
+    scanner_record.save()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
@@ -240,25 +243,38 @@ async def queue_hostname(
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
-    Adds a host for on-demand scanning
+    Adds a host for on-demand scanning, scanner configuration stores the ports and path names to be used
     """
     if validators.email(f"nobody@{hostname}") is not True:
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
+
+    ports = [443]
+    path_names = ["/"]
+    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+        for monitor_host in scanner_record.monitored_targets:
+            monitor_host: models.MonitorHostname
+            if monitor_host.hostname == hostname:
+                internals.logger.info(f"Matched monitor_host {monitor_host}")
+                ports = monitor_host.ports
+                path_names = monitor_host.path_names
+                break
+
     queue_name = f"{internals.APP_ENV.lower()}-reconnaissance"
     queued_timestamp = round(time() * 1000)  # JavaScript support
+    internals.logger.info(f"queue {queue_name} {hostname}")
     services.aws.store_sqs(
         queue_name=queue_name,
         message_body=json.dumps(
             {
                 "hostname": hostname,
-                "port": 443,
+                "ports": ports,
+                "path_names": path_names,
                 "type": models.ScanRecordType.ONDEMAND,
             },
             default=str,
         ),
         deduplicate=False,
-        http_paths=["/"],
         account=authz.account.name,  # type: ignore
         queued_by=authz.member.email,  # type: ignore
         queued_timestamp=queued_timestamp,  # JavaScript support
@@ -337,8 +353,7 @@ async def delete_config(
             },
         )
     else:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return scanner_record
 
@@ -411,7 +426,6 @@ async def update_config(
             },
         )
     else:
-        response.status_code = status.HTTP_204_NO_CONTENT
-        return
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return scanner_record

@@ -62,13 +62,17 @@
         "window.autoDetectColorScheme": true,
         "cSpell.words": [
             "cachier",
+            "CCADB",
             "fastapi",
+            "mkcert",
             "NOSONAR",
             "pydantic",
+            "rustls",
             "sendgrid",
             "starlette",
             "totp",
-            "trivialscan"
+            "trivialscan",
+            "webpki"
         ]
     },
     "extensions": {

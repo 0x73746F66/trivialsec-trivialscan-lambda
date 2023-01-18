@@ -8,7 +8,7 @@
   issue: |-
     <p>Forward Anonymity, frequently and mistakenly described as Perfect Forward Secrecy (PFS), is where the TLS connection applies technical mechanisms intentionally that will not expose any unique client identifier that might be used by a server (TLS termination endpoint) for the purposes of user profiling and tracking.</p>
     <p>This is not the same as applying 'secrecy' or privacy to the contents of your TLS connection, the mechanism is designed only for identity protection a.k.a Anonymity - which is an entirely distinct concept from secrecy.</p>
-    <p>If the TLS connection does not use a cipher that offer the Forward Anonymity anonymity characteristic, the client identity can be tracked for any purpose the server (or Attacker in-the-middle) might choose, with no possibility of the client protecting themselves.</p>
+    <p>If the TLS connection does not use a cipher that offer the 'anonymity' characteristic, the client identity can be tracked for any purpose the server (or Attacker in-the-middle) might choose, with no possibility of the client protecting themselves.</p>
 "1.13":
   issue: |-
     <p>A cipher suite is a combination of authentication, encryption, and message authentication code (MAC) algorithms</p>
@@ -95,6 +95,7 @@
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "1.6":
   issue: |-
     <p>If the Certificate being used for client Authentication (M/TLS) was not matched to a subject sent by the server to indicate accepted client Certificates then most properly configured servers will drop the connection.</p>
@@ -192,26 +193,32 @@
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.25":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.26":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.27":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.28":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.29":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.3":
   issue: |-
     <p>When visiting a website that uses an expired Certificate it is likely the TLS connection is not secure.</p>
@@ -219,42 +226,52 @@
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.31":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.32":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.33":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.34":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.35":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.36":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.37":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.38":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.39":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.4":
   issue: |-
     <p>Whenever a DNS zone is signed with a SHA-1 DNSKEY algorithm it is vulnerable to chosen prefix collision attacks. This is a problem when a zone accepts updates from multiple parties, such as; TLDs, enterprises, hosting providers. It is also a problem when a key is re-used by multiple zones</p>
@@ -262,18 +279,61 @@
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
+    <p>Various servers will use different versions, i.e. an updated Debian-based server should include the latest Java JDK distributed by Debian which may not be either the same version considered to be the latest Java JDK distributed, nor the same on other operating systems.</p>
 "2.41":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
+    <p>The original source of these root certificates is the <a href="https://www.ccadb.org/">Common CA Database (CCADB)</a> (also the source for Google, Microsoft, Apple, and many more).</p>
+    <p>Then they are curated and prepared for bundling into Mozilla's Network Security Services (NSS), which is consumed by most Mozilla products and published publicly to also be consumed by countless 3rd party products.</p>
+    <p>The open source tool <a href="https://curl.se/docs/mk-ca-bundle.html">mk-ca-bundle</a> creates the bundle and <a href="https://github.com/curl/curl/blob/master/scripts/mk-ca-bundle.pl#L626">further curates</a> the certificates.</p>
+    <p>It doesn't appear <code>curl</code> apply bespoke filtering, and the resultant Root CA Trust Store is verifiable.</p>
 "2.42":
-  issue: |-
-    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
-    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+  issue: "<p>Certificates should be treated as suspicious when they do not have\
+    \ a trusted Root Certificate Authority, as it offers no security characteristics\
+    \ of TLS built on Trust Anchor system.</p>\n<p>When visiting a website that\
+    \ uses an suspicious Certificate it is likely the TLS connection is not secure.</p>\n\
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted\
+    \ stores then all website that have a leaf certificated issued by this CA\
+    \ will gain the ability to eaves-drop on all unencrypted information, inherently\
+    \ due to the nature they are providing the means for the encryption inherently\
+    \ and are present in the trusted CA Root store.</p>\n<p>We rely on a list\
+    \ generated from <a href=\"https://github.com/schors/gost-russian-ca/tree/master/certs\"\
+    >open source</a> collection of Russian CA MinTsifry Rossii (\u041C\u0438\u043D\
+    \u0446\u0438\u0444\u0440\u044B \u0420\u043E\u0441\u0441\u0438\u0438), Ministry\
+    \ of Telecom and Mass Communications of Russia (\u041C\u0438\u043D\u043A\u043E\
+    \u043C\u0441\u0432\u044F\u0437\u044C \u0420\u043E\u0441\u0441\u0438\u0438\
+    )</p>"
 "2.43":
-  issue: |-
-    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
-    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+  issue: "<p>Certificates should be treated as suspicious when they do not have\
+    \ a trusted Root Certificate Authority, as it offers no security characteristics\
+    \ of TLS built on Trust Anchor system.</p>\n<p>When visiting a website that\
+    \ uses an suspicious Certificate it is likely the TLS connection is not secure.</p>\n\
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted\
+    \ stores then all website that have a leaf certificated issued by this CA\
+    \ will gain the ability to eaves-drop on all unencrypted information, inherently\
+    \ due to the nature they are providing the means for the encryption inherently\
+    \ and are present in the trusted CA Root store.</p>\n<p>The <code>rustls</code>\
+    \ crate contains <em>curated</em> root certificates for use with the <code>webpki</code>\
+    \ crate and anywhere <code>rustls</code> itself is used.</p>\n<p>The original\
+    \ source of these root certificates is the <a href=\"https://www.ccadb.org/\"\
+    >Common CA Database (CCADB)</a> (also the source for Google, Microsoft, Apple,\
+    \ and many more).</p>\n<p>Then they are curated and prepared for bundling\
+    \ into Mozilla's Network Security Services (NSS), which is consumed by most\
+    \ Mozilla products and published publicly to also be consumed by countless\
+    \ 3rd party products.</p>\n<p>Before <code>rustls</code> get's the bundle\
+    \ the <a href=\"mkcert.org\">mkcert.org</a> (commonly mistakenly referred\
+    \ to as the \"Mozilla tooling\", which it is not) further curates the certificates\
+    \ and serves them over a HTTP API which is insecure, as it is unverifiable\
+    \ what the code is doing (an open source repo is not the same as the running\
+    \ environment, merely a small portion is the code), but that is the method\
+    \ <code>rustls</code> implemented to initially get the root certificates.</p>\n\
+    <p>Finally, <code>rustls</code> apply filtering on the subject and produce\
+    \ the resultant Root CA Trust Store.</p>\n<p><strong>Critical Review</strong>;\
+    \ \nA GitHub.com issue <a href=\"https://github.com/rustls/webpki-roots/issues/25\"\
+    >#25</a> outlines a lack of trust and we hope to have this addressed.</p>"
 "2.44":
   issue: |-
     <p>This is frequently a miss-configuration, i.e. the website domain name was not included in your common name by mistake.</p>
