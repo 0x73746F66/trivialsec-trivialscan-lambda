@@ -116,10 +116,10 @@ def retrieve_host(
     for match in matches:
         if match.endswith("latest.json"):
             continue
-        _port, _, date = (
+        _port, _ip, date = (
             match.replace(".json", "").replace(f"{prefix_key}/", "").split("/")
         )
-        versions.append(f"{_port}/{date}")
+        versions.append(f"{_port}/{date}/{_ip}")
 
     if last_updated:
         object_key = None

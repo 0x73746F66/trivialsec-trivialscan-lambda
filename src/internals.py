@@ -8,7 +8,7 @@ from base64 import b64encode, b64decode
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from os import getenv
-from typing import Union
+from typing import Union, Optional
 from enum import Enum
 from ipaddress import (
     IPv4Address,
@@ -22,7 +22,6 @@ from starlette.requests import Request
 from fastapi import Header, HTTPException, status
 from pydantic import (
     IPvAnyAddress,
-    HttpUrl,
     AnyHttpUrl,
     PositiveInt,
     PositiveFloat,
@@ -254,9 +253,9 @@ class AuthorizationRoute(str, Enum):
     SUPPORT = "/support"
     NOTIFICATION_DISABLE = "/notification/disable/"
     NOTIFICATION_ENABLE = "/notification/enable/"
-    WEBHOOK_DISABLE = "/webhook/disable/"
-    WEBHOOK_ENABLE = "/webhook/enable/"
+    WEBHOOK_ENABLE = "/webhook/enable"
     WEBHOOK_ENDPOINT = "/webhook/endpoint"
+    WEBHOOK_DELETE = "/webhook"
 
 
 class Authorization:
@@ -304,7 +303,7 @@ class Authorization:
         AuthorizationRoute.NOTIFICATION_DISABLE,
         AuthorizationRoute.NOTIFICATION_ENABLE,
         AuthorizationRoute.WEBHOOK_ENABLE,
-        AuthorizationRoute.WEBHOOK_DISABLE,
+        AuthorizationRoute.WEBHOOK_DELETE,
         AuthorizationRoute.WEBHOOK_ENDPOINT,
     ]
     secret_allow: list[AuthorizationRoute] = []
@@ -327,12 +326,12 @@ class Authorization:
         self.route: AuthorizationRoute
         self.is_valid: bool = False
         self.is_authorized: bool = False
-        self.account: Union[models.MemberAccount, None] = None
-        self.session: Union[models.MemberSession, None] = None
-        self.client: Union[models.Client, None] = None
-        self.member: Union[models.MemberProfile, None] = None
-        self.ip_addr: Union[IPvAnyAddress, None] = None
-        self.user_agent: str
+        self.account: Optional[models.MemberAccount]
+        self.session: Optional[models.MemberSession]
+        self.client: Optional[models.Client]
+        self.member: Optional[models.MemberProfile]
+        self.ip_addr: Optional[IPvAnyAddress]
+        self.user_agent: Optional[str]
 
         if postman_token := request.headers.get("Postman-Token"):
             logger.info(f"Postman-Token: {postman_token}")
@@ -576,7 +575,7 @@ def _request_task(url, body, headers):
 
 
 def post_beacon(
-    url: HttpUrl, body: dict, headers: dict = {"Content-Type": "application/json"}
+    url: AnyHttpUrl, body: dict, headers: dict = {"Content-Type": "application/json"}
 ):
     """
     A beacon is a fire and forget HTTP POST, the response is not

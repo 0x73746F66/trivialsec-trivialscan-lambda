@@ -284,8 +284,8 @@ async def queue_hostname(
         account=authz.account,
         data={
             "hostname": hostname,
-            "port": 443,
-            "http_paths": ["/"],
+            "ports": ports,
+            "http_paths": path_names,
             "type": models.ScanRecordType.ONDEMAND,
             "status": "queued",
             "account": authz.account.name,

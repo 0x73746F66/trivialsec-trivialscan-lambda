@@ -4,9 +4,10 @@ from time import time
 from random import random
 from secrets import token_urlsafe
 
+import validators
 from fastapi import APIRouter, Response, status, Depends
 from starlette.requests import Request
-import validators
+from pydantic import AnyHttpUrl
 
 import internals
 import models
@@ -74,7 +75,7 @@ async def account_register(
         display=data.display,
         primary_email=data.primary_email,
         billing_email=data.primary_email,
-        api_key=token_urlsafe(nbytes=32),
+        api_key=token_urlsafe(nbytes=23),
         ip_addr=ip_addr,
         user_agent=user_agent,
         timestamp=round(time() * 1000),  # JavaScript support
@@ -110,7 +111,7 @@ async def account_register(
         )
         activation_url = f"{internals.DASHBOARD_URL}/login/{member.confirmation_token}"
         sendgrid = services.sendgrid.send_email(
-            subject="Trivial Security - Confirmation",
+            subject="Registration Confirmation",
             recipient=member.email,
             template="registrations",
             data={"activation_url": activation_url},
@@ -490,11 +491,11 @@ async def disable_notification(
     return
 
 
-@router.get(
-    "/webhook/enable/{event_type}",
+@router.post(
+    "/webhook/enable",
     response_model=models.Webhooks,
     response_model_exclude_none=True,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_201_CREATED,
     responses={
         401: {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
@@ -510,25 +511,60 @@ async def disable_notification(
 )
 async def enable_webhook(
     response: Response,
-    event_type: str,
+    webhook: models.Webhooks,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
-    Enables an webhook event type
+    Enables a webhook
     """
-    try:
-        setattr(authz.account.webhooks, event_type, True)  # type: ignore
-        if authz.account.save():  # type: ignore
-            return authz.account.webhooks  # type: ignore
-    except AttributeError:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    found = False
+    changed = False
+    webhooks = []
+    for _webhook in authz.account.webhooks:
+        if webhook.endpoint == _webhook.endpoint:
+            found = True
+            changed = True
+            # preserve signing secret, clients cannot update this!
+            webhook.signing_secret = _webhook.signing_secret
+            webhooks.append(webhook)
+            continue
+        webhooks.append(_webhook)
+
+    if found:
+        response.status_code = status.HTTP_206_PARTIAL_CONTENT
+    else:
+        webhook.signing_secret = token_urlsafe(nbytes=23)
+        webhooks.append(webhook)
+        changed = True
+        sendgrid = services.sendgrid.send_email(
+            subject="Webhook Registered",
+            recipient=authz.member.email,
+            template="webhook_signing_secret",
+            data={
+                "endpoint": webhook.endpoint,
+                "signing_secret": webhook.signing_secret,
+            }
+        )
+        if sendgrid._content:  # pylint: disable=protected-access
+            res = json.loads(
+                sendgrid._content.decode()  # pylint: disable=protected-access
+            )
+            if isinstance(res, dict) and res.get("errors"):
+                internals.logger.error(res.get("errors"))
+                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+
+    authz.account.webhooks = webhooks
+    if changed and authz.account.save():
+        return webhook
+
+    internals.logger.warning(f"found {found} changed {changed}")
+    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
 
 
-@router.get(
-    "/webhook/disable/{event_type}",
-    response_model=models.Webhooks,
-    response_model_exclude_none=True,
+@router.delete(
+    "/webhook",
+    response_model=bool,
     status_code=status.HTTP_202_ACCEPTED,
     responses={
         401: {
@@ -543,65 +579,22 @@ async def enable_webhook(
     },
     tags=["Member Account"],
 )
-async def disable_webhook(
-    response: Response,
-    event_type: str,
+async def delete_webhook(
+    endpoint: AnyHttpUrl,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
-    Disables an webhook event type
+    Deletes a webhook
     """
-    try:
-        setattr(authz.account.webhooks, event_type, False)  # type: ignore
-        if authz.account.save():  # type: ignore
-            return authz.account.webhooks  # type: ignore
-    except AttributeError:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
+    found = False
+    webhooks = []
+    for webhook in authz.account.webhooks:
+        if endpoint == webhook.endpoint:
+            found = True
+            continue
+        webhooks.append(webhook)
+    authz.account.webhooks = webhooks
+    if found and authz.account.save():
+        return True
 
-
-@router.post(
-    "/webhook/endpoint",
-    response_model=models.Webhooks,
-    status_code=status.HTTP_202_ACCEPTED,
-    responses={
-        208: {"description": "The account is already registered"},
-        400: {
-            "description": "The display name was not provided or email address is not valid"
-        },
-        409: {"description": "The email address has already been registered"},
-        424: {"description": "Email sending errors were logged"},
-        500: {
-            "description": "An unhandled error occurred during an AWS request for data access"
-        },
-    },
-    tags=["Member Account"],
-)
-async def webhook_endpoint(
-    response: Response,
-    data: models.WebhookEndpointRequest,
-    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
-):
-    """
-    Manages the webhook endpoint URL
-    """
-    try:
-        authz.account.webhooks.webhook_endpoint = data.endpoint  # type: ignore
-        if authz.account.save():  # type: ignore
-            services.webhook.send(
-                event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
-                account=authz.account,
-                data={
-                    "type": "update_webhook_endpoint",
-                    "webhook_endpoint": data.endpoint,
-                    "timestamp": round(time() * 1000),
-                    "account": authz.account.name,
-                    "member": authz.member.email,
-                    "ip_addr": authz.ip_addr,
-                    "user_agent": authz.user_agent,
-                },
-            )
-            return authz.account.webhooks  # type: ignore
-    except AttributeError:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
+    return False

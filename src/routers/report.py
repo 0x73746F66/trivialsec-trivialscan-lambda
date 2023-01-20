@@ -189,7 +189,7 @@ async def store(
             del data["config"]["dashboard_api_url"]
 
     if report_type is models.ReportType.REPORT:
-        data["report_id"] = token_urlsafe(56)
+        data["report_id"] = token_urlsafe(32)
         data["results_uri"] = f'/result/{data["report_id"]}/detail'
         client_info = None
         if client := models.Client(account=authz.account, name=data.get("client_name")).load():  # type: ignore

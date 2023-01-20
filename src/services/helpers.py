@@ -8,6 +8,7 @@ from pydantic import IPvAnyAddress
 
 import config
 import models
+import models.stripe
 import internals
 
 
@@ -40,15 +41,15 @@ def get_quotas(
     monitoring_total = 1
     passive_total = 1
     active_total = 0
-    if sub := models.SubscriptionAddon().load(account.name):  # type: ignore
+    if sub := models.stripe.SubscriptionAddon().load(account.name):  # type: ignore
         unlimited_scans = True
-    if sub := models.SubscriptionBasics().load(account.name):  # type: ignore
+    if sub := models.stripe.SubscriptionBasics().load(account.name):  # type: ignore
         monitoring_total = 1 if not sub.metadata else sub.metadata.get("monitoring", 1)
         passive_total = (
             1 if not sub.metadata else sub.metadata.get("managed_passive", 1)
         )
         active_total = 0 if not sub.metadata else sub.metadata.get("managed_active", 0)
-    elif sub := models.SubscriptionPro().load(account.name):  # type: ignore
+    elif sub := models.stripe.SubscriptionPro().load(account.name):  # type: ignore
         monitoring_total = (
             10 if not sub.metadata else sub.metadata.get("monitoring", 10)
         )
@@ -59,7 +60,7 @@ def get_quotas(
             50 if not sub.metadata else sub.metadata.get("managed_active", 50)
         )
         new_only = False
-    elif sub := models.SubscriptionEnterprise().load(account.name):  # type: ignore
+    elif sub := models.stripe.SubscriptionEnterprise().load(account.name):  # type: ignore
         monitoring_total = (
             50 if not sub.metadata else sub.metadata.get("monitoring", 50)
         )
@@ -70,7 +71,7 @@ def get_quotas(
             100 if not sub.metadata else sub.metadata.get("managed_active", 100)
         )
         new_only = False
-    elif sub := models.SubscriptionUnlimited().load(account.name):  # type: ignore
+    elif sub := models.stripe.SubscriptionUnlimited().load(account.name):  # type: ignore
         unlimited_scans = True
         unlimited_monitoring = True
 

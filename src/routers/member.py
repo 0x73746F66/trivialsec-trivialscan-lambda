@@ -29,7 +29,7 @@ router = APIRouter()
     response_model=models.CheckToken,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_203_NON_AUTHORITATIVE_INFORMATION,
     responses={
         403: {
             "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
@@ -52,7 +52,7 @@ async def validate_authorization(
             "timestamp": round(time() * 1000),
             "account": authz.account.name,
             "member": None
-            if not hasattr(authz.member, "email")
+            if not hasattr(authz, "member")
             else authz.member.email,
             "client": None if not hasattr(authz.client, "name") else authz.client.name,
             "ip_addr": authz.ip_addr,
@@ -62,9 +62,15 @@ async def validate_authorization(
     return {
         "version": x_trivialscan_version,
         "account": authz.account,
-        "client": authz.client,
-        "member": authz.member,
-        "session": authz.session,
+        "client": None
+            if not hasattr(authz, "client")
+            else authz.client,
+        "member": None
+            if not hasattr(authz, "member")
+            else authz.member,
+        "session": None
+            if not hasattr(authz, "session")
+            else authz.session,
         "authorisation_valid": authz.is_valid,
         "ip_addr": authz.ip_addr,
         "user_agent": authz.user_agent,
@@ -390,7 +396,7 @@ async def login(
         session = models.MemberSession(
             member=member,
             session_token=session_token,
-            access_token=token_urlsafe(nbytes=32),
+            access_token=token_urlsafe(nbytes=23),
             ip_addr=ip_addr,
             user_agent=user_agent,
             timestamp=round(time() * 1000),

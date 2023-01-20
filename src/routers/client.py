@@ -67,7 +67,7 @@ async def claim_client(
             client_info=client_info,
             name=client_name,
             cli_version=x_trivialscan_version,
-            access_token=token_urlsafe(nbytes=32),
+            access_token=token_urlsafe(nbytes=23),
             ip_addr=authz.ip_addr,
             user_agent=authz.user_agent,
             timestamp=round(time() * 1000),  # JavaScript support

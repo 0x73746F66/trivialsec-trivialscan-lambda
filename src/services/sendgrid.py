@@ -16,10 +16,11 @@ SENDGRID_TEMPLATES = {
     "magic_link": "d-48aa0ed2e9ff442ea6ee9b73ac984b96",
     "recovery_request": "d-1958843496444e7bb8e29f4277e74182",
     "registrations": "d-a0a115275e404b32bf96b540ecdffeda",
+    "scan_completed": "d-b3e18e04202449398bb631694f10753e",
     "subscriptions": "d-1d20f029d4eb46b5957c253c3ccd3262",
     "support": "d-821ef38856bb4d0581f26c4745ce00e7",
     "updated_email": "d-fef742bc0a754165a8778f4929df3dbb",
-    "scan_completed": "d-b3e18e04202449398bb631694f10753e",
+    "webhook_signing_secret": "d-98a39d14bb11487c94f27d9df88c5c82",
 }
 SENDGRID_GROUPS = {
     "notifications": 18318,

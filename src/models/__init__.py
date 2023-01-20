@@ -4,7 +4,6 @@ import hashlib
 from abc import ABCMeta, abstractmethod
 from enum import Enum
 from typing import Union, Any, Optional
-from decimal import Decimal
 from datetime import datetime
 
 import validators
@@ -24,7 +23,7 @@ from pydantic.error_wrappers import ValidationError
 import internals
 import services.aws
 import services.stripe
-
+import models.stripe
 
 class DAL(metaclass=ABCMeta):
     @abstractmethod
@@ -86,379 +85,6 @@ class ReportType(str, Enum):
     EVALUATIONS = "evaluations"
 
 
-class PriceType(str, Enum):
-    ONE_TIME = "one_time"
-    RECURRING = "recurring"
-
-
-class BillingScheme(str, Enum):
-    PER_UNIT = "per_unit"
-    TIERED = "tiered"
-
-
-class SupportedCurrency(str, Enum):
-    USD = "usd"
-    AUD = "aud"
-
-
-class RecurringInterval(str, Enum):
-    MONTH = "month"
-    YEAR = "year"
-    WEEK = "week"
-    DAY = "day"
-
-
-class RecurringType(str, Enum):
-    LICENSED = "licensed"
-    METERED = "metered"
-
-
-class PriceRecurring(BaseModel):
-    aggregate_usage: Union[str, None] = Field(default=None)
-    interval: RecurringInterval
-    interval_count: int
-    trial_period_days: Union[str, None] = Field(default=None)
-    usage_type: RecurringType
-
-
-class SubscriptionPrice(BaseModel):
-    id: str
-    active: bool
-    billing_scheme: BillingScheme
-    created: int
-    currency: SupportedCurrency
-    livemode: bool
-    metadata: dict = Field(default={})
-    nickname: Union[str, None] = Field(default=None)
-    product: str
-    recurring: PriceRecurring
-    type: PriceType
-    unit_amount: Decimal
-    unit_amount_decimal: str
-
-
-class SubscriptionItem(BaseModel):
-    id: str
-    created: int
-    metadata: dict = Field(default={})
-    price: SubscriptionPrice
-    quantity: int
-    subscription: str
-    tax_rates: list = Field(default=[])
-
-
-class SubscriptionCollectionMethod(str, Enum):
-    CHARGE_AUTOMATICALLY = "charge_automatically"
-    SEND_INVOICE = "send_invoice"
-
-
-class SubscriptionPauseBehavior(str, Enum):
-    KEEP_AS_DRAFT = "keep_as_draft"
-    MARK_UNCOLLECTIBLE = "mark_uncollectible"
-    VOID = "void"
-
-
-class SubscriptionCouponDuration(str, Enum):
-    ONCE = "once"
-    REPEATING = "repeating"
-    FOREVER = "forever"
-
-
-class SubscriptionStatus(str, Enum):
-    INCOMPLETE = "incomplete"
-    INCOMPLETE_EXPIRED = "incomplete_expired"
-    TRIALING = "trialing"
-    ACTIVE = "active"
-    PAST_DUE = "past_due"
-    CANCELED = "canceled"
-    UNPAID = "unpaid"
-
-
-class SubscriptionPause(BaseModel):
-    behavior: SubscriptionPauseBehavior
-    resumes_at: int
-
-
-class SubscriptionCoupon(BaseModel):
-    id: str
-    amount_off: Union[Decimal, None] = Field(default=None)
-    created: int
-    currency: Union[SupportedCurrency, None] = Field(default=None)
-    duration: SubscriptionCouponDuration
-    duration_in_months: Union[int, None] = Field(default=None)
-    livemode: bool
-    max_redemptions: Union[int, None] = Field(default=None)
-    metadata: Union[dict, None] = Field(default={})
-    name: str
-    percent_off: Union[Decimal, None] = Field(default=None)
-    redeem_by: int
-    times_redeemed: int
-    valid: bool
-
-
-class SubscriptionDiscount(BaseModel):
-    id: str
-    coupon: SubscriptionCoupon
-    customer: str
-    end: Union[int, None] = Field(default=None)
-    invoice: Union[str, None] = Field(default=None)
-    invoice_item: Union[str, None] = Field(default=None)
-    promotion_code: str
-    start: int
-    subscription: str
-
-
-class SubscriptionPlan(BaseModel):
-    id: str
-    active: bool
-    aggregate_usage: Union[str, None] = Field(default=None)
-    amount: Decimal
-    amount_decimal: str
-    billing_scheme: BillingScheme
-    created: int
-    currency: SupportedCurrency
-    interval: RecurringInterval
-    interval_count: int
-    livemode: bool
-    metadata: Union[dict, None] = Field(default={})
-    nickname: Union[str, None] = Field(default=None)
-    product: str
-    trial_period_days: Union[int, None] = Field(default=None)
-    usage_type: RecurringType
-
-
-class SubscriptionBase(BaseModel):
-    id: Optional[str]
-    billing_cycle_anchor: Optional[int]
-    cancel_at: Union[int, None] = Field(default=None)
-    cancel_at_period_end: Union[bool, None] = Field(default=None)
-    canceled_at: Union[int, None] = Field(default=None)
-    collection_method: Optional[SubscriptionCollectionMethod]
-    created: Optional[int]
-    currency: Optional[SupportedCurrency]
-    current_period_end: Union[int, None] = Field(default=None)
-    current_period_start: Union[int, None] = Field(default=None)
-    customer: Optional[str]
-    days_until_due: Union[int, None] = Field(default=None)
-    default_payment_method: Optional[str]
-    description: Optional[str]
-    discount: Union[SubscriptionDiscount, None] = Field(default=None)
-    ended_at: Union[int, None] = Field(default=None)
-    latest_invoice: Optional[str]
-    livemode: Optional[bool]
-    metadata: Union[dict, None] = Field(default={})
-    next_pending_invoice_item_invoice: Union[int, None] = Field(default=None)
-    pause_collection: Union[SubscriptionPause, None] = Field(default=None)
-    plan: Optional[SubscriptionPlan]
-    quantity: Optional[int]
-    start_date: Optional[int]
-    status: Optional[SubscriptionStatus]
-    trial_end: Optional[int]
-    trial_start: Optional[int]
-    subscription_item: Optional[SubscriptionItem]
-
-    def load(self, *args, **kwargs):
-        raise NotImplementedError
-
-    def exists(self, account_name: str) -> bool:
-        return self.load(account_name) is not None
-
-    def save(self) -> bool:
-        raise RuntimeWarning(
-            "This is not a supported method. Use the Stripe SDK/API to modify payments"
-        )
-
-    def delete(self) -> bool:
-        raise RuntimeWarning(
-            "This is not a supported method. Use the Stripe SDK/API to modify payments"
-        )
-
-
-class SubscriptionAddon(SubscriptionBase, DAL):
-    def load(self, account_name: str) -> Union["SubscriptionAddon", None]:
-        """
-        Derives a Stripe subscription based on having at least one active record
-        and returns only the most recent. Any other requirements should load the
-        data directly outside this class
-        """
-        if not account_name:
-            raise AttributeError("Subscription.load missing account_name")
-
-        subs = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.UNLIMITED_RESCANS}/"
-        matches = services.aws.list_s3(prefix_key=prefix_key)
-        for match in matches:
-            raw = services.aws.get_s3(path_key=match)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-            except json.decoder.JSONDecodeError as err:
-                internals.logger.debug(err, exc_info=True)
-                continue
-            if not data or not isinstance(data, dict):
-                internals.logger.debug(f"not data {match}")
-                continue
-            if data.get("livemode") and data.get("status") in [
-                SubscriptionStatus.ACTIVE,
-                SubscriptionStatus.TRIALING,
-            ]:
-                subs.append(data)
-
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
-            super().__init__(**res[-1])
-            return self
-
-
-class SubscriptionBasics(SubscriptionBase, DAL):
-    def load(self, account_name: str) -> Union["SubscriptionBasics", None]:
-        """
-        Derives a Stripe subscription based on having at least one active record
-        and returns only the most recent. Any other requirements should load the
-        data directly outside this class
-        """
-        if not account_name:
-            raise AttributeError("Subscription.load missing account_name")
-
-        subs = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.BASICS}/"
-        matches = services.aws.list_s3(prefix_key=prefix_key)
-        for match in matches:
-            raw = services.aws.get_s3(path_key=match)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-            except json.decoder.JSONDecodeError as err:
-                internals.logger.debug(err, exc_info=True)
-                continue
-            if not data or not isinstance(data, dict):
-                internals.logger.debug(f"not data {match}")
-                continue
-            if data.get("livemode") and data.get("status") in [
-                SubscriptionStatus.ACTIVE,
-                SubscriptionStatus.TRIALING,
-            ]:
-                subs.append(data)
-
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
-            super().__init__(**res[-1])
-            return self
-
-
-class SubscriptionPro(SubscriptionBase, DAL):
-    def load(self, account_name: str) -> Union["SubscriptionPro", None]:
-        """
-        Derives a Stripe subscription based on having at least one active record
-        and returns only the most recent. Any other requirements should load the
-        data directly outside this class
-        """
-        if not account_name:
-            raise AttributeError("Subscription.load missing account_name")
-
-        subs = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.PROFESSIONAL}/"
-        matches = services.aws.list_s3(prefix_key=prefix_key)
-        for match in matches:
-            raw = services.aws.get_s3(path_key=match)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-            except json.decoder.JSONDecodeError as err:
-                internals.logger.debug(err, exc_info=True)
-                continue
-            if not data or not isinstance(data, dict):
-                internals.logger.debug(f"not data {match}")
-                continue
-            if data.get("livemode") and data.get("status") in [
-                SubscriptionStatus.ACTIVE,
-                SubscriptionStatus.TRIALING,
-            ]:
-                subs.append(data)
-
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
-            super().__init__(**res[-1])
-            return self
-
-
-class SubscriptionEnterprise(SubscriptionBase, DAL):
-    def load(self, account_name: str) -> Union["SubscriptionEnterprise", None]:
-        """
-        Derives a Stripe subscription based on having at least one active record
-        and returns only the most recent. Any other requirements should load the
-        data directly outside this class
-        """
-        if not account_name:
-            raise AttributeError("Subscription.load missing account_name")
-
-        subs = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.ENTERPRISE}/"
-        matches = services.aws.list_s3(prefix_key=prefix_key)
-        for match in matches:
-            raw = services.aws.get_s3(path_key=match)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-            except json.decoder.JSONDecodeError as err:
-                internals.logger.debug(err, exc_info=True)
-                continue
-            if not data or not isinstance(data, dict):
-                internals.logger.debug(f"not data {match}")
-                continue
-            if data.get("livemode") and data.get("status") in [
-                SubscriptionStatus.ACTIVE,
-                SubscriptionStatus.TRIALING,
-            ]:
-                subs.append(data)
-
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
-            super().__init__(**res[-1])
-            return self
-
-
-class SubscriptionUnlimited(SubscriptionBase, DAL):
-    def load(self, account_name: str) -> Union["SubscriptionUnlimited", None]:
-        """
-        Derives a Stripe subscription based on having at least one active record
-        and returns only the most recent. Any other requirements should load the
-        data directly outside this class
-        """
-        if not account_name:
-            raise AttributeError("Subscription.load missing account_name")
-
-        subs = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.UNLIMITED}/"
-        matches = services.aws.list_s3(prefix_key=prefix_key)
-        for match in matches:
-            raw = services.aws.get_s3(path_key=match)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-            except json.decoder.JSONDecodeError as err:
-                internals.logger.debug(err, exc_info=True)
-                continue
-            if not data or not isinstance(data, dict):
-                internals.logger.debug(f"not data {match}")
-                continue
-            if data.get("livemode") and data.get("status") in [
-                SubscriptionStatus.ACTIVE,
-                SubscriptionStatus.TRIALING,
-            ]:
-                subs.append(data)
-
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
-            super().__init__(**res[-1])
-            return self
-
-
 class AccountRegistration(BaseModel):
     name: str
     display: Optional[str]
@@ -468,10 +94,10 @@ class AccountRegistration(BaseModel):
 class Billing(BaseModel):
     product_name: str
     is_trial: bool = Field(default=False)
-    description: Union[str, None] = Field(default=None)
+    description: Optional[str]
     display_amount: str = Field(default="free")
-    display_period: Union[str, None] = Field(default=None)
-    next_due: Union[int, None] = Field(default=None)
+    display_period: Optional[str]
+    next_due: Optional[int]
     has_invoice: bool = Field(default=False)
 
 
@@ -487,7 +113,8 @@ class AccountNotifications(BaseModel):
 
 
 class Webhooks(BaseModel):
-    webhook_endpoint: Union[AnyHttpUrl, None] = Field(default=None)
+    endpoint: AnyHttpUrl = Field(default=None)
+    signing_secret: Optional[str]
     hosted_monitoring: Optional[bool] = Field(default=False)
     hosted_scanner: Optional[bool] = Field(default=False)
     self_hosted_uploads: Optional[bool] = Field(default=False)
@@ -505,6 +132,15 @@ class Webhooks(BaseModel):
     report_deleted: Optional[bool] = Field(default=False)
     account_activity: Optional[bool] = Field(default=False)
     member_activity: Optional[bool] = Field(default=False)
+
+
+class WebhooksRedacted(Webhooks):
+    class Config:
+        validate_assignment = True
+
+    @validator("signing_secret")
+    def set_signing_secret(cls, _):
+        return None
 
 
 class Webauthn(BaseModel):
@@ -534,52 +170,15 @@ class MfaSetting(str, Enum):
 class MemberAccount(AccountRegistration, DAL):
     billing_email: Optional[EmailStr]
     api_key: Optional[str]
-    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
-    user_agent: Union[str, None] = Field(default=None)
+    ip_addr: Optional[IPvAnyAddress]
+    user_agent: Optional[str]
     timestamp: Optional[int]
     # mfa: Optional[MfaSetting] = Field(default=MfaSetting.ENROLL)
     billing: Union[Billing, None] = Field(default=None)
     notifications: Optional[AccountNotifications] = Field(
         default=AccountNotifications()
     )
-    webhooks: Optional[Webhooks] = Field(default=Webhooks())
-
-    def load_billing(self):
-        if sub := SubscriptionAddon().load(self.name):  # type: ignore
-            return self._billing(sub)
-        elif sub := SubscriptionPro().load(self.name):  # type: ignore
-            return self._billing(sub)  # NOSONAR
-        elif sub := SubscriptionEnterprise().load(self.name):  # type: ignore
-            return self._billing(sub)  # NOSONAR
-        elif sub := SubscriptionUnlimited().load(self.name):  # type: ignore
-            return self._billing(sub)  # NOSONAR
-        self.billing = Billing(
-            product_name=services.stripe.PRODUCTS.get(services.stripe.Product.COMMUNITY_EDITION).get("name")  # type: ignore
-        )
-
-    def _billing(self, sub: SubscriptionBase):
-        self.billing = Billing(
-            product_name=services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")  # type: ignore
-        )
-        self.billing.is_trial = sub.status == SubscriptionStatus.TRIALING
-        self.billing.has_invoice = isinstance(
-            sub.latest_invoice, str
-        ) and sub.latest_invoice.startswith("in_")
-        currency = sub.subscription_item.price.currency  # type: ignore
-        amount = sub.subscription_item.price.unit_amount_decimal  # type: ignore
-        self.billing.display_amount = f"{currency.upper()} ${amount}"
-        self.billing.display_period = sub.subscription_item.price.recurring.interval.capitalize()  # type: ignore
-        if not sub.cancel_at_period_end:
-            # JavaScript compatibility
-            self.billing.next_due = sub.current_period_end * 1000  # type: ignore
-        if (
-            sub.default_payment_method
-            and sub.collection_method
-            == SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY
-        ):
-            self.billing.description = "Stripe Payments"
-        elif sub.collection_method == SubscriptionCollectionMethod.SEND_INVOICE:
-            self.billing.description = "Send Invoice"
+    webhooks: Optional[list[Webhooks]] = Field(default=[])
 
     def exists(self, account_name: Union[str, None] = None) -> bool:
         return self.load(account_name) is not None
@@ -618,6 +217,43 @@ class MemberAccount(AccountRegistration, DAL):
     def delete(self) -> Union[bool, None]:
         object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
         return services.aws.delete_s3(object_key)
+
+    def load_billing(self):
+        if sub := models.stripe.SubscriptionAddon().load(self.name):  # type: ignore
+            return self._billing(sub)
+        elif sub := models.stripe.SubscriptionPro().load(self.name):  # type: ignore
+            return self._billing(sub)  # NOSONAR
+        elif sub := models.stripe.SubscriptionEnterprise().load(self.name):  # type: ignore
+            return self._billing(sub)  # NOSONAR
+        elif sub := models.stripe.SubscriptionUnlimited().load(self.name):  # type: ignore
+            return self._billing(sub)  # NOSONAR
+        self.billing = Billing(
+            product_name=services.stripe.PRODUCTS.get(services.stripe.Product.COMMUNITY_EDITION).get("name")  # type: ignore
+        )
+
+    def _billing(self, sub: models.stripe.SubscriptionBase):
+        self.billing = Billing(
+            product_name=services.stripe.PRODUCTS.get(services.stripe.PRODUCT_MAP.get(sub.plan.product), {}).get("name")  # type: ignore
+        )
+        self.billing.is_trial = sub.status == models.stripe.SubscriptionStatus.TRIALING
+        self.billing.has_invoice = isinstance(
+            sub.latest_invoice, str
+        ) and sub.latest_invoice.startswith("in_")
+        currency = sub.subscription_item.price.currency  # type: ignore
+        amount = sub.subscription_item.price.unit_amount_decimal  # type: ignore
+        self.billing.display_amount = f"{currency.upper()} ${amount}"
+        self.billing.display_period = sub.subscription_item.price.recurring.interval.capitalize()  # type: ignore
+        if not sub.cancel_at_period_end:
+            # JavaScript compatibility
+            self.billing.next_due = sub.current_period_end * 1000  # type: ignore
+        if (
+            sub.default_payment_method
+            and sub.collection_method
+            == models.stripe.SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY
+        ):
+            self.billing.description = "Stripe Payments"
+        elif sub.collection_method == models.stripe.SubscriptionCollectionMethod.SEND_INVOICE:
+            self.billing.description = "Send Invoice"
 
     def update_members(
         self,
@@ -661,13 +297,17 @@ class MemberAccountRedacted(MemberAccount):
     def set_api_key(cls, _):
         return None
 
+    @validator("webhooks")
+    def set_webhooks(cls, webhooks):
+        return [WebhooksRedacted(**webhook.dict()) for webhook in webhooks]
+
 
 class MemberProfile(BaseModel):
     account: Optional[MemberAccount]
     email: EmailStr
     email_md5: Optional[str]
     confirmed: bool = Field(default=False)
-    confirmation_token: Union[str, None] = Field(default=None)
+    confirmation_token: Optional[str]
     timestamp: Optional[int]
     current: Optional[bool] = Field(default=False)
 
@@ -762,9 +402,9 @@ class Client(BaseModel, DAL):
     client_info: Optional[ClientInfo]
     name: str
     cli_version: Optional[str]
-    access_token: Union[str, None] = Field(default=None)
-    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
-    user_agent: Union[str, None] = Field(default=None)
+    access_token: Optional[str]
+    ip_addr: Optional[IPvAnyAddress]
+    user_agent: Optional[str]
     timestamp: Optional[int]
     active: Optional[bool] = Field(default=False)
 
@@ -834,10 +474,10 @@ class MagicLinkRequest(BaseModel):
 
 class MagicLink(MagicLinkRequest, DAL):
     magic_token: str
-    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
-    user_agent: Union[str, None] = Field(default=None)
-    timestamp: Union[int, None] = Field(default=None)
-    sendgrid_message_id: Union[str, None] = Field(default=None)
+    ip_addr: Optional[IPvAnyAddress]
+    user_agent: Optional[str]
+    timestamp: Optional[int]
+    sendgrid_message_id: Optional[str]
 
     def exists(self, magic_token: Union[str, None] = None) -> bool:
         return self.load(magic_token) is not None
@@ -874,10 +514,10 @@ class MemberSession(BaseModel, DAL):
     member: Optional[MemberProfile]
     session_token: str
     access_token: Optional[str]
-    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
-    user_agent: Union[str, None] = Field(default=None)
-    browser: Union[str, None] = Field(default=None)
-    platform: Union[str, None] = Field(default=None)
+    ip_addr: Optional[IPvAnyAddress]
+    user_agent: Optional[str]
+    browser: Optional[str]
+    platform: Optional[str]
     lat: Optional[float]
     lon: Optional[float]
     timestamp: Optional[int]
@@ -970,10 +610,10 @@ class SupportRequest(BaseModel):
 
 class Support(SupportRequest, DAL):
     member: MemberProfileRedacted
-    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
-    user_agent: Union[str, None] = Field(default=None)
-    timestamp: Union[int, None] = Field(default=None)
-    sendgrid_message_id: Union[str, None] = Field(default=None)
+    ip_addr: Optional[IPvAnyAddress]
+    user_agent: Optional[str]
+    timestamp: Optional[int]
+    sendgrid_message_id: Optional[str]
 
     def exists(
         self,
@@ -1033,20 +673,20 @@ class Support(SupportRequest, DAL):
 
 class DefaultInfo(BaseModel):
     generator: str = Field(default="trivialscan")
-    version: Union[str, None] = Field(
+    version: Optional[str] = Field(
         default=None, description="trivialscan CLI version"
     )
-    account_name: Union[str, None] = Field(
+    account_name: Optional[str] = Field(
         default=None, description="Trivial Security account name"
     )
-    client_name: Union[str, None] = Field(
-        default=None, description="Machine name where trivialscan CLI execcutes"
+    client_name: Optional[str] = Field(
+        default=None, description="Machine name where trivialscan CLI executes"
     )
 
 
 class ConfigDefaults(BaseModel):
     use_sni: bool
-    cafiles: Union[str, None] = Field(default=None)
+    cafiles: Optional[str]
     tmp_path_prefix: str = Field(default="/tmp")
     http_path: str = Field(default="/")
     checkpoint: Optional[bool]
@@ -1054,26 +694,26 @@ class ConfigDefaults(BaseModel):
 
 class ConfigOutput(BaseModel):
     type: OutputType
-    use_icons: Union[bool, None]
+    use_icons: Optional[bool]
     when: OutputWhen = Field(default=OutputWhen.FINAL)
-    path: Union[str, None] = Field(default=None)
+    path: Optional[str]
 
 
 class ConfigTarget(BaseModel):
     hostname: str
     port: PositiveInt = Field(default=443)
-    client_certificate: Union[str, None] = Field(default=None)
+    client_certificate: Optional[str]
     http_request_paths: list[str] = Field(default=["/"])
 
 
 class Config(BaseModel):
-    account_name: Union[str, None] = Field(
+    account_name: Optional[str] = Field(
         default=None, description="Trivial Security account name"
     )
-    client_name: Union[str, None] = Field(
+    client_name: Optional[str] = Field(
         default=None, description="Machine name where trivialscan CLI execcutes"
     )
-    project_name: Union[str, None] = Field(
+    project_name: Optional[str] = Field(
         default=None, description="Trivial Scanner project assignment for the report"
     )
     defaults: ConfigDefaults
@@ -1086,7 +726,7 @@ class Flags(BaseModel):
     synchronous_only: Optional[bool]
     hide_banner: Optional[bool]
     track_changes: Optional[bool]
-    previous_report: Union[str, None]
+    previous_report: Optional[str]
     quiet: Optional[bool]
 
 
@@ -1097,18 +737,18 @@ class HostTLSProtocol(BaseModel):
 
 
 class HostTLSCipher(BaseModel):
-    forward_anonymity: Union[bool, None] = Field(default=False)
+    forward_anonymity: Optional[bool] = Field(default=False)
     offered: list[str]
-    offered_rfc: list[str]
+    offered_rfc: Optional[list[str]]
     negotiated: str
     negotiated_bits: PositiveInt
-    negotiated_rfc: str
+    negotiated_rfc: Optional[str]
 
 
 class HostTLSClient(BaseModel):
-    certificate_mtls_expected: Union[bool, None] = Field(default=False)
-    certificate_trusted: Union[bool, None] = Field(default=False)
-    certificate_match: Union[bool, None] = Field(default=False)
+    certificate_mtls_expected: Optional[bool] = Field(default=False)
+    certificate_trusted: Optional[bool] = Field(default=False)
+    certificate_match: Optional[bool] = Field(default=False)
     expected_client_subjects: list[str] = Field(default=[])
 
 
@@ -1140,7 +780,7 @@ class HostTransport(BaseModel):
     port: PositiveInt = Field(default=443)
     sni_support: Optional[bool]
     peer_address: Optional[IPvAnyAddress]
-    certificate_mtls_expected: Union[bool, None] = Field(default=False)
+    certificate_mtls_expected: Optional[bool] = Field(default=False)
 
 
 class Host(BaseModel, DAL):
@@ -1209,20 +849,20 @@ class Host(BaseModel, DAL):
 
 
 class Certificate(BaseModel, DAL):
-    authority_key_identifier: Union[str, None] = Field(default=None)
+    authority_key_identifier: Optional[str]
     expired: Optional[bool]
     expiry_status: Optional[str]
     extensions: Optional[list] = Field(default=[])
-    external_refs: Optional[dict[str, Union[AnyHttpUrl, None]]] = Field(default={})
+    external_refs: Optional[dict[str, Optional[AnyHttpUrl]]] = Field(default={})
     is_self_signed: Optional[bool]
     issuer: Optional[str]
     known_compromised: Optional[bool]
     md5_fingerprint: Optional[str]
     not_after: Optional[datetime]
     not_before: Optional[datetime]
-    public_key_curve: Union[str, None] = Field(default=None)
-    public_key_exponent: Union[PositiveInt, None] = Field(default=None)
-    public_key_modulus: Union[PositiveInt, None] = Field(default=None)
+    public_key_curve: Optional[str]
+    public_key_exponent: Optional[PositiveInt]
+    public_key_modulus: Optional[PositiveInt]
     public_key_size: Optional[PositiveInt]
     public_key_type: Optional[PublicKeyType]
     revocation_crl_urls: Optional[list[AnyHttpUrl]] = Field(default=[])
@@ -1236,8 +876,8 @@ class Certificate(BaseModel, DAL):
     spki_fingerprint: Optional[str]
     subject: Optional[str]
     subject_key_identifier: Optional[str]
-    validation_level: Union[ValidationLevel, None] = Field(default=None)
-    validation_oid: Union[str, None] = Field(default=None)
+    validation_level: Optional[ValidationLevel]
+    validation_oid: Optional[str]
     version: Optional[Any] = Field(default=None)
     type: Optional[CertificateType]
 
@@ -1276,9 +916,9 @@ class Certificate(BaseModel, DAL):
 
 
 class ComplianceItem(BaseModel):
-    requirement: Union[str, None] = Field(default=None)
-    title: Union[str, None] = Field(default=None)
-    description: Union[str, None] = Field(default=None)
+    requirement: Optional[str]
+    title: Optional[str]
+    description: Optional[str]
 
 
 class ComplianceName(str, Enum):
@@ -1290,32 +930,32 @@ class ComplianceName(str, Enum):
 class ComplianceGroup(BaseModel):
     compliance: Optional[ComplianceName]
     version: Optional[str]
-    items: Union[list[ComplianceItem], None] = Field(default=[])
+    items: Optional[list[ComplianceItem]] = Field(default=[])
 
 
 class ThreatItem(BaseModel):
     standard: str
     version: str
-    tactic: Union[str, None] = Field(default=None)
-    tactic_id: Union[str, None] = Field(default=None)
-    tactic_url: Union[AnyHttpUrl, None] = Field(default=None)
-    tactic_description: Union[str, None] = Field(default=None)
-    technique: Union[str, None] = Field(default=None)
-    technique_id: Union[str, None] = Field(default=None)
-    technique_url: Union[AnyHttpUrl, None] = Field(default=None)
-    technique_description: Union[str, None] = Field(default=None)
-    mitigation: Union[str, None] = Field(default=None)
-    mitigation_id: Union[str, None] = Field(default=None)
-    mitigation_url: Union[AnyHttpUrl, None] = Field(default=None)
-    mitigation_description: Union[str, None] = Field(default=None)
-    sub_technique: Union[str, None] = Field(default=None)
-    sub_technique_id: Union[str, None] = Field(default=None)
-    sub_technique_url: Union[AnyHttpUrl, None] = Field(default=None)
-    sub_technique_description: Union[str, None] = Field(default=None)
-    data_source: Union[str, None] = Field(default=None)
-    data_source_id: Union[str, None] = Field(default=None)
-    data_source_url: Union[AnyHttpUrl, None] = Field(default=None)
-    data_source_description: Union[str, None] = Field(default=None)
+    tactic: Optional[str]
+    tactic_id: Optional[str]
+    tactic_url: Optional[AnyHttpUrl]
+    tactic_description: Optional[str]
+    technique: Optional[str]
+    technique_id: Optional[str]
+    technique_url: Optional[AnyHttpUrl]
+    technique_description: Optional[str]
+    mitigation: Optional[str]
+    mitigation_id: Optional[str]
+    mitigation_url: Optional[AnyHttpUrl]
+    mitigation_description: Optional[str]
+    sub_technique: Optional[str]
+    sub_technique_id: Optional[str]
+    sub_technique_url: Optional[AnyHttpUrl]
+    sub_technique_description: Optional[str]
+    data_source: Optional[str]
+    data_source_id: Optional[str]
+    data_source_url: Optional[AnyHttpUrl]
+    data_source_description: Optional[str]
 
 
 class ReferenceType(str, Enum):
@@ -1344,19 +984,19 @@ class ScanRecordCategory(str, Enum):
 
 class ReportSummary(DefaultInfo):
     report_id: str
-    project_name: Union[str, None]
+    project_name: Optional[str]
     targets: list[Host] = Field(default=[])
     date: Optional[datetime]
-    execution_duration_seconds: Union[PositiveFloat, None] = Field(default=None)
+    execution_duration_seconds: Optional[PositiveFloat]
     score: int = Field(default=0)
     results: Optional[dict[str, int]]
     certificates: Optional[list[Certificate]] = Field(default=[])
     results_uri: Optional[str]
-    flags: Union[Flags, None] = Field(default=None)
-    config: Union[Config, None] = Field(default=None)
-    client: Optional[Union[ClientInfo, None]] = Field(default=None)
-    type: Union[ScanRecordType, None] = Field(default=None)
-    category: Union[ScanRecordCategory, None] = Field(default=None)
+    flags: Optional[Flags]
+    config: Optional[Config]
+    client: Optional[ClientInfo]
+    type: Optional[ScanRecordType]
+    category: Optional[ScanRecordCategory]
     is_passive: Optional[bool] = Field(default=True)
 
 
@@ -1370,21 +1010,21 @@ class EvaluationItem(DefaultInfo):
     key: str
     name: str
     group: str
-    observed_at: Union[datetime, None] = Field(default=None)
+    observed_at: Optional[datetime]
     result_value: Union[bool, str, None]
     result_label: str
     result_text: str
-    result_level: Union[str, None] = Field(default=None)
+    result_level: Optional[str]
     score: int = Field(default=0)
     description: Optional[str]
     recommendation: Optional[str]
     metadata: dict[str, Any] = Field(default={})
-    cve: Union[list[str], None] = Field(default=[])
+    cve: Optional[list[str]] = Field(default=[])
     cvss2: Union[str, Any] = Field(default=None)
     cvss3: Union[str, Any] = Field(default=None)
-    references: Union[list[ReferenceItem], None] = Field(default=[])
-    compliance: Union[list[ComplianceGroup], None] = Field(default=[])
-    threats: Union[list[ThreatItem], None] = Field(default=[])
+    references: Optional[list[ReferenceItem]] = Field(default=[])
+    compliance: Optional[list[ComplianceGroup]] = Field(default=[])
+    threats: Optional[list[ThreatItem]] = Field(default=[])
     transport: Optional[HostTransport]
     certificate: Optional[Certificate]
 
@@ -1466,10 +1106,10 @@ class AcceptEdit(BaseModel, DAL):
     change_prop: Optional[str]
     model_key: Optional[str]
     model_value: Optional[str]
-    ip_addr: Union[IPvAnyAddress, None] = Field(default=None)
-    user_agent: Union[str, None] = Field(default=None)
-    timestamp: Union[int, None] = Field(default=None)
-    sendgrid_message_id: Union[str, None] = Field(default=None)
+    ip_addr: Optional[IPvAnyAddress]
+    user_agent: Optional[str]
+    timestamp: Optional[int]
+    sendgrid_message_id: Optional[str]
 
     def exists(self, accept_token: Union[str, None] = None) -> bool:
         return self.load(accept_token) is not None
@@ -1543,11 +1183,11 @@ class AccountQuotas(BaseModel):
 
 
 class SearchResult(BaseModel):
-    last_scanned: Union[int, None]
+    last_scanned: Optional[int]
     hostname: Optional[str]
-    monitoring: bool = Field(default=False)
-    queued_timestamp: Union[int, None] = Field(default=None)
-    queue_status: Union[str, None] = Field(default=False)
+    monitoring: Optional[bool] = Field(default=False)
+    queued_timestamp: Optional[int]
+    queue_status: Optional[str]
     ip_addr: list[IPvAnyAddress]
     resolved_ip: Optional[list[IPvAnyAddress]]
     ports: Optional[list[int]]
@@ -1619,7 +1259,7 @@ class CertificateResponse(BaseModel):
 
 
 class WebhookEndpointRequest(BaseModel):
-    endpoint: Union[AnyHttpUrl, None] = Field(default=None)
+    endpoint: AnyHttpUrl
 
 
 class WebhookEvent(str, Enum):
