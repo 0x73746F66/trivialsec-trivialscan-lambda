@@ -25,6 +25,7 @@ import services.aws
 import services.stripe
 import models.stripe
 
+
 class DAL(metaclass=ABCMeta):
     @abstractmethod
     def exists(self, **kwargs) -> bool:
@@ -252,7 +253,10 @@ class MemberAccount(AccountRegistration, DAL):
             == models.stripe.SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY
         ):
             self.billing.description = "Stripe Payments"
-        elif sub.collection_method == models.stripe.SubscriptionCollectionMethod.SEND_INVOICE:
+        elif (
+            sub.collection_method
+            == models.stripe.SubscriptionCollectionMethod.SEND_INVOICE
+        ):
             self.billing.description = "Send Invoice"
 
     def update_members(
@@ -673,9 +677,7 @@ class Support(SupportRequest, DAL):
 
 class DefaultInfo(BaseModel):
     generator: str = Field(default="trivialscan")
-    version: Optional[str] = Field(
-        default=None, description="trivialscan CLI version"
-    )
+    version: Optional[str] = Field(default=None, description="trivialscan CLI version")
     account_name: Optional[str] = Field(
         default=None, description="Trivial Security account name"
     )
@@ -783,12 +785,26 @@ class HostTransport(BaseModel):
     certificate_mtls_expected: Optional[bool] = Field(default=False)
 
 
+class ThreatIntelSource(str, Enum):
+    CHARLES_HALEY = "CharlesHaley"
+    DATAPLANE = "DataPlane"
+    TALOS_INTELLIGENCE = "TalosIntelligence"
+    DARKLIST = "Darklist"
+
+
+class ThreatIntel(BaseModel):
+    source: ThreatIntelSource
+    feed_identifier: Any
+    feed_date: datetime
+
+
 class Host(BaseModel, DAL):
     last_updated: Optional[datetime]
     transport: HostTransport
     tls: Optional[HostTLS]
     http: Optional[list[HostHTTP]]
     monitoring_enabled: Optional[bool] = Field(default=False)
+    threat_intel: Optional[list[ThreatIntel]] = Field(default=[])
 
     def exists(
         self,
@@ -835,12 +851,19 @@ class Host(BaseModel, DAL):
         return self
 
     def save(self) -> bool:
+        data = self.dict()
         scan_date = self.last_updated.strftime("%Y%m%d")  # type: ignore
         object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/{self.transport.peer_address}/{scan_date}.json"
-        if not services.aws.store_s3(object_key, json.dumps(self.dict(), default=str)):
+        if not services.aws.store_s3(object_key, json.dumps(data, default=str)):
             return False
         object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/latest.json"
-        return services.aws.store_s3(object_key, json.dumps(self.dict(), default=str))
+        # preserve threat_intel
+        original = json.loads(services.aws.get_s3(object_key))
+        data["threat_intel"] = {
+            **original.get("threat_intel", {}),
+            **data.get("threat_intel", {}),
+        }
+        return services.aws.store_s3(object_key, json.dumps(data, default=str))
 
     def delete(self) -> bool:
         scan_date = self.last_updated.strftime("%Y%m%d")  # type: ignore

@@ -1,5 +1,5 @@
 import re
-from typing import Union, Any
+from typing import Union
 
 from dns import resolver, rdatatype
 from dns.exception import DNSException, Timeout as DNSTimeoutError

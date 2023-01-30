@@ -28,7 +28,6 @@ from pydantic import (
     EmailStr,
 )
 
-
 CACHE_DIR = getenv("CACHE_DIR", "/tmp")
 JITTER_SECONDS = int(getenv("JITTER_SECONDS", default="30"))
 APP_ENV = getenv("APP_ENV", "Dev")
@@ -481,7 +480,7 @@ class Authorization:
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime):
-            return o.isoformat()
+            return o.replace(microsecond=0).isoformat()
         if isinstance(
             o,
             (
