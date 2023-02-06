@@ -9,6 +9,7 @@ import models
 import services.helpers
 import services.aws
 import services.webhook
+import services.stripe
 
 router = APIRouter()
 
@@ -88,9 +89,9 @@ async def enable_monitoring(
             account=authz.account,  # type: ignore
             scanner_record=scanner_record,
         )
-        if quotas.monitoring.get(models.Quota.USED, 0) >= quotas.monitoring.get(
-            models.Quota.TOTAL, 0
-        ):
+        if not quotas.unlimited_monitoring and quotas.monitoring.get(
+            models.Quota.USED, 0
+        ) >= quotas.monitoring.get(models.Quota.TOTAL, 0):
             response.status_code = status.HTTP_402_PAYMENT_REQUIRED
             return scanner_record
 
@@ -248,12 +249,32 @@ async def queue_hostname(
     if validators.email(f"nobody@{hostname}") is not True:
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
-
+    ce_name = services.stripe.PRODUCTS[services.stripe.Product.COMMUNITY_EDITION][
+        "name"
+    ]
     ports = [443]
     path_names = ["/"]
     if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+        quotas = services.helpers.get_quotas(
+            account=authz.account,  # type: ignore
+            scanner_record=scanner_record,
+        )
+        internals.logger.info(f"quotas {quotas}")
+        if not quotas.unlimited_scans and quotas.ondemand.get(
+            models.Quota.USED, 0
+        ) >= quotas.ondemand.get(models.Quota.TOTAL, 0):
+            response.status_code = status.HTTP_402_PAYMENT_REQUIRED
+            return False
+        authz.account.load_billing()  # type: ignore
+        internals.logger.info(f"product_name {authz.account.billing.product_name}")
+        if (
+            authz.account.billing.product_name == ce_name
+            and hostname in quotas.seen_hosts
+        ):
+            response.status_code = status.HTTP_402_PAYMENT_REQUIRED
+            return False
+        internals.logger.info(f"NOT {services.stripe.Product.COMMUNITY_EDITION}")
         for monitor_host in scanner_record.monitored_targets:
-            monitor_host: models.MonitorHostname
             if monitor_host.hostname == hostname:
                 internals.logger.info(f"Matched monitor_host {monitor_host}")
                 ports = monitor_host.ports

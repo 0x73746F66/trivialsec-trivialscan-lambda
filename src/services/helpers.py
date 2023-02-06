@@ -1,5 +1,6 @@
 import re
 from typing import Union
+from datetime import datetime
 
 from dns import resolver, rdatatype
 from dns.exception import DNSException, Timeout as DNSTimeoutError
@@ -11,94 +12,97 @@ import models
 import models.stripe
 import internals
 
+MONITORING_HOSTS_CE = 3
+ONDEMAND_HOSTS_CE = 1
+
 
 def get_quotas(
     account: models.MemberAccount,
     scanner_record: models.ScannerRecord,
 ) -> models.AccountQuotas:
-    active = 0
-    passive = 0
-    monitoring = 0
+    seen_hosts = set()
+    monitoring_hosts = set()
     if len(scanner_record.monitored_targets or []) > 0:  # type: ignore
-        monitoring = sum(
-            1 if item.enabled else 0 for item in scanner_record.monitored_targets
-        )
+        monitoring_hosts = {
+            item.hostname for item in scanner_record.monitored_targets if item.enabled
+        }
+    ondemand_hosts = set()
     if len(scanner_record.history or []) > 0:  # type: ignore
-        passive = sum(
-            1 if item.is_passive and item.type == models.ScanRecordType.ONDEMAND else 0
-            for item in scanner_record.history
-        )
-        active = sum(
-            1
-            if not item.is_passive and item.type == models.ScanRecordType.ONDEMAND
-            else 0
-            for item in scanner_record.history
-        )
+        for report in scanner_record.history:
+            for host in report.targets:
+                seen_hosts.add(host.transport.hostname)
+            if not report.date or report.date < datetime.utcnow().replace(
+                day=1, minute=0, second=0, microsecond=0
+            ):
+                continue
+            if report.type == models.ScanRecordType.ONDEMAND:
+                for host in report.targets:
+                    ondemand_hosts.add(f"{host.transport.hostname}_{report.report_id}")
 
     new_only = True
     unlimited_monitoring = False
     unlimited_scans = False
-    monitoring_total = 1
-    passive_total = 1
-    active_total = 0
+    monitoring_hosts_day = MONITORING_HOSTS_CE
+    ondemand_hosts_month = ONDEMAND_HOSTS_CE
+
     if sub := models.stripe.SubscriptionAddon().load(account.name):  # type: ignore
-        unlimited_scans = True
-    if sub := models.stripe.SubscriptionBasics().load(account.name):  # type: ignore
-        monitoring_total = 1 if not sub.metadata else sub.metadata.get("monitoring", 1)
-        passive_total = (
-            1 if not sub.metadata else sub.metadata.get("managed_passive", 1)
+        unlimited_scans = (
+            True
+            if sub.status
+            in [
+                models.stripe.SubscriptionStatus.ACTIVE,
+                models.stripe.SubscriptionStatus.TRIALING,
+            ]
+            else False
         )
-        active_total = 0 if not sub.metadata else sub.metadata.get("managed_active", 0)
-    elif sub := models.stripe.SubscriptionPro().load(account.name):  # type: ignore
-        monitoring_total = (
-            10 if not sub.metadata else sub.metadata.get("monitoring", 10)
+    if sub := models.stripe.SubscriptionPro().load(account.name):  # type: ignore
+        monitoring_hosts_day = (
+            MONITORING_HOSTS_CE
+            if not sub.metadata
+            else int(sub.metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE))
         )
-        passive_total = (
-            500 if not sub.metadata else sub.metadata.get("managed_passive", 500)
-        )
-        active_total = (
-            50 if not sub.metadata else sub.metadata.get("managed_active", 50)
+        ondemand_hosts_month = (
+            ONDEMAND_HOSTS_CE
+            if not sub.metadata
+            else int(sub.metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE))
         )
         new_only = False
     elif sub := models.stripe.SubscriptionEnterprise().load(account.name):  # type: ignore
-        monitoring_total = (
-            50 if not sub.metadata else sub.metadata.get("monitoring", 50)
+        monitoring_hosts_day = (
+            MONITORING_HOSTS_CE
+            if not sub.metadata
+            else int(sub.metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE))
         )
-        passive_total = (
-            1000 if not sub.metadata else sub.metadata.get("managed_passive", 1000)
-        )
-        active_total = (
-            100 if not sub.metadata else sub.metadata.get("managed_active", 100)
+        ondemand_hosts_month = (
+            ONDEMAND_HOSTS_CE
+            if not sub.metadata
+            else int(sub.metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE))
         )
         new_only = False
     elif sub := models.stripe.SubscriptionUnlimited().load(account.name):  # type: ignore
         unlimited_scans = True
         unlimited_monitoring = True
 
-    if unlimited_monitoring:
-        monitoring_total = None
     if unlimited_scans:
-        passive_total = None
-        active_total = None
+        monitoring_hosts_day = 0
+        ondemand_hosts_month = 0
         new_only = False
 
     return models.AccountQuotas(
+        seen_hosts=list(seen_hosts),
         unlimited_monitoring=unlimited_monitoring,
         unlimited_scans=unlimited_scans,
         monitoring={
             models.Quota.PERIOD: "Daily",
-            models.Quota.TOTAL: monitoring_total,
-            models.Quota.USED: monitoring,
+            models.Quota.TOTAL: monitoring_hosts_day,
+            models.Quota.USED: len(monitoring_hosts),
         },
-        passive={
-            models.Quota.PERIOD: "Only new hosts" if new_only else "Daily",
-            models.Quota.TOTAL: passive_total,
-            models.Quota.USED: passive,
-        },
-        active={
-            models.Quota.PERIOD: "Daily",
-            models.Quota.TOTAL: active_total,
-            models.Quota.USED: active,
+        ondemand={
+            models.Quota.PERIOD: "Once per host" if new_only else "Monthly",
+            models.Quota.TOTAL: max(monitoring_hosts_day, 1)
+            if new_only
+            else ondemand_hosts_month,
+            models.Quota.USED: len(ondemand_hosts),
         },
     )
 

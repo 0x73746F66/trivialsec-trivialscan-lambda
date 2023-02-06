@@ -1201,8 +1201,8 @@ class AccountQuotas(BaseModel):
     unlimited_monitoring: bool
     unlimited_scans: bool
     monitoring: dict[Quota, Any]
-    passive: dict[Quota, Any]
-    active: dict[Quota, Any]
+    ondemand: dict[Quota, Any]
+    seen_hosts: list[str]
 
 
 class SearchResult(BaseModel):

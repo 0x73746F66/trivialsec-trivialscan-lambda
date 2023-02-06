@@ -237,43 +237,6 @@ class SubscriptionAddon(SubscriptionBase):
             return self
 
 
-class SubscriptionBasics(SubscriptionBase):
-    def load(self, account_name: str) -> Union["SubscriptionBasics", None]:
-        """
-        Derives a Stripe subscription based on having at least one active record
-        and returns only the most recent. Any other requirements should load the
-        data directly outside this class
-        """
-        if not account_name:
-            raise AttributeError("Subscription.load missing account_name")
-
-        subs = []
-        prefix_key = f"{internals.APP_ENV}/accounts/{account_name}/subscriptions/{services.stripe.Product.BASICS}/"
-        matches = services.aws.list_s3(prefix_key=prefix_key)
-        for match in matches:
-            raw = services.aws.get_s3(path_key=match)
-            if not raw:
-                continue
-            try:
-                data = json.loads(raw)
-            except json.decoder.JSONDecodeError as err:
-                internals.logger.debug(err, exc_info=True)
-                continue
-            if not data or not isinstance(data, dict):
-                internals.logger.debug(f"not data {match}")
-                continue
-            if data.get("livemode") and data.get("status") in [
-                SubscriptionStatus.ACTIVE,
-                SubscriptionStatus.TRIALING,
-            ]:
-                subs.append(data)
-
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
-            super().__init__(**res[-1])
-            return self
-
-
 class SubscriptionPro(SubscriptionBase):
     def load(self, account_name: str) -> Union["SubscriptionPro", None]:
         """
@@ -311,7 +274,9 @@ class SubscriptionPro(SubscriptionBase):
             return self
 
 
-class SubscriptionEnterprise(SubscriptionBase,):
+class SubscriptionEnterprise(
+    SubscriptionBase,
+):
     def load(self, account_name: str) -> Union["SubscriptionEnterprise", None]:
         """
         Derives a Stripe subscription based on having at least one active record
