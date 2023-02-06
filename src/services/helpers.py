@@ -90,6 +90,7 @@ def get_quotas(
 
     return models.AccountQuotas(
         seen_hosts=list(seen_hosts),
+        monitoring_hosts=list(monitoring_hosts),
         unlimited_monitoring=unlimited_monitoring,
         unlimited_scans=unlimited_scans,
         monitoring={

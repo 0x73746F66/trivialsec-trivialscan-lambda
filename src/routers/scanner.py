@@ -269,7 +269,7 @@ async def queue_hostname(
         internals.logger.info(f"product_name {authz.account.billing.product_name}")
         if (
             authz.account.billing.product_name == ce_name
-            and hostname in quotas.seen_hosts
+            and (hostname in quotas.seen_hosts or hostname not in quotas.monitoring_hosts)
         ):
             response.status_code = status.HTTP_402_PAYMENT_REQUIRED
             return False

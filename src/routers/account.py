@@ -99,13 +99,14 @@ async def account_register(
         if not member.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
+        try:
+            customer = services.stripe.create_customer(email=account.billing_email)  # type: ignore
+            account.billing_client_id = customer.id
+        except:
+            pass  # pylint: disable=bare-except
         if not account.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
-        try:
-            services.stripe.create_customer(email=account.billing_email)  # type: ignore
-        except:
-            pass  # pylint: disable=bare-except
         services.sendgrid.upsert_contact(
             recipient_email=member.email, list_name="members"
         )
@@ -264,13 +265,14 @@ async def update_billing_email(
             f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
         )
         authz.account.billing_email = data.email  # type: ignore
+        try:
+            customer = services.stripe.create_customer(email=authz.account.billing_email)  # type: ignore
+            authz.account.billing_client_id = customer.id
+        except:  # pylint: disable=bare-except
+            pass
         if not authz.account.save() or not authz.account.update_members():  # type: ignore
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
-        try:
-            services.stripe.create_customer(email=authz.account.billing_email)  # type: ignore
-        except:  # pylint: disable=bare-except
-            pass
         services.webhook.send(
             event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
             account=authz.account,

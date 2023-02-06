@@ -232,6 +232,8 @@ class AuthorizationRoute(str, Enum):
     SCANNER_QUEUE = "/scanner/queue/"
     VALIDATE = "/validate"
     ME = "/me"
+    STRIPE_CUSTOMER_PORTAL = "/stripe/create-customer-portal-session"
+    UPDATE_BILLING_EMAIL = "/billing/email"
     LIST_SESSIONS = "/sessions"
     LIST_MEMBERS = "/members"
     INVITE_MEMBER = "/member/invite"
@@ -282,6 +284,8 @@ class Authorization:
         AuthorizationRoute.DEACTIVATE_MONITOR,
         AuthorizationRoute.SCANNER_QUEUE,
         AuthorizationRoute.ME,
+        AuthorizationRoute.STRIPE_CUSTOMER_PORTAL,
+        AuthorizationRoute.UPDATE_BILLING_EMAIL,
         AuthorizationRoute.LIST_CLIENTS,
         AuthorizationRoute.LIST_MEMBERS,
         AuthorizationRoute.INVITE_MEMBER,

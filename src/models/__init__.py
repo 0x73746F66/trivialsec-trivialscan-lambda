@@ -170,6 +170,7 @@ class MfaSetting(str, Enum):
 
 class MemberAccount(AccountRegistration, DAL):
     billing_email: Optional[EmailStr]
+    billing_client_id: Optional[str]
     api_key: Optional[str]
     ip_addr: Optional[IPvAnyAddress]
     user_agent: Optional[str]
@@ -1203,6 +1204,7 @@ class AccountQuotas(BaseModel):
     monitoring: dict[Quota, Any]
     ondemand: dict[Quota, Any]
     seen_hosts: list[str]
+    monitoring_hosts: list[str]
 
 
 class SearchResult(BaseModel):

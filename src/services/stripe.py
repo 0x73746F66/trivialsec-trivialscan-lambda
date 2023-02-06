@@ -64,6 +64,10 @@ PRODUCTS = {
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
 def get_product(product: Product) -> stripe.Product:
     product_id = PRODUCTS[product].get("id")
+    stripe.api_key = services.aws.get_ssm(
+        f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
+        WithDecryption=True,
+    )
     try:
         return stripe.Product.retrieve(product_id)
 
@@ -81,6 +85,10 @@ def get_product(product: Product) -> stripe.Product:
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
 def get_pricing_by_id(price_id: str) -> stripe.Price:
+    stripe.api_key = services.aws.get_ssm(
+        f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
+        WithDecryption=True,
+    )
     try:
         return stripe.Price.retrieve(price_id)
 
@@ -100,6 +108,10 @@ def get_pricing_by_id(price_id: str) -> stripe.Price:
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
 def create_customer(email: str) -> stripe.Customer:
+    stripe.api_key = services.aws.get_ssm(
+        f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
+        WithDecryption=True,
+    )
     try:
         return stripe.Customer.create(email=email)
 
@@ -117,6 +129,10 @@ def create_customer(email: str) -> stripe.Customer:
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
 def get_customer(customer_id: str) -> stripe.Customer:
+    stripe.api_key = services.aws.get_ssm(
+        f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
+        WithDecryption=True,
+    )
     try:
         return stripe.Customer.retrieve(customer_id)
 
@@ -134,6 +150,10 @@ def get_customer(customer_id: str) -> stripe.Customer:
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
 def get_invoice(invoice_id: str) -> stripe.Invoice:
+    stripe.api_key = services.aws.get_ssm(
+        f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
+        WithDecryption=True,
+    )
     try:
         return stripe.Invoice.retrieve(invoice_id)
 
@@ -151,6 +171,10 @@ def get_invoice(invoice_id: str) -> stripe.Invoice:
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
 def get_subscription(subscription_id: str) -> stripe.Subscription:
+    stripe.api_key = services.aws.get_ssm(
+        f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
+        WithDecryption=True,
+    )
     try:
         return stripe.Subscription.retrieve(subscription_id)
 

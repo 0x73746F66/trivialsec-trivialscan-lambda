@@ -1,6 +1,7 @@
-from fastapi import Header, APIRouter, Response, status
-from starlette.requests import Request
 import stripe
+from fastapi import Header, APIRouter, Response, status, Depends
+from starlette.requests import Request
+from starlette.responses import RedirectResponse
 from stripe.error import SignatureVerificationError
 
 import internals
@@ -46,3 +47,21 @@ async def webhook_received(
         internals.logger.critical(err)
 
     return {'success': False}
+
+
+@router.post('/create-customer-portal-session',
+    include_in_schema=False,
+)
+def customer_portal(
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    stripe.api_key = services.aws.get_ssm(
+        f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
+        WithDecryption=True,
+    )
+    return_url = f'https://{"www" if internals.APP_ENV == "Prod" else internals.APP_ENV.lower()}.trivialsec.com/profile'
+    session = stripe.billing_portal.Session.create(
+        customer=authz.account.billing_client_id,  # type: ignore
+        return_url=return_url,
+    )
+    return session.url
