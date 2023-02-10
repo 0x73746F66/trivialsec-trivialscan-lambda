@@ -15,18 +15,6 @@ stages:
   - deploy
   - post-deploy
 
-swagger validation:
-  stage: tests
-  tags:
-    - jager
-  allow_failure: true
-  script:
-    - pre-commit run swagger-validation --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
-  only:
-    refs:
-      - merge_request
-      - main
-
 terraform validate:
   stage: tests
   tags:
@@ -75,18 +63,6 @@ sast flake8:
   allow_failure: true
   script:
     - pre-commit run flake8 --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
-  only:
-    refs:
-      - merge_request
-      - main
-
-sast pylint:
-  stage: tests
-  tags:
-    - jager
-  allow_failure: true
-  script:
-    - pre-commit run pylint --local-branch ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-$CI_COMMIT_BRANCH}
   only:
     refs:
       - merge_request

@@ -1,3 +1,4 @@
+import contextlib
 import json
 import socket
 from datetime import datetime
@@ -12,9 +13,6 @@ import services.helpers
 import services.aws
 
 router = APIRouter()
-
-
-import contextlib
 
 
 @router.get(

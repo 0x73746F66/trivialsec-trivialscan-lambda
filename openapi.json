@@ -72,21 +72,21 @@
         "operationId": "support_request_support_post",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -146,21 +146,21 @@
         "operationId": "update_billing_email_billing_email_post",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -223,21 +223,21 @@
         "operationId": "update_primary_email_account_email_post",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -300,21 +300,21 @@
         "operationId": "update_account_display_name_account_display_post",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -361,6 +361,291 @@
         }
       }
     },
+    "/notification/enable/{event_type}": {
+      "get": {
+        "tags": [
+          "Member Account"
+        ],
+        "summary": "Enable Notification",
+        "description": "Enables an email notification event type",
+        "operationId": "enable_notification_notification_enable__event_type__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "Event Type",
+              "type": "string"
+            },
+            "name": "event_type",
+            "in": "path"
+          },
+          {
+            "required": true,
+            "schema": {
+              "title": "HMAC-SHA512 Signed Request",
+              "type": "string"
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountNotifications"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notification/disable/{event_type}": {
+      "get": {
+        "tags": [
+          "Member Account"
+        ],
+        "summary": "Disable Notification",
+        "description": "Disables an email notification event type",
+        "operationId": "disable_notification_notification_disable__event_type__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "Event Type",
+              "type": "string"
+            },
+            "name": "event_type",
+            "in": "path"
+          },
+          {
+            "required": true,
+            "schema": {
+              "title": "HMAC-SHA512 Signed Request",
+              "type": "string"
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountNotifications"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhook/enable": {
+      "post": {
+        "tags": [
+          "Member Account"
+        ],
+        "summary": "Enable Webhook",
+        "description": "Enables a webhook",
+        "operationId": "enable_webhook_webhook_enable_post",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "HMAC-SHA512 Signed Request",
+              "type": "string"
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Webhooks"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhooks"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhook": {
+      "delete": {
+        "tags": [
+          "Member Account"
+        ],
+        "summary": "Delete Webhook",
+        "description": "Deletes a webhook",
+        "operationId": "delete_webhook_webhook_delete",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "Endpoint",
+              "maxLength": 65536,
+              "minLength": 1,
+              "type": "string",
+              "format": "uri"
+            },
+            "name": "endpoint",
+            "in": "query"
+          },
+          {
+            "required": true,
+            "schema": {
+              "title": "HMAC-SHA512 Signed Request",
+              "type": "string"
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Webhook Webhook Delete",
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/validate": {
       "get": {
         "tags": [
@@ -380,26 +665,26 @@
             "in": "header"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
         "responses": {
-          "202": {
+          "203": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -435,21 +720,21 @@
         "operationId": "member_profile_me_get",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -459,7 +744,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MemberSessionRedacted"
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -496,21 +781,21 @@
         "operationId": "member_sessions_sessions_get",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -523,14 +808,14 @@
                   "title": "Response Member Sessions Sessions Get",
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/MemberSessionRedacted"
+                    "$ref": "#/components/schemas/MemberSessionForList"
                   }
                 }
               }
             }
           },
           "204": {
-            "description": "No sesson data available, this is probably an error"
+            "description": "No session data available, this is probably an error"
           },
           "401": {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
@@ -564,21 +849,21 @@
         "operationId": "list_members_members_get",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -591,7 +876,7 @@
                   "title": "Response List Members Members Get",
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/MemberProfileRedacted"
+                    "$ref": "#/components/schemas/MemberProfileForList"
                   }
                 }
               }
@@ -641,21 +926,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -773,7 +1058,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MemberSession"
+                  "$ref": "#/components/schemas/LoginResponse"
                 }
               }
             }
@@ -813,21 +1098,21 @@
         "operationId": "update_email_member_email_post",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -900,24 +1185,6 @@
             },
             "name": "token",
             "in": "path"
-          },
-          {
-            "required": false,
-            "schema": {
-              "title": "Authorization",
-              "type": "string"
-            },
-            "name": "authorization",
-            "in": "header"
-          },
-          {
-            "required": false,
-            "schema": {
-              "title": "X-Trivialscan-Account",
-              "type": "string"
-            },
-            "name": "x-trivialscan-account",
-            "in": "header"
           }
         ],
         "responses": {
@@ -967,21 +1234,21 @@
         "operationId": "send_member_invitation_member_invite_post",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1056,21 +1323,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1079,7 +1346,10 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "title": "Response Delete Member Member  Email  Delete",
+                  "type": "boolean"
+                }
               }
             }
           },
@@ -1118,21 +1388,21 @@
         "operationId": "retrieve_reports_reports_get",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1195,21 +1465,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1268,21 +1538,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1339,21 +1609,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1391,7 +1661,8 @@
     "/store/{report_type}": {
       "post": {
         "tags": [
-          "Scan Reports"
+          "Scan Reports",
+          "CLI"
         ],
         "summary": "Store",
         "description": "Stores various client report data generated by Trivial Scanner CLI",
@@ -1415,21 +1686,21 @@
             "in": "header"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1490,21 +1761,21 @@
         "operationId": "retrieve_hosts_hosts_get",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1590,21 +1861,21 @@
             "in": "query"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1673,21 +1944,21 @@
             "in": "query"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1737,21 +2008,21 @@
         "operationId": "dashboard_compliance_dashboard_compliance_get",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1805,21 +2076,21 @@
         "operationId": "dashboard_quotas_dashboard_quotas_get",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1833,6 +2104,9 @@
                 }
               }
             }
+          },
+          "204": {
+            "description": "No scan data is present for this account"
           },
           "401": {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
@@ -1876,21 +2150,21 @@
             "in": "query"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -1954,21 +2228,21 @@
             "in": "query"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2012,6 +2286,150 @@
         }
       }
     },
+    "/scanner/config": {
+      "get": {
+        "tags": [
+          "Scanner"
+        ],
+        "summary": "Scanner Config",
+        "description": "Fetches host monitoring configuration",
+        "operationId": "scanner_config_scanner_config_get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "HMAC-SHA512 Signed Request",
+              "type": "string"
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Scanner Config Scanner Config Get",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MonitorHostname"
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "New accounts have no data, if this occurs after adding a host to be monitored this response code indicates an urgent issue"
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Scanner"
+        ],
+        "summary": "Update Config",
+        "description": "Deletes a host monitoring configuration",
+        "operationId": "update_config_scanner_config_post",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "HMAC-SHA512 Signed Request",
+              "type": "string"
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "204": {
+            "description": "Nothing changed, was it already updated?"
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "404": {
+            "description": "No parameters to change were provided"
+          },
+          "406": {
+            "description": "Invalid Hostname"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/scanner/monitor/{hostname}": {
       "get": {
         "tags": [
@@ -2031,21 +2449,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2068,6 +2486,9 @@
           },
           "403": {
             "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "406": {
+            "description": "Invalid Hostname"
           },
           "500": {
             "description": "An unhandled error occurred during an AWS request for data access"
@@ -2104,21 +2525,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2138,6 +2559,9 @@
           },
           "403": {
             "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "406": {
+            "description": "Invalid Hostname"
           },
           "500": {
             "description": "An unhandled error occurred during an AWS request for data access"
@@ -2161,7 +2585,7 @@
           "Scanner"
         ],
         "summary": "Queue Hostname",
-        "description": "Adds a host for on-demand scanning",
+        "description": "Adds a host for on-demand scanning, scanner configuration stores the ports and path names to be used",
         "operationId": "queue_hostname_scanner_queue__hostname__get",
         "parameters": [
           {
@@ -2174,21 +2598,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2209,6 +2633,83 @@
           },
           "403": {
             "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "406": {
+            "description": "Invalid Hostname"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scanner/config/{hostname}": {
+      "delete": {
+        "tags": [
+          "Scanner"
+        ],
+        "summary": "Delete Config",
+        "description": "Deletes a host monitoring configuration",
+        "operationId": "delete_config_scanner_config__hostname__delete",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "Hostname",
+              "type": "string"
+            },
+            "name": "hostname",
+            "in": "path"
+          },
+          {
+            "required": true,
+            "schema": {
+              "title": "HMAC-SHA512 Signed Request",
+              "type": "string"
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "204": {
+            "description": "No matching host, was it already removed?"
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "406": {
+            "description": "Invalid Hostname"
           },
           "500": {
             "description": "An unhandled error occurred during an AWS request for data access"
@@ -2245,21 +2746,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2323,21 +2824,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2384,7 +2885,8 @@
     "/claim/{client_name}": {
       "post": {
         "tags": [
-          "Client Server"
+          "Client",
+          "CLI"
         ],
         "summary": "Claim Client",
         "description": "Generates an access token for provided *NEW* client name.\nClient names must be unique, if the corresponding registration token was lost a new client and token must be created.",
@@ -2409,21 +2911,21 @@
             "in": "header"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2479,7 +2981,8 @@
     "/auth/{client_name}": {
       "post": {
         "tags": [
-          "Client Server"
+          "Client",
+          "CLI"
         ],
         "summary": "Auth Client",
         "description": "Authenticates the generated access token and client",
@@ -2504,21 +3007,21 @@
             "in": "header"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2571,28 +3074,29 @@
     "/clients": {
       "get": {
         "tags": [
-          "Client Server"
+          "Member Account",
+          "Client"
         ],
         "summary": "Retrieve Clients",
         "description": "Retrieves a collection of your clients",
         "operationId": "retrieve_clients_clients_get",
         "parameters": [
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2605,7 +3109,7 @@
                   "title": "Response Retrieve Clients Clients Get",
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ClientRedacted"
+                    "$ref": "#/components/schemas/Client"
                   }
                 }
               }
@@ -2639,10 +3143,11 @@
     "/activate/{client_name}": {
       "get": {
         "tags": [
-          "Client Server"
+          "Member Account",
+          "Client"
         ],
         "summary": "Activate Client",
-        "description": "Activate a activated client",
+        "description": "Activate a client",
         "operationId": "activate_client_activate__client_name__get",
         "parameters": [
           {
@@ -2655,21 +3160,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2679,7 +3184,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ClientRedacted"
+                  "$ref": "#/components/schemas/Client"
                 }
               }
             }
@@ -2712,7 +3217,8 @@
     "/deactivated/{client_name}": {
       "get": {
         "tags": [
-          "Client Server"
+          "Member Account",
+          "Client"
         ],
         "summary": "Deactivated Client",
         "description": "Deactivate a client",
@@ -2728,21 +3234,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2752,7 +3258,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ClientRedacted"
+                  "$ref": "#/components/schemas/Client"
                 }
               }
             }
@@ -2785,7 +3291,8 @@
     "/client/{client_name}": {
       "delete": {
         "tags": [
-          "Client Server"
+          "Member Account",
+          "Client"
         ],
         "summary": "Delete Client",
         "description": "Deletes a specific MemberProfile within the same account as the authorized requester",
@@ -2801,21 +3308,21 @@
             "in": "path"
           },
           {
-            "required": false,
+            "required": true,
             "schema": {
-              "title": "Authorization",
+              "title": "HMAC-SHA512 Signed Request",
               "type": "string"
             },
-            "name": "authorization",
+            "name": "Authorization",
             "in": "header"
           },
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Account",
+              "title": "CLI Client Token hint",
               "type": "string"
             },
-            "name": "x-trivialscan-account",
+            "name": "X-Trivialscan-Account",
             "in": "header"
           }
         ],
@@ -2914,14 +3421,61 @@
           }
         }
       },
+      "AccountNotifications": {
+        "title": "AccountNotifications",
+        "type": "object",
+        "properties": {
+          "scan_completed": {
+            "title": "Scan Completed",
+            "type": "boolean",
+            "default": false
+          },
+          "monitor_completed": {
+            "title": "Monitor Completed",
+            "type": "boolean",
+            "default": false
+          },
+          "self_hosted_uploads": {
+            "title": "Self Hosted Uploads",
+            "type": "boolean",
+            "default": false
+          },
+          "early_warning": {
+            "title": "Early Warning",
+            "type": "boolean",
+            "default": false
+          },
+          "new_findings_certificates": {
+            "title": "New Findings Certificates",
+            "type": "boolean",
+            "default": false
+          },
+          "new_findings_domains": {
+            "title": "New Findings Domains",
+            "type": "boolean",
+            "default": false
+          },
+          "include_warning": {
+            "title": "Include Warning",
+            "type": "boolean",
+            "default": false
+          },
+          "include_info": {
+            "title": "Include Info",
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
       "AccountQuotas": {
         "title": "AccountQuotas",
         "required": [
           "unlimited_monitoring",
           "unlimited_scans",
           "monitoring",
-          "passive",
-          "active"
+          "ondemand",
+          "seen_hosts",
+          "monitoring_hosts"
         ],
         "type": "object",
         "properties": {
@@ -2937,13 +3491,23 @@
             "title": "Monitoring",
             "type": "object"
           },
-          "passive": {
-            "title": "Passive",
+          "ondemand": {
+            "title": "Ondemand",
             "type": "object"
           },
-          "active": {
-            "title": "Active",
-            "type": "object"
+          "seen_hosts": {
+            "title": "Seen Hosts",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "monitoring_hosts": {
+            "title": "Monitoring Hosts",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -2964,8 +3528,7 @@
           },
           "primary_email": {
             "title": "Primary Email",
-            "type": "string",
-            "format": "email"
+            "type": "string"
           }
         }
       },
@@ -3222,7 +3785,7 @@
             "$ref": "#/components/schemas/MemberSessionRedacted"
           },
           "client": {
-            "$ref": "#/components/schemas/ClientRedacted"
+            "$ref": "#/components/schemas/Client"
           },
           "account": {
             "$ref": "#/components/schemas/MemberAccountRedacted"
@@ -3255,8 +3818,9 @@
         ],
         "type": "object",
         "properties": {
-          "account": {
-            "$ref": "#/components/schemas/MemberAccount"
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
           },
           "client_info": {
             "$ref": "#/components/schemas/ClientInfo"
@@ -3312,51 +3876,6 @@
           "architecture": {
             "title": "Architecture",
             "type": "string"
-          }
-        }
-      },
-      "ClientRedacted": {
-        "title": "ClientRedacted",
-        "required": [
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "account": {
-            "$ref": "#/components/schemas/MemberAccount"
-          },
-          "client_info": {
-            "$ref": "#/components/schemas/ClientInfo"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "cli_version": {
-            "title": "Cli Version",
-            "type": "string"
-          },
-          "access_token": {
-            "title": "Access Token",
-            "type": "string"
-          },
-          "ip_addr": {
-            "title": "Ip Addr",
-            "type": "string",
-            "format": "ipvanyaddress"
-          },
-          "user_agent": {
-            "title": "User Agent",
-            "type": "string"
-          },
-          "timestamp": {
-            "title": "Timestamp",
-            "type": "integer"
-          },
-          "active": {
-            "title": "Active",
-            "type": "boolean",
-            "default": false
           }
         }
       },
@@ -3567,6 +4086,38 @@
           }
         }
       },
+      "ConfigUpdateRequest": {
+        "title": "ConfigUpdateRequest",
+        "required": [
+          "hostname"
+        ],
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "http_paths": {
+            "title": "Http Paths",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ports": {
+            "title": "Ports",
+            "type": "array",
+            "items": {
+              "exclusiveMinimum": 0.0,
+              "type": "integer"
+            }
+          }
+        }
+      },
       "DashboardCompliance": {
         "title": "DashboardCompliance",
         "required": [
@@ -3606,8 +4157,7 @@
         "properties": {
           "email": {
             "title": "Email",
-            "type": "string",
-            "format": "email"
+            "type": "string"
           }
         }
       },
@@ -3643,7 +4193,7 @@
           "client_name": {
             "title": "Client Name",
             "type": "string",
-            "description": "Machine name where trivialscan CLI execcutes"
+            "description": "Machine name where trivialscan CLI executes"
           },
           "report_id": {
             "title": "Report Id",
@@ -3704,6 +4254,10 @@
           },
           "description": {
             "title": "Description",
+            "type": "string"
+          },
+          "recommendation": {
+            "title": "Recommendation",
             "type": "string"
           },
           "metadata": {
@@ -3824,7 +4378,7 @@
           "client_name": {
             "title": "Client Name",
             "type": "string",
-            "description": "Machine name where trivialscan CLI execcutes"
+            "description": "Machine name where trivialscan CLI executes"
           },
           "report_id": {
             "title": "Report Id",
@@ -3970,17 +4524,19 @@
             "title": "Monitoring Enabled",
             "type": "boolean",
             "default": false
+          },
+          "threat_intel": {
+            "title": "Threat Intel",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreatIntel"
+            },
+            "default": []
           }
         }
       },
       "HostHTTP": {
         "title": "HostHTTP",
-        "required": [
-          "title",
-          "status_code",
-          "headers",
-          "body_hash"
-        ],
         "type": "object",
         "properties": {
           "title": {
@@ -4002,6 +4558,10 @@
           },
           "body_hash": {
             "title": "Body Hash",
+            "type": "string"
+          },
+          "request_url": {
+            "title": "Request Url",
             "type": "string"
           }
         }
@@ -4088,10 +4648,8 @@
         "title": "HostTLSCipher",
         "required": [
           "offered",
-          "offered_rfc",
           "negotiated",
-          "negotiated_bits",
-          "negotiated_rfc"
+          "negotiated_bits"
         ],
         "type": "object",
         "properties": {
@@ -4254,6 +4812,26 @@
           }
         }
       },
+      "LoginResponse": {
+        "title": "LoginResponse",
+        "required": [
+          "session",
+          "member",
+          "account"
+        ],
+        "type": "object",
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/MemberSession"
+          },
+          "member": {
+            "$ref": "#/components/schemas/MemberProfileRedacted"
+          },
+          "account": {
+            "$ref": "#/components/schemas/MemberAccountRedacted"
+          }
+        }
+      },
       "MagicLinkRequest": {
         "title": "MagicLinkRequest",
         "required": [
@@ -4263,55 +4841,7 @@
         "properties": {
           "email": {
             "title": "Email",
-            "type": "string",
-            "format": "email"
-          }
-        }
-      },
-      "MemberAccount": {
-        "title": "MemberAccount",
-        "required": [
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "title": "Name",
             "type": "string"
-          },
-          "display": {
-            "title": "Display",
-            "type": "string"
-          },
-          "primary_email": {
-            "title": "Primary Email",
-            "type": "string",
-            "format": "email"
-          },
-          "billing_email": {
-            "title": "Billing Email",
-            "type": "string",
-            "format": "email"
-          },
-          "api_key": {
-            "title": "Api Key",
-            "type": "string"
-          },
-          "ip_addr": {
-            "title": "Ip Addr",
-            "type": "string",
-            "format": "ipvanyaddress"
-          },
-          "user_agent": {
-            "title": "User Agent",
-            "type": "string"
-          },
-          "timestamp": {
-            "title": "Timestamp",
-            "type": "integer"
-          },
-          "billing": {
-            "$ref": "#/components/schemas/Billing"
           }
         }
       },
@@ -4332,13 +4862,15 @@
           },
           "primary_email": {
             "title": "Primary Email",
-            "type": "string",
-            "format": "email"
+            "type": "string"
           },
           "billing_email": {
             "title": "Billing Email",
-            "type": "string",
-            "format": "email"
+            "type": "string"
+          },
+          "billing_client_id": {
+            "title": "Billing Client Id",
+            "type": "string"
           },
           "api_key": {
             "title": "Api Key",
@@ -4359,6 +4891,32 @@
           },
           "billing": {
             "$ref": "#/components/schemas/Billing"
+          },
+          "notifications": {
+            "title": "Notifications",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AccountNotifications"
+              }
+            ],
+            "default": {
+              "scan_completed": false,
+              "monitor_completed": false,
+              "self_hosted_uploads": false,
+              "early_warning": false,
+              "new_findings_certificates": false,
+              "new_findings_domains": false,
+              "include_warning": false,
+              "include_info": false
+            }
+          },
+          "webhooks": {
+            "title": "Webhooks",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Webhooks"
+            },
+            "default": []
           }
         }
       },
@@ -4371,8 +4929,7 @@
         "properties": {
           "email": {
             "title": "Email",
-            "type": "string",
-            "format": "email"
+            "type": "string"
           }
         }
       },
@@ -4383,13 +4940,47 @@
         ],
         "type": "object",
         "properties": {
-          "account": {
-            "$ref": "#/components/schemas/MemberAccount"
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
           },
           "email": {
             "title": "Email",
-            "type": "string",
-            "format": "email"
+            "type": "string"
+          },
+          "email_md5": {
+            "title": "Email Md5",
+            "type": "string"
+          },
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean",
+            "default": false
+          },
+          "confirmation_token": {
+            "title": "Confirmation Token",
+            "type": "string"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "integer"
+          }
+        }
+      },
+      "MemberProfileForList": {
+        "title": "MemberProfileForList",
+        "required": [
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
           },
           "email_md5": {
             "title": "Email Md5",
@@ -4422,13 +5013,13 @@
         ],
         "type": "object",
         "properties": {
-          "account": {
-            "$ref": "#/components/schemas/MemberAccount"
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
           },
           "email": {
             "title": "Email",
-            "type": "string",
-            "format": "email"
+            "type": "string"
           },
           "email_md5": {
             "title": "Email Md5",
@@ -4446,23 +5037,75 @@
           "timestamp": {
             "title": "Timestamp",
             "type": "integer"
-          },
-          "current": {
-            "title": "Current",
-            "type": "boolean",
-            "default": false
           }
         }
       },
       "MemberSession": {
         "title": "MemberSession",
         "required": [
+          "member_email",
           "session_token"
         ],
         "type": "object",
         "properties": {
-          "member": {
-            "$ref": "#/components/schemas/MemberProfile"
+          "member_email": {
+            "title": "Member Email",
+            "type": "string"
+          },
+          "session_token": {
+            "title": "Session Token",
+            "type": "string"
+          },
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "ip_addr": {
+            "title": "Ip Addr",
+            "type": "string",
+            "format": "ipvanyaddress"
+          },
+          "user_agent": {
+            "title": "User Agent",
+            "type": "string"
+          },
+          "browser": {
+            "title": "Browser",
+            "type": "string"
+          },
+          "platform": {
+            "title": "Platform",
+            "type": "string"
+          },
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "title": "Lon",
+            "type": "number"
+          },
+          "timestamp": {
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "map_svg": {
+            "title": "Map Svg",
+            "type": "string"
+          }
+        }
+      },
+      "MemberSessionForList": {
+        "title": "MemberSessionForList",
+        "required": [
+          "member_email",
+          "session_token"
+        ],
+        "type": "object",
+        "properties": {
+          "member_email": {
+            "title": "Member Email",
+            "type": "string"
           },
           "session_token": {
             "title": "Session Token",
@@ -4515,12 +5158,14 @@
       "MemberSessionRedacted": {
         "title": "MemberSessionRedacted",
         "required": [
+          "member_email",
           "session_token"
         ],
         "type": "object",
         "properties": {
-          "member": {
-            "$ref": "#/components/schemas/MemberProfile"
+          "member_email": {
+            "title": "Member Email",
+            "type": "string"
           },
           "session_token": {
             "title": "Session Token",
@@ -4562,11 +5207,6 @@
           "map_svg": {
             "title": "Map Svg",
             "type": "string"
-          },
-          "current": {
-            "title": "Current",
-            "type": "boolean",
-            "default": false
           }
         }
       },
@@ -4582,6 +5222,16 @@
             "title": "Hostname",
             "type": "string"
           },
+          "ports": {
+            "title": "Ports",
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "default": [
+              443
+            ]
+          },
           "timestamp": {
             "title": "Timestamp",
             "type": "integer"
@@ -4590,6 +5240,36 @@
             "title": "Enabled",
             "type": "boolean",
             "default": false
+          },
+          "path_names": {
+            "title": "Path Names",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "/"
+            ]
+          }
+        }
+      },
+      "MyProfile": {
+        "title": "MyProfile",
+        "required": [
+          "session",
+          "member",
+          "account"
+        ],
+        "type": "object",
+        "properties": {
+          "session": {
+            "$ref": "#/components/schemas/MemberSessionRedacted"
+          },
+          "member": {
+            "$ref": "#/components/schemas/MemberProfileRedacted"
+          },
+          "account": {
+            "$ref": "#/components/schemas/MemberAccountRedacted"
           }
         }
       },
@@ -4699,7 +5379,7 @@
           "client_name": {
             "title": "Client Name",
             "type": "string",
-            "description": "Machine name where trivialscan CLI execcutes"
+            "description": "Machine name where trivialscan CLI executes"
           },
           "report_id": {
             "title": "Report Id",
@@ -4859,8 +5539,7 @@
           },
           "queue_status": {
             "title": "Queue Status",
-            "type": "string",
-            "default": false
+            "type": "string"
           },
           "ip_addr": {
             "title": "Ip Addr",
@@ -4955,6 +5634,38 @@
             "type": "string"
           }
         }
+      },
+      "ThreatIntel": {
+        "title": "ThreatIntel",
+        "required": [
+          "source",
+          "feed_date"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/ThreatIntelSource"
+          },
+          "feed_identifier": {
+            "title": "Feed Identifier"
+          },
+          "feed_date": {
+            "title": "Feed Date",
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ThreatIntelSource": {
+        "title": "ThreatIntelSource",
+        "enum": [
+          "CharlesHaley",
+          "DataPlane",
+          "TalosIntelligence",
+          "Darklist"
+        ],
+        "type": "string",
+        "description": "An enumeration."
       },
       "ThreatItem": {
         "title": "ThreatItem",
@@ -5111,6 +5822,108 @@
         ],
         "type": "string",
         "description": "An enumeration."
+      },
+      "Webhooks": {
+        "title": "Webhooks",
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "title": "Endpoint",
+            "maxLength": 65536,
+            "minLength": 1,
+            "type": "string",
+            "format": "uri"
+          },
+          "signing_secret": {
+            "title": "Signing Secret",
+            "type": "string"
+          },
+          "hosted_monitoring": {
+            "title": "Hosted Monitoring",
+            "type": "boolean",
+            "default": false
+          },
+          "hosted_scanner": {
+            "title": "Hosted Scanner",
+            "type": "boolean",
+            "default": false
+          },
+          "self_hosted_uploads": {
+            "title": "Self Hosted Uploads",
+            "type": "boolean",
+            "default": false
+          },
+          "early_warning_email": {
+            "title": "Early Warning Email",
+            "type": "boolean",
+            "default": false
+          },
+          "early_warning_domain": {
+            "title": "Early Warning Domain",
+            "type": "boolean",
+            "default": false
+          },
+          "early_warning_ip": {
+            "title": "Early Warning Ip",
+            "type": "boolean",
+            "default": false
+          },
+          "new_findings_certificates": {
+            "title": "New Findings Certificates",
+            "type": "boolean",
+            "default": false
+          },
+          "new_findings_domains": {
+            "title": "New Findings Domains",
+            "type": "boolean",
+            "default": false
+          },
+          "include_warning": {
+            "title": "Include Warning",
+            "type": "boolean",
+            "default": false
+          },
+          "include_info": {
+            "title": "Include Info",
+            "type": "boolean",
+            "default": false
+          },
+          "client_status": {
+            "title": "Client Status",
+            "type": "boolean",
+            "default": false
+          },
+          "client_activity": {
+            "title": "Client Activity",
+            "type": "boolean",
+            "default": false
+          },
+          "scanner_configurations": {
+            "title": "Scanner Configurations",
+            "type": "boolean",
+            "default": false
+          },
+          "report_created": {
+            "title": "Report Created",
+            "type": "boolean",
+            "default": false
+          },
+          "report_deleted": {
+            "title": "Report Deleted",
+            "type": "boolean",
+            "default": false
+          },
+          "account_activity": {
+            "title": "Account Activity",
+            "type": "boolean",
+            "default": false
+          },
+          "member_activity": {
+            "title": "Member Activity",
+            "type": "boolean",
+            "default": false
+          }
+        }
       }
     }
   }

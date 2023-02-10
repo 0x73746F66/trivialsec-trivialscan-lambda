@@ -1,4 +1,5 @@
 # pylint: disable=line-too-long
+import contextlib
 import json
 import logging
 import hmac
@@ -70,39 +71,33 @@ class HMAC:
     @property
     def scheme(self) -> Union[str, None]:
         return (
-            None
-            if not hasattr(self, "parsed_header")
-            else self.parsed_header.get("scheme")
+            self.parsed_header.get("scheme") if hasattr(self, "parsed_header") else None
         )
 
     @property
-    def id(self) -> Union[str, None]:
+    def id(self) -> Union[str, None]:  # pylint: disable=invalid-name
+        return self.parsed_header.get("id") if hasattr(self, "parsed_header") else None
+
+    @property
+    def ts(self) -> Union[int, None]:  # pylint: disable=invalid-name
         return (
-            None if not hasattr(self, "parsed_header") else self.parsed_header.get("id")
+            int(self.parsed_header.get("ts"))  # type: ignore
+            if hasattr(self, "parsed_header")
+            else None
         )
-
-    @property
-    def ts(self) -> Union[int, None]:
-        return None if not hasattr(self, "parsed_header") else int(self.parsed_header.get("ts"))  # type: ignore
 
     @property
     def mac(self) -> Union[str, None]:
-        return (
-            None
-            if not hasattr(self, "parsed_header")
-            else self.parsed_header.get("mac")
-        )
+        return self.parsed_header.get("mac") if hasattr(self, "parsed_header") else None
 
     @property
     def canonical_string(self) -> str:
         parsed_url = urlparse(self.request_url)
         port = 443 if parsed_url.port is None else parsed_url.port
-        bits = []
-        bits.append(self.request_method.upper())
-        bits.append(parsed_url.hostname.lower())  # type: ignore
-        bits.append(str(port))
-        bits.append(parsed_url.path)
-        bits.append(str(self.ts))
+        bits = [self.request_method.upper()]
+        bits.extend(
+            (parsed_url.hostname.lower(), str(port), parsed_url.path, str(self.ts))  # type: ignore
+        )
         if self.contents:
             bits.append(b64encode(self.contents.encode("utf8")).decode("utf8"))
         return "\n".join(bits)
@@ -122,12 +117,16 @@ class HMAC:
         self.contents = raw_body
         self.request_method: str = method
         self.request_url: str = request_url
-        self.algorithm: str = self.default_algorithm if not self.supported_algorithms.get(algorithm) else algorithm  # type: ignore
+        self.algorithm: str = (
+            algorithm
+            if self.supported_algorithms.get(algorithm)  # type: ignore
+            else self.default_algorithm
+        )
         self._expire_after_seconds: int = expire_after_seconds
         self._not_before_seconds: int = not_before_seconds
-        from services.helpers import (
+        from services.helpers import (  # pylint: disable=import-outside-toplevel
             parse_authorization_header,
-        )  # pylint: disable=import-outside-toplevel
+        )
 
         self.parsed_header: dict[str, str] = parse_authorization_header(
             authorization_header
@@ -142,7 +141,7 @@ class HMAC:
         now = datetime.now(tz=timezone.utc)
         not_before = now - timedelta(seconds=self._not_before_seconds)
         expire_after = now + timedelta(seconds=self._expire_after_seconds)
-        # expire_after can assist with support for offline/aeroplane mode
+        # expire_after can assist with support for offline/airplane mode
         if compare_date < not_before or compare_date > expire_after:
             logger.info(
                 f"now {now} compare_date {compare_date} not_before {not_before} expire_after {expire_after}"
@@ -571,23 +570,21 @@ async def auth_required(
 
 
 def _request_task(url, body, headers):
-    try:
+    with contextlib.suppress(requests.exceptions.ConnectionError):
         requests.post(
             url,
             data=json.dumps(body, cls=JSONEncoder),
             headers=headers,
             timeout=(15, 30),
         )
-    except requests.exceptions.ConnectionError:
-        pass
 
 
-def post_beacon(
-    url: AnyHttpUrl, body: dict, headers: dict = {"Content-Type": "application/json"}
-):
+def post_beacon(url: AnyHttpUrl, body: dict, headers: dict = None):  # type: ignore
     """
     A beacon is a fire and forget HTTP POST, the response is not
     needed so we do not even wait for one, so there is no
     response to discard because it was never received
     """
+    if headers is None:
+        headers = {"Content-Type": "application/json"}
     threading.Thread(target=_request_task, args=(url, body, headers)).start()

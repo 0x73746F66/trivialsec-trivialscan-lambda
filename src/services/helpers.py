@@ -1,7 +1,7 @@
 import contextlib
 import re
 from typing import Union
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dns import resolver, rdatatype
 from dns.exception import DNSException, Timeout as DNSTimeoutError
@@ -32,7 +32,7 @@ def get_quotas(
         for report in scanner_record.history:
             for host in report.targets:
                 seen_hosts.add(host.transport.hostname)
-            if not report.date or report.date < datetime.utcnow().replace(
+            if not report.date or report.date < datetime.now(timezone.utc).replace(
                 day=1, minute=0, second=0, microsecond=0
             ):
                 continue

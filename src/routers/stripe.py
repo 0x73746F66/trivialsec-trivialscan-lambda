@@ -1,7 +1,6 @@
 import stripe
 from fastapi import Header, APIRouter, Response, status, Depends
 from starlette.requests import Request
-from starlette.responses import RedirectResponse
 from stripe.error import SignatureVerificationError
 
 import internals

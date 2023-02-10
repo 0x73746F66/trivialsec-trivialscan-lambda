@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import json
 from time import time
@@ -18,9 +19,6 @@ import services.helpers
 import services.webhook
 
 router = APIRouter()
-
-
-import contextlib
 
 
 @router.post(
@@ -268,13 +266,11 @@ async def update_billing_email(
             f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
         )
         authz.account.billing_email = data.email
-        try:
+        with contextlib.suppress(Exception):
             customer = services.stripe.create_customer(
                 email=authz.account.billing_email
             )
             authz.account.billing_client_id = customer.id  # type: ignore
-        except:  # pylint: disable=bare-except
-            pass
         if not authz.account.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return

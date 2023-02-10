@@ -4,7 +4,7 @@ import hashlib
 from abc import ABCMeta, abstractmethod
 from enum import Enum
 from typing import Union, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 import validators
 from pydantic import (
@@ -149,6 +149,13 @@ class Webauthn(BaseModel):
     alias: str
     created_at: datetime
 
+    class Config:
+        validate_assignment = True
+
+    @validator("created_at")
+    def set_created_at(cls, created_at: datetime):
+        return created_at.replace(tzinfo=timezone.utc)
+
 
 class Totp(BaseModel):
     assertion_response_raw_id: str
@@ -157,6 +164,13 @@ class Totp(BaseModel):
     alias: Optional[str] = Field(default="")
     active: Optional[bool] = Field(default=True)
     created_at: datetime
+
+    class Config:
+        validate_assignment = True
+
+    @validator("created_at")
+    def set_created_at(cls, created_at: datetime):
+        return created_at.replace(tzinfo=timezone.utc)
 
 
 class MfaSetting(str, Enum):
@@ -753,6 +767,13 @@ class ThreatIntel(BaseModel):
     feed_identifier: Any
     feed_date: datetime
 
+    class Config:
+        validate_assignment = True
+
+    @validator("feed_date")
+    def set_feed_date(cls, feed_date: datetime):
+        return feed_date.replace(tzinfo=timezone.utc)
+
 
 class Host(BaseModel, DAL):
     last_updated: Optional[datetime]
@@ -761,6 +782,13 @@ class Host(BaseModel, DAL):
     http: Optional[list[HostHTTP]]
     monitoring_enabled: Optional[bool] = Field(default=False)
     threat_intel: Optional[list[ThreatIntel]] = Field(default=[])
+
+    class Config:
+        validate_assignment = True
+
+    @validator("last_updated")
+    def set_last_updated(cls, last_updated: datetime):
+        return last_updated.replace(tzinfo=timezone.utc) if last_updated else None
 
     def exists(
         self,
@@ -859,6 +887,17 @@ class Certificate(BaseModel, DAL):
     validation_oid: Optional[str]
     version: Optional[Any] = Field(default=None)
     type: Optional[CertificateType]
+
+    class Config:
+        validate_assignment = True
+
+    @validator("not_after")
+    def set_not_after(cls, not_after: datetime):
+        return not_after.replace(tzinfo=timezone.utc) if not_after else None
+
+    @validator("not_before")
+    def set_not_before(cls, not_before: datetime):
+        return not_before.replace(tzinfo=timezone.utc) if not_before else None
 
     def exists(self, sha1_fingerprint: Union[str, None] = None) -> bool:
         return self.load(sha1_fingerprint)
@@ -976,6 +1015,13 @@ class ReportSummary(DefaultInfo):
     category: Optional[ScanRecordCategory]
     is_passive: Optional[bool] = Field(default=True)
 
+    class Config:
+        validate_assignment = True
+
+    @validator("date")
+    def set_date(cls, date: datetime):
+        return date.replace(tzinfo=timezone.utc) if date else None
+
 
 class EvaluationItem(DefaultInfo):
     class Config:
@@ -1004,6 +1050,10 @@ class EvaluationItem(DefaultInfo):
     threats: Optional[list[ThreatItem]] = Field(default=[])
     transport: Optional[HostTransport]
     certificate: Optional[Certificate]
+
+    @validator("observed_at")
+    def set_observed_at(cls, observed_at: datetime):
+        return observed_at.replace(tzinfo=timezone.utc) if observed_at else None
 
     @validator("references")
     def set_references(cls, references):
@@ -1263,6 +1313,13 @@ class WebhookPayload(BaseModel):
     event_name: WebhookEvent
     timestamp: datetime
     payload: dict
+
+    class Config:
+        validate_assignment = True
+
+    @validator("timestamp")
+    def set_timestamp(cls, timestamp: datetime):
+        return timestamp.replace(tzinfo=timezone.utc) if timestamp else None
 
 
 class ConfigUpdateRequest(BaseModel):

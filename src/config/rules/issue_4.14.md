@@ -1,4 +1,4 @@
-The Referrer-Policy HTTP header controls how much referrer information (sent with the Referer header) should be included with requests.
+The Referrer-Policy HTTP header controls how much referrer information (sent with the Referrer header) should be included with requests.
 
 This policy will leak potentially-private information from HTTPS resource URLs to insecure origins. Carefully consider the impact of this setting.
 
