@@ -47,8 +47,8 @@ def retrieve_hosts(
     a distinct list of hosts and ports, optionally returning the latest host
     full record
     """
-    scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
-    if not scanner_record:
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if not scanner_record.load():
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     seen = set()
@@ -59,11 +59,7 @@ def retrieve_hosts(
             if target not in seen:
                 seen.add(target)
                 data.append(host)
-
-    if not data:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    return data
+    return data or Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
@@ -123,7 +119,7 @@ def retrieve_host(
 
     if last_updated:
         object_key = None
-        scan_date = last_updated.strftime("%Y%m%d")  # type: ignore
+        scan_date = last_updated.strftime("%Y%m%d")
         if port:
             prefix_key = path.join(prefix_key, str(port))
         for match in matches:
@@ -145,18 +141,20 @@ def retrieve_host(
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         host = models.Host(**json.loads(ret))
         reports = []
-        if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
-            for target in scanner_record.monitored_targets:  # type: ignore
+        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        if scanner_record.load():
+            for target in scanner_record.monitored_targets:
                 if target.hostname == hostname:
                     host.monitoring_enabled = target.enabled
             for record in scanner_record.history:
-                for _host in record.targets:
+                reports.extend(
+                    record
+                    for _host in record.targets
                     if (
                         _host.transport.hostname == hostname
                         and _host.transport.port == port
-                    ):
-                        reports.append(record)
-
+                    )
+                )
         return models.HostResponse(
             host=host,
             versions=versions,

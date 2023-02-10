@@ -62,12 +62,14 @@ def retrieve_certificate(
 
         certificate = models.Certificate(**json.loads(ret))
         reports = []
-        if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        if scanner_record.load():
             for record in scanner_record.history:
-                for cert in record.certificates:  # type: ignore
-                    if cert.sha1_fingerprint == sha1_fingerprint:
-                        reports.append(record)
-
+                reports.extend(
+                    record
+                    for cert in record.certificates  # type: ignore
+                    if cert.sha1_fingerprint == sha1_fingerprint
+                )
         return models.CertificateResponse(certificate=certificate, reports=sorted(reports, key=lambda x: x.date, reverse=True))  # type: ignore
 
     except RuntimeError as err:

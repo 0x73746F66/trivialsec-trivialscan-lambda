@@ -51,7 +51,8 @@ def retrieve_reports(
     """
     Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
     """
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
         return sorted(scanner_record.history, key=lambda x: x.date, reverse=True)  # type: ignore
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -89,7 +90,8 @@ def retrieve_summary(
     """
     Retrieves a summary of a Trivial Scanner report for the provided report identifier
     """
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
         for summary in scanner_record.history:
             if summary.report_id == report_id:
                 return summary
@@ -132,16 +134,17 @@ def retrieve_full_report(
     """
     Retrieves a full Trivial Scanner report for the provided report identifier
     """
-    report = models.FullReport(report_id=report_id, account_name=authz.account.name).load()  # type: ignore
-    if not report:
+    report = models.FullReport(report_id=report_id, account_name=authz.account.name)  # type: ignore
+    if not report.load():
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     report.evaluations = services.helpers.load_descriptions(report)
-    scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
-    for host in report.targets:  # type: ignore
-        for target in scanner_record.monitored_targets:  # type: ignore
-            if target.hostname == host.transport.hostname:
-                host.monitoring_enabled = target.enabled
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
+        for host in report.targets:  # pylint: disable=not-an-iterable
+            for target in scanner_record.monitored_targets:  # type: ignore
+                if target.hostname == host.transport.hostname:
+                    host.monitoring_enabled = target.enabled
 
     return report
 
@@ -191,9 +194,8 @@ async def store(
     if report_type is models.ReportType.REPORT:
         data["report_id"] = token_urlsafe(32)
         data["results_uri"] = f'/result/{data["report_id"]}/detail'
-        client_info = None
-        if client := models.Client(account=authz.account, name=data.get("client_name")).load():  # type: ignore
-            client_info = client.client_info
+        client = models.Client(account_name=authz.account.name, name=data.get("client_name"))  # type: ignore
+        client_info = client.client_info if client.load() else None
         report = models.ReportSummary(
             type=models.ScanRecordType.SELF_MANAGED,
             category=models.ScanRecordCategory.RECONNAISSANCE,
@@ -201,8 +203,8 @@ async def store(
             client=client_info,
             **data,
         )
-        scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
-        if not scanner_record:
+        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        if not scanner_record.load():
             scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
         scanner_record.history.append(report)
         if scanner_record.save():
@@ -217,7 +219,7 @@ async def store(
                     "client": authz.client.name,
                     "report_id": report.report_id,
                     "ip_addr": authz.ip_addr,
-                    "user_agent": authz.user_agent,
+                    "user_agent": authz.user_agent.ua_string,
                 },
             )
             return {"results_uri": data["results_uri"]}
@@ -228,15 +230,16 @@ async def store(
             response.status_code = status.HTTP_412_PRECONDITION_FAILED
             return
         if full_report.client_name:
-            if client := models.Client(account=authz.account, name=full_report.client_name).load():  # type: ignore
+            client = models.Client(account_name=authz.account.name, name=full_report.client_name)  # type: ignore
+            if client.load():
                 full_report.client = client.client_info
         items = []
-        certs = {cert.sha1_fingerprint: cert for cert in full_report.certificates}  # type: ignore
+        certs = {cert.sha1_fingerprint: cert for cert in full_report.certificates}  # type: ignore pylint: disable=not-an-iterable
         for _item in data["evaluations"]:
             item = models.EvaluationItem(
                 generator=full_report.generator,
                 version=full_report.version,
-                account_name=authz.account.name,  # type: ignore
+                account_name=authz.account.name,
                 client_name=full_report.client_name,
                 report_id=full_report.report_id,
                 observed_at=full_report.date,
@@ -280,6 +283,7 @@ async def store(
                 certificate=certs.get(_item.get("metadata", {}).get("sha1_fingerprint"))
                 if _item.get("group") == "certificate"
                 else None,
+                recommendation=None,
             )
             items.append(item)
 
@@ -317,11 +321,11 @@ async def store(
                                 "port": _target.transport.port,
                             }
                         }
-                        for _target in full_report.targets
+                        for _target in full_report.targets  # type: ignore pylint: disable=not-an-iterable
                     ],
                     "date": full_report.date,
                     "results": full_report.results,
-                    "certificates": [cert.sha1_fingerprint for cert in full_report.certificates],  # type: ignore
+                    "certificates": [cert.sha1_fingerprint for cert in full_report.certificates],  # type: ignore pylint: disable=not-an-iterable
                     "results_uri": full_report.results_uri,
                     "type": models.ScanRecordType.SELF_MANAGED,
                     "category": models.ScanRecordCategory.RECONNAISSANCE,
@@ -338,13 +342,17 @@ async def store(
                     "account": authz.account.name,
                     "client": authz.client.name,
                     "ip_addr": authz.ip_addr,
-                    "user_agent": authz.user_agent,
+                    "user_agent": authz.user_agent.ua_string,
                 },
             )
             if authz.account.notifications.self_hosted_uploads:  # type: ignore
                 internals.logger.info("Emailing result")
-                first_hostname = full_report.targets[0].transport.hostname
-                first_port = full_report.targets[0].transport.port
+                first_hostname = full_report.targets[
+                    0
+                ].transport.hostname  # pylint: disable=unsubscriptable-object
+                first_port = full_report.targets[
+                    0
+                ].transport.port  # pylint: disable=unsubscriptable-object
                 suffix = ""
                 if len(full_report.targets) > 1:
                     suffix = f" +{len(full_report.targets)} hosts"
@@ -384,10 +392,10 @@ async def store(
                         "client": authz.client.name,
                         "sha1_fingerprint": cert.sha1_fingerprint,
                         "ip_addr": authz.ip_addr,
-                        "user_agent": authz.user_agent,
+                        "user_agent": authz.user_agent.ua_string,
                     },
                 )
-            for host in full_report.targets:  # type: ignore
+            for host in full_report.targets:  # pylint: disable=not-an-iterable
                 host.save()
                 services.webhook.send(
                     event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
@@ -399,7 +407,7 @@ async def store(
                         "account": authz.account.name,
                         "client": authz.client.name,
                         "ip_addr": authz.ip_addr,
-                        "user_agent": authz.user_agent,
+                        "user_agent": authz.user_agent.ua_string,
                         "last_updated": host.last_updated,
                         "hostname": host.transport.hostname,
                         "port": host.transport.port,
@@ -412,7 +420,7 @@ async def store(
         object_key = path.join(
             internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem"
         )
-        if services.aws.store_s3(object_key, contents):  # type: ignore
+        if services.aws.store_s3(object_key, contents):
             services.webhook.send(
                 event_name=models.WebhookEvent.SELF_HOSTED_UPLOADS,
                 account=authz.account,
@@ -425,7 +433,7 @@ async def store(
                     "sha1_fingerprint": sha1_fingerprint,
                     "pem": contents.decode(),
                     "ip_addr": authz.ip_addr,
-                    "user_agent": authz.user_agent,
+                    "user_agent": authz.user_agent.ua_string,
                 },
             )
             return {"results_uri": f"/certificate/{sha1_fingerprint}"}
@@ -457,7 +465,8 @@ async def delete_report(
     Deletes a specific ReportSummary within the ScannerRecord, the accompanying FullReport file, and eventually any aggregate evaluation records will be computed out also
     (as they are triggered from the deleted report file)
     """
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
         found = False
         history = []
         for summary in scanner_record.history:
@@ -469,7 +478,8 @@ async def delete_report(
             scanner_record.history = history
             scanner_record.save()
 
-    if report := models.FullReport(report_id=report_id, account_name=authz.account.name).load():  # type: ignore
+    report = models.FullReport(report_id=report_id, account_name=authz.account.name)  # type: ignore
+    if report.load():
         report.delete()
         services.webhook.send(
             event_name=models.WebhookEvent.REPORT_DELETED,
@@ -480,6 +490,6 @@ async def delete_report(
                 "account": authz.account.name,
                 "member": authz.member.email,
                 "ip_addr": authz.ip_addr,
-                "user_agent": authz.user_agent,
+                "user_agent": authz.user_agent.ua_string,
             },
         )

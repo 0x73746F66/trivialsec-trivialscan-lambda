@@ -231,8 +231,7 @@ class SubscriptionAddon(SubscriptionBase):
             ]:
                 subs.append(data)
 
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
+        if res := sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created"))):
             super().__init__(**res[-1])
             return self
 
@@ -268,8 +267,7 @@ class SubscriptionPro(SubscriptionBase):
             ]:
                 subs.append(data)
 
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
+        if res := sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created"))):
             super().__init__(**res[-1])
             return self
 
@@ -307,8 +305,7 @@ class SubscriptionEnterprise(
             ]:
                 subs.append(data)
 
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
+        if res := sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created"))):
             super().__init__(**res[-1])
             return self
 
@@ -344,7 +341,6 @@ class SubscriptionUnlimited(SubscriptionBase):
             ]:
                 subs.append(data)
 
-        res = sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created")))
-        if res:
+        if res := sorted(subs, key=lambda x: datetime.fromtimestamp(x.get("created"))):
             super().__init__(**res[-1])
             return self

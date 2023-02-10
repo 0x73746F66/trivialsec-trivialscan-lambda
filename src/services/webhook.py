@@ -10,36 +10,31 @@ import models
 
 
 def send(event_name: models.WebhookEvent, account: models.MemberAccount, data: dict):
-    for webhook in account.webhooks:
+    for webhook in account.webhooks:  # type: ignore pylint: disable=not-an-iterable
         if not hasattr(webhook, event_name.value):
             internals.logger.warning(f"Invalid webhook event {event_name}")
             continue
-        if not webhook.endpoint or validators.url(webhook.endpoint) is not True:
+        if not webhook.endpoint or validators.url(webhook.endpoint) is not True:  # type: ignore
             continue
         internals.logger.info(f"Webhook enabled for {account.name}")
         if getattr(webhook, event_name.value) is True:
             internals.logger.info(f"Sending webhook event {event_name}")
-            _sign_and_send(
-                event_name,
-                webhook,
-                data,
-                account.name
-            )
+            _sign_and_send(event_name, webhook, data, account.name)
 
 
 def _sign_and_send(
-        event_name: models.WebhookEvent,
-        webhook: models.Webhooks,
-        data: dict,
-        client_id: str,
-        algorithm: str = "sha3_512",
-    ):
-    def _make_header(id: str, mac: str, ts: int, alg: str = "sha3_512"):
+    event_name: models.WebhookEvent,
+    webhook: models.Webhooks,
+    data: dict,
+    client_id: str,
+    algorithm: str = "sha3_512",
+):
+    def _make_header(identifier: str, mac: str, ts: int, alg: str = "sha3_512"):
         """
         Never hint the alg when signed requests purpose is for real
         authorization. This is fine, and helpful, for webhooks.
         """
-        return f'HMAC id="{id}", mac="{mac}", ts="{ts}", alg="{alg}"'
+        return f'HMAC id="{identifier}", mac="{mac}", ts="{ts}", alg="{alg}"'
 
     payload = models.WebhookPayload(
         event_name=event_name, timestamp=datetime.utcnow(), payload=data
@@ -54,13 +49,15 @@ def _sign_and_send(
         algorithm=algorithm,
     )
     client_mac = hmac.new(
-        webhook.signing_secret.encode("utf8"), client_mac.canonical_string.encode("utf8"), hashlib.sha3_512
+        webhook.signing_secret.encode("utf8"),
+        client_mac.canonical_string.encode("utf8"),
+        hashlib.sha3_512,
     ).hexdigest()
     internals.post_beacon(
         url=webhook.endpoint,
         body=payload.dict(),
         headers={
-            'Authorization': _make_header(client_id, client_mac, unix_ts, algorithm),
-            'User-Agent': "Trivial Security signed webhook"
-        }
+            "Authorization": _make_header(client_id, client_mac, unix_ts, algorithm),
+            "User-Agent": "Trivial Security signed webhook",
+        },
     )

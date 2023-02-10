@@ -1,7 +1,7 @@
 import json
 from time import time
 
-from fastapi import APIRouter, Response, status, Depends, Query
+from fastapi import APIRouter, Response, status, Depends
 import validators
 
 import internals
@@ -40,11 +40,12 @@ async def scanner_config(
     """
     Fetches host monitoring configuration
     """
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
         if len(scanner_record.monitored_targets) == 0:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         return scanner_record.monitored_targets
-    scanner_record = models.ScannerRecord(account=authz.account)
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
     scanner_record.save()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -80,13 +81,14 @@ async def enable_monitoring(
     """
     Adds and enables host monitoring
     """
-    if validators.email(f"nobody@{hostname}") is not True:
+    if validators.email(f"nobody@{hostname}") is not True:  # type: ignore
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
     changed = False
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
         quotas = services.helpers.get_quotas(
-            account=authz.account,  # type: ignore
+            account=authz.account,
             scanner_record=scanner_record,
         )
         if not quotas.unlimited_monitoring and quotas.monitoring.get(
@@ -133,7 +135,7 @@ async def enable_monitoring(
                 "account": authz.account.name,
                 "member": authz.member.email,
                 "ip_addr": authz.ip_addr,
-                "user_agent": authz.user_agent,
+                "user_agent": authz.user_agent.ua_string,
             },
         )
 
@@ -168,11 +170,12 @@ async def deactivate_monitoring(
     """
     Adds and enables host monitoring
     """
-    if validators.email(f"nobody@{hostname}") is not True:
+    if validators.email(f"nobody@{hostname}") is not True:  # type: ignore
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
     changed = False
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
         found = False
         for target in scanner_record.monitored_targets:
             if target.hostname == hostname:
@@ -213,7 +216,7 @@ async def deactivate_monitoring(
                 "account": authz.account.name,
                 "member": authz.member.email,
                 "ip_addr": authz.ip_addr,
-                "user_agent": authz.user_agent,
+                "user_agent": authz.user_agent.ua_string,
             },
         )
 
@@ -246,7 +249,7 @@ async def queue_hostname(
     """
     Adds a host for on-demand scanning, scanner configuration stores the ports and path names to be used
     """
-    if validators.email(f"nobody@{hostname}") is not True:
+    if validators.email(f"nobody@{hostname}") is not True:  # type: ignore
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
     ce_name = services.stripe.PRODUCTS[services.stripe.Product.COMMUNITY_EDITION][
@@ -254,9 +257,10 @@ async def queue_hostname(
     ]
     ports = [443]
     path_names = ["/"]
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
         quotas = services.helpers.get_quotas(
-            account=authz.account,  # type: ignore
+            account=authz.account,
             scanner_record=scanner_record,
         )
         internals.logger.info(f"quotas {quotas}")
@@ -265,11 +269,10 @@ async def queue_hostname(
         ) >= quotas.ondemand.get(models.Quota.TOTAL, 0):
             response.status_code = status.HTTP_402_PAYMENT_REQUIRED
             return False
-        authz.account.load_billing()  # type: ignore
-        internals.logger.info(f"product_name {authz.account.billing.product_name}")
-        if (
-            authz.account.billing.product_name == ce_name
-            and (hostname in quotas.seen_hosts or hostname not in quotas.monitoring_hosts)
+        authz.account.load_billing()
+        internals.logger.info(f"product_name {authz.account.billing.product_name}")  # type: ignore
+        if authz.account.billing.product_name == ce_name and (  # type: ignore
+            hostname in quotas.seen_hosts or hostname not in quotas.monitoring_hosts
         ):
             response.status_code = status.HTTP_402_PAYMENT_REQUIRED
             return False
@@ -296,8 +299,8 @@ async def queue_hostname(
             default=str,
         ),
         deduplicate=False,
-        account=authz.account.name,  # type: ignore
-        queued_by=authz.member.email,  # type: ignore
+        account=authz.account.name,
+        queued_by=authz.member.email,
         queued_timestamp=queued_timestamp,  # JavaScript support
     )
     services.webhook.send(
@@ -313,7 +316,7 @@ async def queue_hostname(
             "member": authz.member.email,
             "queued_timestamp": queued_timestamp,
             "ip_addr": authz.ip_addr,
-            "user_agent": authz.user_agent,
+            "user_agent": authz.user_agent.ua_string,
         },
     )
     return True
@@ -345,21 +348,23 @@ async def delete_config(
     """
     Deletes a host monitoring configuration
     """
-    if validators.email(f"nobody@{hostname}") is not True:
+    if validators.email(f"nobody@{hostname}") is not True:  # type: ignore
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
     changed = False
     monitored_targets = []
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
         for target in scanner_record.monitored_targets:
             if target.hostname == hostname:
                 changed = True
                 continue
             monitored_targets.append(target)
+        if changed:
+            scanner_record.monitored_targets = monitored_targets
+            scanner_record.save()
 
     if changed:
-        scanner_record.monitored_targets = monitored_targets
-        scanner_record.save()
         services.webhook.send(
             event_name=models.WebhookEvent.SCANNER_CONFIGURATIONS,
             account=authz.account,
@@ -370,7 +375,7 @@ async def delete_config(
                 "account": authz.account.name,
                 "member": authz.member.email,
                 "ip_addr": authz.ip_addr,
-                "user_agent": authz.user_agent,
+                "user_agent": authz.user_agent.ua_string,
             },
         )
     else:
@@ -406,11 +411,12 @@ async def update_config(
     """
     Deletes a host monitoring configuration
     """
-    if validators.email(f"nobody@{data.hostname}") is not True:
+    if validators.email(f"nobody@{data.hostname}") is not True:  # type: ignore
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
     changed = False
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
         for target in scanner_record.monitored_targets:
             if target.hostname != data.hostname:
                 continue
@@ -418,20 +424,21 @@ async def update_config(
                 target.enabled = data.enabled
                 changed = True
             if data.http_paths:
-                target.path_names.sort(key=str.lower)
+                target.path_names.sort(key=str.lower)  # type: ignore
                 data.http_paths.sort(key=str.lower)
                 if target.path_names != data.http_paths:
                     target.path_names = data.http_paths
                     changed = True
             if data.ports:
-                target.ports.sort(key=int)
+                target.ports.sort(key=int)  # type: ignore
                 data.ports.sort(key=int)
                 if data.ports != target.ports:
                     target.ports = data.ports
                     changed = True
+        if changed:
+            scanner_record.save()
 
     if changed:
-        scanner_record.save()
         services.webhook.send(
             event_name=models.WebhookEvent.SCANNER_CONFIGURATIONS,
             account=authz.account,
@@ -443,7 +450,7 @@ async def update_config(
                 "account": authz.account.name,
                 "member": authz.member.email,
                 "ip_addr": authz.ip_addr,
-                "user_agent": authz.user_agent,
+                "user_agent": authz.user_agent.ua_string,
             },
         )
     else:

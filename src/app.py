@@ -62,7 +62,7 @@ app.include_router(stripe.router, include_in_schema=False, prefix="/stripe")
 async def startup_event():
     if getenv("AWS_EXECUTION_ENV") is None:
         internals.logger = logging.getLogger("uvicorn.default")
-    boto3.set_stream_logger("boto3", getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))  # type: ignore
+    boto3.set_stream_logger("boto3", getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
     internals.logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
 
 

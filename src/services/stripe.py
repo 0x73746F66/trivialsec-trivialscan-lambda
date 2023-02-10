@@ -1,6 +1,7 @@
 import json
 from enum import Enum
 from datetime import datetime
+from typing import Union
 
 import stripe
 from stripe.error import (
@@ -11,7 +12,6 @@ from stripe.error import (
     StripeError,
 )
 from retry.api import retry
-from pydantic import EmailStr
 
 import services.aws
 import internals
@@ -62,7 +62,7 @@ PRODUCTS = {
 
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
-def get_product(product: Product) -> stripe.Product:
+def get_product(product: Product) -> Union[stripe.Product, None]:
     product_id = PRODUCTS[product].get("id")
     stripe.api_key = services.aws.get_ssm(
         f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
@@ -84,7 +84,7 @@ def get_product(product: Product) -> stripe.Product:
 
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
-def get_pricing_by_id(price_id: str) -> stripe.Price:
+def get_pricing_by_id(price_id: str) -> Union[stripe.Price, None]:
     stripe.api_key = services.aws.get_ssm(
         f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
         WithDecryption=True,
@@ -107,7 +107,7 @@ def get_pricing_by_id(price_id: str) -> stripe.Price:
 
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
-def create_customer(email: str) -> stripe.Customer:
+def create_customer(email: str) -> Union[stripe.Customer, None]:
     stripe.api_key = services.aws.get_ssm(
         f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
         WithDecryption=True,
@@ -128,7 +128,7 @@ def create_customer(email: str) -> stripe.Customer:
 
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
-def get_customer(customer_id: str) -> stripe.Customer:
+def get_customer(customer_id: str) -> Union[stripe.Customer, None]:
     stripe.api_key = services.aws.get_ssm(
         f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
         WithDecryption=True,
@@ -149,7 +149,7 @@ def get_customer(customer_id: str) -> stripe.Customer:
 
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
-def get_invoice(invoice_id: str) -> stripe.Invoice:
+def get_invoice(invoice_id: str) -> Union[stripe.Invoice, None]:
     stripe.api_key = services.aws.get_ssm(
         f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
         WithDecryption=True,
@@ -170,7 +170,7 @@ def get_invoice(invoice_id: str) -> stripe.Invoice:
 
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
-def get_subscription(subscription_id: str) -> stripe.Subscription:
+def get_subscription(subscription_id: str) -> Union[stripe.Subscription, None]:
     stripe.api_key = services.aws.get_ssm(
         f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
         WithDecryption=True,
@@ -192,7 +192,7 @@ def get_subscription(subscription_id: str) -> stripe.Subscription:
         internals.logger.exception(ex)
 
 
-def get_account_by_billing_email(billing_email: EmailStr):
+def get_account_by_billing_email(billing_email: str):
     from models import MemberAccount  # pylint: disable=import-outside-toplevel
 
     prefix_key = f"{internals.APP_ENV}/accounts/"
@@ -203,7 +203,7 @@ def get_account_by_billing_email(billing_email: EmailStr):
         raw = services.aws.get_s3(path_key=object_path)
         data = json.loads(raw)
         account = MemberAccount(**data)
-        if account.billing_email == str(billing_email):
+        if account.billing_email == billing_email:
             return account
 
 
@@ -227,8 +227,8 @@ class Webhook:
         self._data_object = data_object
         self.event_type = event_type
         if data_object.get("customer"):
-            self._customer = get_customer(data_object.get("customer"))
-            self.account = get_account_by_billing_email(self._customer.get("email"))
+            self._customer = get_customer(data_object.get("customer"))  # type: ignore
+            self.account = get_account_by_billing_email(self._customer.get("email"))  # type: ignore
 
     def process(self) -> bool:
         from models import MemberAccount  # pylint: disable=import-outside-toplevel
@@ -253,26 +253,26 @@ class Webhook:
 
     def _upsert_subscription(self) -> bool:
         results: list[bool] = []
-        subscription = get_subscription(self._data_object.get("id"))
-        for _item in subscription["items"]["data"]:
-            item = subscription.copy()
+        subscription = get_subscription(self._data_object.get("id"))  # type: ignore
+        for _item in subscription["items"]["data"]:  # type: ignore
+            item = subscription.copy()  # type: ignore
             item["subscription_item"] = _item.copy()
             del item["items"]
             product_id = _item["price"]["product"]
             results.append(
                 services.aws.store_s3(
-                    f"{internals.APP_ENV}/accounts/{self.account.name}/subscriptions/{PRODUCT_MAP[product_id]}/{_item.get('id')}.json",
+                    f"{internals.APP_ENV}/accounts/{self.account.name}/subscriptions/{PRODUCT_MAP[product_id]}/{_item.get('id')}.json",  # type: ignore
                     json.dumps(item, default=str),
                 )
             )
         return all(results)
 
     def _upsert_invoice(self) -> bool:
-        invoice = get_invoice(self._data_object.get("id"))
-        created = datetime.fromtimestamp(invoice.get("created")).strftime("%Y%m%d")
+        invoice = get_invoice(self._data_object.get("id"))  # type: ignore
+        created = datetime.fromtimestamp(invoice.get("created")).strftime("%Y%m%d")  # type: ignore
         return services.aws.store_s3(
-            f"{internals.APP_ENV}/accounts/{self.account.name}/invoices/{created}/{invoice.get('id')}.json",
-            json.dumps(invoice.to_dict_recursive(), default=str),
+            f"{internals.APP_ENV}/accounts/{self.account.name}/invoices/{created}/{invoice.get('id')}.json",  # type: ignore
+            json.dumps(invoice.to_dict_recursive(), default=str),  # type: ignore
         )
 
     def _payment_intent_succeeded(self):
@@ -283,7 +283,7 @@ class Webhook:
             )
             results.append(
                 services.aws.store_s3(
-                    f"{internals.APP_ENV}/accounts/{self.account.name}/payments/{created}/{charges_data.get('id')}.json",
+                    f"{internals.APP_ENV}/accounts/{self.account.name}/payments/{created}/{charges_data.get('id')}.json",  # type: ignore
                     json.dumps(charges_data, default=str),
                 )
             )

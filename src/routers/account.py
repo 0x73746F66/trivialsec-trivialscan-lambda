@@ -20,6 +20,9 @@ import services.webhook
 router = APIRouter()
 
 
+import contextlib
+
+
 @router.post(
     "/account/register",
     response_model=models.MemberProfile,
@@ -79,14 +82,14 @@ async def account_register(
         ip_addr=ip_addr,
         user_agent=user_agent,
         timestamp=round(time() * 1000),  # JavaScript support
-    )
+    )  # type: ignore
     if not account.name:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     if not ip_addr or not user_agent:
         internals.logger.warning(f"ip_addr {ip_addr} user_agent {user_agent}")
     member = models.MemberProfile(
-        account=account,
+        account_name=account.name,
         email=account.primary_email,
         confirmed=False,
         confirmation_token=hashlib.sha224(bytes(str(random()), "ascii")).hexdigest(),
@@ -99,11 +102,9 @@ async def account_register(
         if not member.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
-        try:
+        with contextlib.suppress(Exception):
             customer = services.stripe.create_customer(email=account.billing_email)  # type: ignore
-            account.billing_client_id = customer.id
-        except:
-            pass  # pylint: disable=bare-except
+            account.billing_client_id = customer.id  # type: ignore
         if not account.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
@@ -120,8 +121,8 @@ async def account_register(
         )
         if sendgrid._content:  # pylint: disable=protected-access
             res = json.loads(
-                sendgrid._content.decode()
-            )  # pylint: disable=protected-access
+                sendgrid._content.decode()  # pylint: disable=protected-access
+            )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -173,19 +174,21 @@ async def support_request(
     try:
         sendgrid = services.sendgrid.send_email(
             subject=f"Support | {data.subject}",
-            sender_name=authz.account.name,  # type: ignore
-            sender=authz.member.email,  # type: ignore
+            sender_name=authz.account.name,
+            sender=authz.member.email,
             recipient="support@trivialsec.com",
             template="support",
             data={
                 "message": data.message,
-                "json": json.dumps(authz.member.dict(), indent=2, default=str, sort_keys=True),  # type: ignore
+                "json": json.dumps(
+                    authz.member.dict(), indent=2, default=str, sort_keys=True
+                ),
             },
         )
         if sendgrid._content:  # pylint: disable=protected-access
             res = json.loads(
-                sendgrid._content.decode()
-            )  # pylint: disable=protected-access
+                sendgrid._content.decode()  # pylint: disable=protected-access
+            )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -196,7 +199,7 @@ async def support_request(
             subject=data.subject,
             message=data.message,
             ip_addr=authz.ip_addr,
-            user_agent=authz.user_agent,
+            user_agent=authz.user_agent.ua_string,
             timestamp=round(time() * 1000),  # JavaScript support
             sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
         )
@@ -247,16 +250,16 @@ async def update_billing_email(
             cc=data.email,
             template="updated_email",
             data={
-                "old_email": authz.account.billing_email,  # type: ignore
+                "old_email": authz.account.billing_email,
                 "new_email": data.email,
-                "modifying_email": authz.member.email,  # type: ignore
+                "modifying_email": authz.member.email,
                 "email_type_message": "account billing email address",
             },
         )
         if sendgrid._content:  # pylint: disable=protected-access
             res = json.loads(
-                sendgrid._content.decode()
-            )  # pylint: disable=protected-access
+                sendgrid._content.decode()  # pylint: disable=protected-access
+            )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -264,13 +267,15 @@ async def update_billing_email(
         internals.logger.info(
             f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
         )
-        authz.account.billing_email = data.email  # type: ignore
+        authz.account.billing_email = data.email
         try:
-            customer = services.stripe.create_customer(email=authz.account.billing_email)  # type: ignore
-            authz.account.billing_client_id = customer.id
+            customer = services.stripe.create_customer(
+                email=authz.account.billing_email
+            )
+            authz.account.billing_client_id = customer.id  # type: ignore
         except:  # pylint: disable=bare-except
             pass
-        if not authz.account.save() or not authz.account.update_members():  # type: ignore
+        if not authz.account.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         services.webhook.send(
@@ -282,7 +287,7 @@ async def update_billing_email(
                 "account": authz.account.name,
                 "member": authz.member.email,
                 "ip_addr": authz.ip_addr,
-                "user_agent": authz.user_agent,
+                "user_agent": authz.user_agent.ua_string,
             },
         )
         return authz.account
@@ -332,16 +337,16 @@ async def update_primary_email(
             cc=data.email,
             template="updated_email",
             data={
-                "old_email": authz.account.primary_email,  # type: ignore
+                "old_email": authz.account.primary_email,
                 "new_email": data.email,
-                "modifying_email": authz.member.email,  # type: ignore
+                "modifying_email": authz.member.email,
                 "email_type_message": "account primary contact email address",
             },
         )
         if sendgrid._content:  # pylint: disable=protected-access
             res = json.loads(
-                sendgrid._content.decode()
-            )  # pylint: disable=protected-access
+                sendgrid._content.decode()  # pylint: disable=protected-access
+            )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
                 response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -349,8 +354,8 @@ async def update_primary_email(
         internals.logger.info(
             f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
         )
-        authz.account.primary_email = data.email  # type: ignore
-        if not authz.account.save() or not authz.account.update_members():  # type: ignore
+        authz.account.primary_email = data.email
+        if not authz.account.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         services.webhook.send(
@@ -362,7 +367,7 @@ async def update_primary_email(
                 "account": authz.account.name,
                 "member": authz.member.email,
                 "ip_addr": authz.ip_addr,
-                "user_agent": authz.user_agent,
+                "user_agent": authz.user_agent.ua_string,
             },
         )
         return authz.account
@@ -399,8 +404,8 @@ async def update_account_display_name(
     Updates the display name for the account.
     """
     try:
-        authz.account.display = data.name  # type: ignore
-        if not authz.account.save() or not authz.account.update_members():  # type: ignore
+        authz.account.display = data.name
+        if not authz.account.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
         services.webhook.send(
@@ -412,7 +417,7 @@ async def update_account_display_name(
                 "account": authz.account.name,
                 "member": authz.member.email,
                 "ip_addr": authz.ip_addr,
-                "user_agent": authz.user_agent,
+                "user_agent": authz.user_agent.ua_string,
             },
         )
         return authz.account
@@ -450,9 +455,9 @@ async def enable_notification(
     Enables an email notification event type
     """
     try:
-        setattr(authz.account.notifications, event_type, True)  # type: ignore
-        if authz.account.save():  # type: ignore
-            return authz.account.notifications  # type: ignore
+        setattr(authz.account.notifications, event_type, True)
+        if authz.account.save():
+            return authz.account.notifications
     except AttributeError:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
@@ -485,9 +490,9 @@ async def disable_notification(
     Disables an email notification event type
     """
     try:
-        setattr(authz.account.notifications, event_type, False)  # type: ignore
-        if authz.account.save():  # type: ignore
-            return authz.account.notifications  # type: ignore
+        setattr(authz.account.notifications, event_type, False)
+        if authz.account.save():
+            return authz.account.notifications
     except AttributeError:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
     return
@@ -522,7 +527,7 @@ async def enable_webhook(
     found = False
     changed = False
     webhooks = []
-    for _webhook in authz.account.webhooks:
+    for _webhook in authz.account.webhooks:  # type: ignore
         if webhook.endpoint == _webhook.endpoint:
             found = True
             changed = True
@@ -545,7 +550,7 @@ async def enable_webhook(
             data={
                 "endpoint": webhook.endpoint,
                 "signing_secret": webhook.signing_secret,
-            }
+            },
         )
         if sendgrid._content:  # pylint: disable=protected-access
             res = json.loads(
@@ -590,13 +595,10 @@ async def delete_webhook(
     """
     found = False
     webhooks = []
-    for webhook in authz.account.webhooks:
+    for webhook in authz.account.webhooks:  # type: ignore
         if endpoint == webhook.endpoint:
             found = True
             continue
         webhooks.append(webhook)
     authz.account.webhooks = webhooks
-    if found and authz.account.save():
-        return True
-
-    return False
+    return bool(found and authz.account.save())

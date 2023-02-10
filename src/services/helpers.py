@@ -1,3 +1,4 @@
+import contextlib
 import re
 from typing import Union
 from datetime import datetime
@@ -22,12 +23,12 @@ def get_quotas(
 ) -> models.AccountQuotas:
     seen_hosts = set()
     monitoring_hosts = set()
-    if len(scanner_record.monitored_targets or []) > 0:  # type: ignore
+    if len(scanner_record.monitored_targets or []) > 0:
         monitoring_hosts = {
             item.hostname for item in scanner_record.monitored_targets if item.enabled
         }
     ondemand_hosts = set()
-    if len(scanner_record.history or []) > 0:  # type: ignore
+    if len(scanner_record.history or []) > 0:
         for report in scanner_record.history:
             for host in report.targets:
                 seen_hosts.add(host.transport.hostname)
@@ -46,37 +47,40 @@ def get_quotas(
     ondemand_hosts_month = ONDEMAND_HOSTS_CE
 
     if sub := models.stripe.SubscriptionAddon().load(account.name):  # type: ignore
-        unlimited_scans = (
-            True
-            if sub.status
-            in [
-                models.stripe.SubscriptionStatus.ACTIVE,
-                models.stripe.SubscriptionStatus.TRIALING,
-            ]
-            else False
-        )
+        unlimited_scans = sub.status in [
+            models.stripe.SubscriptionStatus.ACTIVE,
+            models.stripe.SubscriptionStatus.TRIALING,
+        ]
     if sub := models.stripe.SubscriptionPro().load(account.name):  # type: ignore
         monitoring_hosts_day = (
-            MONITORING_HOSTS_CE
-            if not sub.metadata
-            else int(sub.metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE))
+            int(
+                sub.metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE)
+            )  # pylint: disable=no-member
+            if sub.metadata
+            else MONITORING_HOSTS_CE
         )
         ondemand_hosts_month = (
-            ONDEMAND_HOSTS_CE
-            if not sub.metadata
-            else int(sub.metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE))
+            int(
+                sub.metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE)
+            )  # pylint: disable=no-member
+            if sub.metadata
+            else ONDEMAND_HOSTS_CE
         )
         new_only = False
     elif sub := models.stripe.SubscriptionEnterprise().load(account.name):  # type: ignore
         monitoring_hosts_day = (
-            MONITORING_HOSTS_CE
-            if not sub.metadata
-            else int(sub.metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE))
+            int(
+                sub.metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE)
+            )  # pylint: disable=no-member
+            if sub.metadata
+            else MONITORING_HOSTS_CE
         )
         ondemand_hosts_month = (
-            ONDEMAND_HOSTS_CE
-            if not sub.metadata
-            else int(sub.metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE))
+            int(
+                sub.metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE)
+            )  # pylint: disable=no-member
+            if sub.metadata
+            else ONDEMAND_HOSTS_CE
         )
         new_only = False
     elif sub := models.stripe.SubscriptionUnlimited().load(account.name):  # type: ignore
@@ -117,11 +121,11 @@ def parse_authorization_header(authorization_header: str) -> dict[str, str]:
     pairs = []
     if pairs_str:
         for pair in pairs_str.split(","):
-            if not pairs or auth_param_re.match(pairs[-1]):  # type: ignore
+            if not pairs or auth_param_re.match(pairs[-1]):
                 pairs.append(pair)
             else:
-                pairs[-1] = pairs[-1] + "," + pair
-        if not auth_param_re.match(pairs[-1]):  # type: ignore
+                pairs[-1] = f"{pairs[-1]},{pair}"
+        if not auth_param_re.match(pairs[-1]):
             raise ValueError("Malformed auth parameters")
     for pair in pairs:
         (key, value) = pair.strip().split("=", 1)
@@ -170,20 +174,15 @@ def dns_query(
         return dns_query(
             tldext.registered_domain, try_apex=try_apex, resolve_type=resolve_type
         )
-    if not answer:
-        return None
-    return answer
+    return answer or None
 
 
 def retrieve_ip_for_host(hostname: str) -> list[IPvAnyAddress]:
     results = set()
-    domains_to_check = set()
-    domains_to_check.add(hostname)
+    domains_to_check = {hostname}
     if answer := dns_query(hostname, resolve_type=rdatatype.CNAME):
-        try:
+        with contextlib.suppress(Exception):
             domains_to_check.add(answer.rrset.to_rdataset().to_text().split(" ").pop()[:-1])  # type: ignore
-        except:
-            pass  # pylint: disable=bare-except
     for domain in domains_to_check:
         for resolve_type in [rdatatype.A, rdatatype.AAAA]:
             if answer := dns_query(domain, resolve_type=resolve_type):
@@ -239,9 +238,9 @@ def load_descriptions(
                 pci4_items = []
                 for compliance in group.items or []:
                     compliance.description = (
-                        None
-                        if not compliance.requirement
-                        else config.pcidss4.requirements.get(compliance.requirement, "")
+                        config.pcidss4.requirements.get(compliance.requirement, "")
+                        if compliance.requirement
+                        else None
                     )
                     pci4_items.append(compliance)
                 group.items = pci4_items
@@ -253,9 +252,9 @@ def load_descriptions(
                 pci3_items = []
                 for compliance in group.items or []:
                     compliance.description = (
-                        None
-                        if not compliance.requirement
-                        else config.pcidss3.requirements.get(compliance.requirement, "")
+                        config.pcidss3.requirements.get(compliance.requirement, "")
+                        if compliance.requirement
+                        else None
                     )
                     pci3_items.append(compliance)
                 group.items = pci3_items

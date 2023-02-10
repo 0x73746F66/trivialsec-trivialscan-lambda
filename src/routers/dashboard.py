@@ -1,9 +1,8 @@
+import contextlib
 import json
-from typing import Union
 from datetime import timedelta
 
-from fastapi import Header, APIRouter, Response, status, Depends
-from starlette.requests import Request
+from fastapi import APIRouter, Response, status, Depends
 from cachier import cachier
 
 import internals
@@ -49,18 +48,15 @@ def dashboard_compliance(
     """
     Retrieves a collection of your clients
     """
-    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-compliance.json"  # type: ignore
+    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-compliance.json"
     try:
         raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         data = json.loads(raw)
         for item in data:
-            try:
+            with contextlib.suppress(AttributeError):
                 item["label"] = getattr(models.GraphLabel, item["label"])
-            except AttributeError:
-                pass  # Label should already be the correct value
-
         return data
 
     except RuntimeError as err:
@@ -76,6 +72,7 @@ def dashboard_compliance(
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
+        204: {"description": "No scan data is present for this account"},
         401: {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
         },
@@ -99,9 +96,12 @@ def dashboard_quotas(
     """
     Retrieves a collection of your clients
     """
-    scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
-    if scanner_record:
-        return services.helpers.get_quotas(account=authz.account, scanner_record=scanner_record)  # type: ignore
+    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    if scanner_record.load():
+        return services.helpers.get_quotas(
+            account=authz.account, scanner_record=scanner_record
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
@@ -139,7 +139,7 @@ def certificate_issues(
     a list of certificate issues filtered to include only the highest risk
     and ordered by last seen
     """
-    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-certificates.json"  # type: ignore
+    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-certificates.json"
     try:
         raw = services.aws.get_s3(path_key=object_key)
         if not raw:
@@ -154,10 +154,7 @@ def certificate_issues(
                     f"{item.group_id}.{item.rule_id}"
                 )
             enriched_data.append(item)
-        sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))  # type: ignore
-
-        return sorted_data
-
+        return list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))
     except RuntimeError as err:
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -199,7 +196,7 @@ def latest_findings(
     a list of host findings filtered to include only the highest risk issues
     and ordered by last seen
     """
-    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-findings.json"  # type: ignore
+    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-findings.json"
     try:
         raw = services.aws.get_s3(path_key=object_key)
         if not raw:
@@ -214,7 +211,7 @@ def latest_findings(
                     f"{item.group_id}.{item.rule_id}"
                 )
 
-            for group in item.compliance or []:
+            for group in item.compliance or []:  # pylint: disable=not-an-iterable
                 if (
                     config.pcidss4
                     and group.compliance == models.ComplianceName.PCI_DSS
@@ -223,11 +220,9 @@ def latest_findings(
                     pci4_items = []
                     for compliance in group.items or []:
                         compliance.description = (
-                            None
-                            if not compliance.requirement
-                            else config.pcidss4.requirements.get(
-                                compliance.requirement, ""
-                            )
+                            config.pcidss4.requirements.get(compliance.requirement, "")
+                            if compliance.requirement
+                            else None
                         )
                         pci4_items.append(compliance)
                     group.items = pci4_items
@@ -239,11 +234,9 @@ def latest_findings(
                     pci3_items = []
                     for compliance in group.items or []:
                         compliance.description = (
-                            None
-                            if not compliance.requirement
-                            else config.pcidss3.requirements.get(
-                                compliance.requirement, ""
-                            )
+                            config.pcidss3.requirements.get(compliance.requirement, "")
+                            if compliance.requirement
+                            else None
                         )
                         pci3_items.append(compliance)
                     group.items = pci3_items
@@ -254,7 +247,7 @@ def latest_findings(
                     group.items = None
 
             if config.mitre_attack:
-                for threat in item.threats or []:
+                for threat in item.threats or []:  # pylint: disable=not-an-iterable
                     for tactic in config.mitre_attack.tactics:
                         if tactic.id == threat.tactic_id:
                             threat.tactic_description = tactic.description
@@ -274,10 +267,7 @@ def latest_findings(
                                 )
 
             enriched_data.append(item)
-        sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))  # type: ignore
-
-        return sorted_data
-
+        return list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))
     except RuntimeError as err:
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR

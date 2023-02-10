@@ -58,20 +58,20 @@ async def claim_client(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     try:
-        if models.Client(account=authz.account, name=client_name).exists():  # type: ignore
+        if models.Client(account_name=authz.account.name, name=client_name).exists():  # type: ignore
             response.status_code = status.HTTP_409_CONFLICT
             return
 
         client = models.Client(
-            account=authz.account,
+            account_name=authz.account.name,
             client_info=client_info,
             name=client_name,
             cli_version=x_trivialscan_version,
             access_token=token_urlsafe(nbytes=23),
             ip_addr=authz.ip_addr,
-            user_agent=authz.user_agent,
+            user_agent=authz.user_agent.ua_string,
             timestamp=round(time() * 1000),  # JavaScript support
-        )
+        )  # type: ignore
         if client.save():
             services.webhook.send(
                 event_name=models.WebhookEvent.CLIENT_ACTIVITY,
@@ -80,12 +80,12 @@ async def claim_client(
                     "type": "client_token",
                     "timestamp": round(time() * 1000),
                     "account": authz.account.name,
-                    "member": None
-                    if not hasattr(authz.member, "email")
-                    else authz.member.email,
+                    "member": authz.member.email
+                    if hasattr(authz.member, "email")
+                    else None,
                     "client": client,
                     "ip_addr": authz.ip_addr,
-                    "user_agent": authz.user_agent,
+                    "user_agent": authz.user_agent.ua_string,
                 },
             )
             return client
@@ -130,11 +130,11 @@ async def auth_client(
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
     try:
-        authz.client.client_info = client_info  # type: ignore
-        authz.client.cli_version = x_trivialscan_version  # type: ignore
-        authz.client.ip_addr = authz.ip_addr  # type: ignore
-        authz.client.user_agent = authz.user_agent  # type: ignore
-        if authz.client.save():  # type: ignore
+        authz.client.client_info = client_info
+        authz.client.cli_version = x_trivialscan_version
+        authz.client.ip_addr = authz.ip_addr
+        authz.client.user_agent = authz.user_agent.ua_string
+        if authz.client.save():
             services.webhook.send(
                 event_name=models.WebhookEvent.CLIENT_ACTIVITY,
                 account=authz.account,
@@ -145,7 +145,7 @@ async def auth_client(
                     "authorisation_valid": authz.is_valid,
                     "client": authz.client,
                     "ip_addr": authz.ip_addr,
-                    "user_agent": authz.user_agent,
+                    "user_agent": authz.user_agent.ua_string,
                 },
             )
             return {
@@ -158,7 +158,7 @@ async def auth_client(
 
 @router.get(
     "/clients",
-    response_model=list[models.ClientRedacted],
+    response_model=list[models.Client],
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -191,7 +191,9 @@ def retrieve_clients(
     object_keys = []
     data = []
     try:
-        prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "client-tokens")  # type: ignore
+        prefix_key = path.join(
+            internals.APP_ENV, "accounts", authz.account.name, "client-tokens"
+        )
         object_keys = services.aws.list_s3(prefix_key=prefix_key)
 
     except RuntimeError as err:
@@ -221,7 +223,7 @@ def retrieve_clients(
 
 @router.get(
     "/activate/{client_name}",
-    response_model=models.ClientRedacted,
+    response_model=models.Client,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -247,8 +249,8 @@ async def activate_client(
     """
     Activate a client
     """
-    client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
-    if not client:
+    client = models.Client(account_name=authz.account.name, name=client_name)  # type: ignore
+    if not client.load():
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     if client.active is not True:
         client.active = True
@@ -264,7 +266,7 @@ async def activate_client(
             "account": authz.account.name,
             "member": authz.member.email,
             "ip_addr": authz.ip_addr,
-            "user_agent": authz.user_agent,
+            "user_agent": authz.user_agent.ua_string,
         },
     )
 
@@ -273,7 +275,7 @@ async def activate_client(
 
 @router.get(
     "/deactivated/{client_name}",
-    response_model=models.ClientRedacted,
+    response_model=models.Client,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -299,8 +301,8 @@ async def deactivated_client(
     """
     Deactivate a client
     """
-    client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
-    if not client:
+    client = models.Client(account_name=authz.account.name, name=client_name)  # type: ignore
+    if not client.load():
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     if client.active is not False:
         client.active = False
@@ -316,7 +318,7 @@ async def deactivated_client(
             "account": authz.account.name,
             "member": authz.member.email,
             "ip_addr": authz.ip_addr,
-            "user_agent": authz.user_agent,
+            "user_agent": authz.user_agent.ua_string,
         },
     )
 
@@ -351,10 +353,10 @@ async def delete_client(
     if validators.email(client_name) is True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
-    client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
-    if not client:
+    client = models.Client(account_name=authz.account.name, name=client_name)  # type: ignore
+    if not client.load():
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    if authz.account.name != client.account.name:  # type: ignore
+    if authz.account.name != client.account_name:  # pylint: disable=no-member
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return
     services.webhook.send(
@@ -366,7 +368,7 @@ async def delete_client(
             "account": authz.account.name,
             "member": authz.member.email,
             "ip_addr": authz.ip_addr,
-            "user_agent": authz.user_agent,
+            "user_agent": authz.user_agent.ua_string,
         },
     )
 

@@ -8,7 +8,7 @@ from base64 import b64encode, b64decode
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from os import getenv
-from typing import Union, Optional
+from typing import Union
 from enum import Enum
 from ipaddress import (
     IPv4Address,
@@ -17,7 +17,7 @@ from ipaddress import (
 
 import validators
 import requests
-from user_agents import parse as ua_parser
+from user_agents.parsers import UserAgent, parse as ua_parser
 from starlette.requests import Request
 from fastapi import Header, HTTPException, status
 from pydantic import (
@@ -25,7 +25,6 @@ from pydantic import (
     AnyHttpUrl,
     PositiveInt,
     PositiveFloat,
-    EmailStr,
 )
 
 CACHE_DIR = getenv("CACHE_DIR", "/tmp")
@@ -113,8 +112,8 @@ class HMAC:
         authorization_header: str,
         request_url: str,
         method: str = "GET",
-        raw_body: Union[str, None] = None,  # type: ignore
-        algorithm: Union[str, None] = None,  # type: ignore
+        raw_body: Union[str, None] = None,
+        algorithm: Union[str, None] = None,
         not_before_seconds: int = JITTER_SECONDS,
         expire_after_seconds: int = JITTER_SECONDS,
     ):
@@ -188,15 +187,17 @@ class HMAC:
         if not self.is_valid_timestamp():
             logger.error(f"jitter detected {self.ts}")
             return False
-        if not self.supported_algorithms.get(self.algorithm):  # type: ignore
+        if not self.supported_algorithms.get(self.algorithm):
             logger.error(f"algorithm {self.algorithm} is not supported")
             return False
 
-        digestmod = self.supported_algorithms.get(self.algorithm, self.default_algorithm)  # type: ignore
+        digestmod = self.supported_algorithms.get(
+            self.algorithm, self.default_algorithm
+        )
         # Sign HMAC using server-side secret (not provided by client)
         digest = hmac.new(
             secret_key.encode("utf8"), self.canonical_string.encode("utf8"), digestmod
-        ).hexdigest()  # type: ignore
+        ).hexdigest()
         self.server_mac = digest
         # Compare server-side HMAC with client provided HMAC
         if invalid := not hmac.compare_digest(digest, self.mac):  # type: ignore
@@ -317,7 +318,7 @@ class Authorization:
         user_agent: Union[str, None] = None,
         ip_addr: Union[IPvAnyAddress, None] = None,
         account_name: Union[str, None] = None,
-        algorithm: Union[str, None] = None,  # type: ignore
+        algorithm: Union[str, None] = None,
         not_before_seconds: int = JITTER_SECONDS,
         expire_after_seconds: int = JITTER_SECONDS,
         raw_body: Union[str, None] = None,
@@ -329,12 +330,14 @@ class Authorization:
         self.route: AuthorizationRoute
         self.is_valid: bool = False
         self.is_authorized: bool = False
-        self.account: Optional[models.MemberAccount]
-        self.session: Optional[models.MemberSession]
-        self.client: Optional[models.Client]
-        self.member: Optional[models.MemberProfile]
-        self.ip_addr: Optional[IPvAnyAddress]
-        self.user_agent: Optional[str]
+        self.account: models.MemberAccount
+        self.session: models.MemberSession
+        self.client: models.Client
+        self.member: models.MemberProfile
+        self.ip_addr: IPvAnyAddress
+        self.user_agent: UserAgent = ua_parser(
+            user_agent or request.headers.get("User-Agent")
+        )
 
         if postman_token := request.headers.get("Postman-Token"):
             logger.info(f"Postman-Token: {postman_token}")
@@ -348,82 +351,84 @@ class Authorization:
             not_before_seconds=not_before_seconds,
             expire_after_seconds=expire_after_seconds,
         )
-        self.ip_addr = (
-            ip_addr
-            if ip_addr
-            else request.headers.get(
-                "X-Forwarded-For", request.headers.get("X-Real-IP")
-            )
-        )
-        self.user_agent = (
-            user_agent if user_agent else request.headers.get("User-Agent")
+        self.ip_addr = ip_addr or request.headers.get(
+            "X-Forwarded-For", request.headers.get("X-Real-IP")
         )
         if not self.ip_addr:
             logger.warning(
                 "IP Address not determined, potential conflict if not deliberate or is running locally"
             )
+        if not self.user_agent:
+            logger.critical("Missing User-Agent")
+            return
+        if self.user_agent.is_bot:
+            logger.critical("DENY Bot User-Agent")
+            return
+        if (
+            not any(
+                [
+                    self.user_agent.is_mobile,
+                    self.user_agent.is_tablet,
+                    self.user_agent.is_pc,
+                ]
+            )
+            and not postman_token
+        ):
+            logger.critical(f"DENY unrecognisable User-Agent {self.user_agent}")
+            return
 
         logger.info(f"Authorization validation id {self.hmac.id}")
         secret_key = None
         if validators.email(self.hmac.id) is True:  # type: ignore
-            if not self.user_agent:
-                logger.critical("Missing User-Agent")
-                return
-            ua = ua_parser(self.user_agent)
-            if ua.is_bot:
-                logger.critical("DENY Bot User-Agent")
-                return
-            if not any([ua.is_mobile, ua.is_tablet, ua.is_pc]) and not postman_token:
-                logger.critical(f"DENY unrecognisable User-Agent {self.user_agent}")
-                return
-            self.member = models.MemberProfile(email=self.hmac.id).load()
-            if not isinstance(self.member, models.MemberProfile):
+            self.member = models.MemberProfile(email=self.hmac.id)
+            if not self.member.load():
                 logger.critical(f"DENY missing MemberProfile {self.hmac.id}")
                 return
-            self.account = self.member.account.load()  # type: ignore
-            if not isinstance(self.account, models.MemberAccount):
+            self.account = models.MemberAccount(name=self.member.account_name)  # type: ignore
+            if not self.account.load():
                 logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
                 return
             logger.info(
-                f"Session inputs; {self.member.email} | {ua.get_browser()} | {ua.get_os()} | {ua.get_device()}"
+                f"Session inputs; {self.member.email} | {self.user_agent.get_browser()} | {self.user_agent.get_os()} | {self.user_agent.get_device()}"
             )
             session_token = hashlib.sha224(
                 bytes(
-                    f"{self.member.email}{ua.get_browser()}{ua.get_os()}{ua.get_device()}",
+                    f"{self.member.email}{self.user_agent.get_browser()}{self.user_agent.get_os()}{self.user_agent.get_device()}",
                     "ascii",
                 )
             ).hexdigest()
             logger.info(
                 f"AUTH_FLOW Session HMAC-based Authorization: session_token {session_token}"
             )
-            self.session = models.MemberSession(member=self.member, session_token=session_token).load()  # type: ignore
-            if not isinstance(self.session, models.MemberSession):
+            self.session = models.MemberSession(member_email=self.member.email, session_token=session_token)  # type: ignore
+            if not self.session.load():
                 logger.critical(f"DENY missing MemberSession {self.hmac.id}")
                 return
-            self.session.member = self.member
             if self.session.save():
-                secret_key = self.session.access_token  # type: ignore
+                secret_key = self.session.access_token
                 self.token_type = TokenTypes.SESSION_TOKEN
         elif account_name is None or self.hmac.id == account_name:
             logger.info(
                 f"AUTH_FLOW Secret Key HMAC-based Authorization: account_name {account_name}"
             )
-            self.account = models.MemberAccount(name=self.hmac.id).load()  # type: ignore
-            if not isinstance(self.account, models.MemberAccount):
+            self.account = models.MemberAccount(name=self.hmac.id)  # type: ignore
+            if not self.account.load():
                 logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
                 return
-            secret_key = self.account.api_key  # type: ignore pylint: disable=no-member
+            secret_key = self.account.api_key
             self.token_type = TokenTypes.SECRET_KEY
         elif account_name:
             logger.info(
                 f"AUTH_FLOW Client Token HMAC-based Authorization: client_name {self.hmac.id}"
             )
-            self.account = models.MemberAccount(name=account_name).load()  # type: ignore
-            self.client = models.Client(account=self.account, name=self.hmac.id).load()  # type: ignore
-            if not isinstance(self.client, models.Client):
+            self.account = models.MemberAccount(name=account_name)  # type: ignore
+            if not self.account.load():
+                logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
+                return
+            self.client = models.Client(account_name=self.account.name, name=self.hmac.id)  # type: ignore
+            if not self.client.load():
                 logger.critical(f"DENY missing Client {self.hmac.id}")
                 return
-            self.client.account = self.account
             if not isinstance(self.account, models.MemberAccount):
                 logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
             if self.client.active:
@@ -477,7 +482,7 @@ class Authorization:
             if not hasattr(self, "member") or not self.member
             else self.member.dict(),
             "ip_addr": self.ip_addr,
-            "user_agent": self.user_agent,
+            "user_agent": self.user_agent.ua_string,
         }
 
 
@@ -499,7 +504,7 @@ class JSONEncoder(json.JSONEncoder):
                 AnyHttpUrl,
                 IPv4Address,
                 IPv6Address,
-                EmailStr,
+                str,
             ),
         ):
             return str(o)
