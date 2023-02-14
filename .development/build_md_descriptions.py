@@ -3,6 +3,10 @@ from pathlib import Path
 
 import yaml
 
+"""
+Takes content in YAML (contributed from the open source CLI project) and generates Markdown files (overwriting markdown changes)
+"""
+
 def force_keys_as_str(self, node, deep=False):
     data = self.old_construct_mapping(node, deep)
     return {

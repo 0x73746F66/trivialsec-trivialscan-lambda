@@ -5,6 +5,9 @@ from pathlib import Path
 from markdown import markdown
 import yaml
 
+"""
+Takes content in Markdown and generates YAM files that can be used for the CLI (overwriting YAML)
+"""
 
 def str_presenter(dumper, data):
     if len(data) > 50:  # check for multiline string

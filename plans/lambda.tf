@@ -30,3 +30,9 @@ resource "aws_lambda_function_url" "trivialscan" {
   function_name      = aws_lambda_function.trivialscan.arn
   authorization_type = "NONE"
 }
+
+resource "aws_cloudwatch_log_group" "api_logs" {
+  skip_destroy      = var.app_env == "Prod"
+  name              = "/aws/lambda/${aws_lambda_function.trivialscan.function_name}"
+  retention_in_days = local.retention_in_days
+}

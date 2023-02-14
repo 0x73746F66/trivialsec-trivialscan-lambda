@@ -15,4 +15,5 @@ locals {
     domain_name           = "${lower(var.app_env)}-api.trivialsec.com"
     timeout               = 900
     memory_size           = 1024
+    retention_in_days     = var.app_env == "Prod" ? 30 : 7
 }

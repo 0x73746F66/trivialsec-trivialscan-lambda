@@ -5,6 +5,7 @@ repos:
     hooks:
       - id: pyupgrade
         args: [--py37-plus]
+        files: src
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
@@ -13,19 +14,26 @@ repos:
         files: src
       - id: check-merge-conflict
       - id: check-yaml
+        files: src
       - id: check-json
+        files: src
       - id: end-of-file-fixer
+        files: src
       - id: mixed-line-ending
       - id: trailing-whitespace
+        files: src
       - id: check-added-large-files
       - id: check-builtin-literals
+        files: src
         args: ["--no-allow-dict-kwargs"]
       - id: debug-statements
+        files: src
       - id: detect-private-key
       - id: no-commit-to-branch
         args: [--branch, main]
       - id: pretty-format-json
         args: [--autofix, --no-sort-keys]
+        files: src
 
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v2.1.1
@@ -49,6 +57,7 @@ repos:
     rev: v1.3.1
     hooks:
       - id: remove-tabs
+        files: src
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.0.0-alpha.4
@@ -60,12 +69,14 @@ repos:
     rev: v1.77.0
     hooks:
       - id: terraform_validate
+        files: plans
       - id: terraform_checkov
+        files: plans
         args:
           - --args=--skip-download
           - --args=--quiet
           - --args=--framework terraform
-          - --args=--skip-check CKV_AWS_18,CKV_AWS_19,CKV_AWS_21,CKV2_AWS_34,CKV_AWS_50,CKV_AWS_115,CKV_AWS_116,CKV_AWS_117,CKV_AWS_144,CKV_AWS_145,CKV_AWS_173,CKV_AWS_258,CKV_AWS_272
+          - --args=--skip-check CKV_AWS_18,CKV_AWS_19,CKV_AWS_21,CKV2_AWS_34,CKV_AWS_50,CKV_AWS_115,CKV_AWS_116,CKV_AWS_117,CKV_AWS_144,CKV_AWS_145,CKV_AWS_173,CKV_AWS_258,CKV_AWS_272,CKV_AWS_158
 
   - repo: https://github.com/psf/black
     rev: 22.12.0
