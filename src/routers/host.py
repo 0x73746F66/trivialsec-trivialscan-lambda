@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from fastapi import Query, APIRouter, Response, status, Depends
 from cachier import cachier
+from tldextract import TLDExtract
 
 import internals
 import models
@@ -83,7 +84,7 @@ def retrieve_hosts(
     tags=["Hostname"],
 )
 @cachier(
-    stale_after=timedelta(seconds=30),
+    stale_after=timedelta(seconds=1),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda _, kw: kw["authz"].account.name
     + str(kw.get("hostname", ""))
@@ -106,16 +107,32 @@ def retrieve_host(
     """
     Retrieves TLS data on any hostname, providing an optional port number
     """
-    prefix_key = path.join(internals.APP_ENV, "hosts", hostname)
+    prefix_key = f"{internals.APP_ENV}/hosts/"
     versions = ["latest"]
+    related_domains = set()
+    tld = TLDExtract(cache_dir=internals.CACHE_DIR)(f"http://{hostname}")
+    if tld.registered_domain != hostname:
+        related_domains.add(tld.registered_domain)
+
     matches = services.aws.list_s3(prefix_key=prefix_key)
     for match in matches:
         if match.endswith("latest.json"):
+            if f".{tld.registered_domain}/" in match:
+                related = match.split("/")[2]
+                if related != hostname:
+                    related_domains.add(related)
             continue
-        _port, _ip, date = (
-            match.replace(".json", "").replace(f"{prefix_key}/", "").split("/")
-        )
-        versions.append(f"{_port}/{date}/{_ip}")
+        if f"/{hostname}/" not in match:
+            continue
+        try:
+            _port, _ip, date, *_ = (
+                match.replace(".json", "")
+                .replace(f"{prefix_key}{hostname}/", "")
+                .split("/")
+            )
+            versions.append(f"{_port}/{date}/{_ip}")
+        except ValueError:
+            print(match)
 
     if last_updated:
         object_key = None
@@ -133,7 +150,7 @@ def retrieve_host(
     else:
         if not port:
             port = 443
-        object_key = path.join(prefix_key, str(port), "latest.json")
+        object_key = path.join(prefix_key, hostname, str(port), "latest.json")
 
     try:
         ret = services.aws.get_s3(object_key)
@@ -190,6 +207,7 @@ def retrieve_host(
                 "LeakIX": f"https://leakix.net/domain/{hostname}",
                 "Intelligence X": f"https://intelx.io/?s={hostname}",
             },
+            related_domains=list(related_domains),
         )
 
     except RuntimeError as err:

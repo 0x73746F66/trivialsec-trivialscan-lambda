@@ -1,8 +1,9 @@
 import json
 from time import time
 
-from fastapi import APIRouter, Response, status, Depends
 import validators
+from fastapi import APIRouter, Response, status, Depends
+from tldextract import TLDExtract
 
 import internals
 import models
@@ -276,7 +277,6 @@ async def queue_hostname(
         ):
             response.status_code = status.HTTP_402_PAYMENT_REQUIRED
             return False
-        internals.logger.info(f"NOT {services.stripe.Product.COMMUNITY_EDITION}")
         for monitor_host in scanner_record.monitored_targets:
             if monitor_host.hostname == hostname:
                 internals.logger.info(f"Matched monitor_host {monitor_host}")
@@ -301,7 +301,25 @@ async def queue_hostname(
         deduplicate=False,
         account=authz.account.name,
         queued_by=authz.member.email,
-        queued_timestamp=queued_timestamp,  # JavaScript support
+        queued_timestamp=queued_timestamp,
+    )
+    queue_name = f"{internals.APP_ENV.lower()}-subdomains"
+    internals.logger.info(f"queue {queue_name} {hostname}")
+    services.aws.store_sqs(
+        queue_name=queue_name,
+        message_body=json.dumps(
+            {
+                "hostname": TLDExtract(cache_dir=internals.CACHE_DIR)(
+                    f"http://{hostname}"
+                ).registered_domain,
+                "type": models.ScanRecordType.SUBDOMAINS,
+            },
+            default=str,
+        ),
+        deduplicate=False,
+        account=authz.account.name,
+        queued_by=authz.member.email,
+        queued_timestamp=queued_timestamp,
     )
     services.webhook.send(
         event_name=models.WebhookEvent.HOSTED_SCANNER,

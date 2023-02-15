@@ -10,8 +10,9 @@ from pydantic import IPvAnyAddress
 
 import config
 import models
-import models.stripe
 import internals
+import models.stripe
+import services.stripe
 
 MONITORING_HOSTS_CE = 3
 ONDEMAND_HOSTS_CE = 1
@@ -40,57 +41,85 @@ def get_quotas(
                 for host in report.targets:
                     ondemand_hosts.add(f"{host.transport.hostname}_{report.report_id}")
 
-    new_only = True
+    new_only = False
     unlimited_monitoring = False
     unlimited_scans = False
     monitoring_hosts_day = MONITORING_HOSTS_CE
     ondemand_hosts_month = ONDEMAND_HOSTS_CE
 
-    if sub := models.stripe.SubscriptionAddon().load(account.name):  # type: ignore
-        unlimited_scans = sub.status in [
-            models.stripe.SubscriptionStatus.ACTIVE,
-            models.stripe.SubscriptionStatus.TRIALING,
-        ]
-    if sub := models.stripe.SubscriptionPro().load(account.name):  # type: ignore
-        monitoring_hosts_day = (
-            int(
-                sub.metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE)
-            )  # pylint: disable=no-member
-            if sub.metadata
-            else MONITORING_HOSTS_CE
-        )
-        ondemand_hosts_month = (
-            int(
-                sub.metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE)
-            )  # pylint: disable=no-member
-            if sub.metadata
-            else ONDEMAND_HOSTS_CE
-        )
-        new_only = False
-    elif sub := models.stripe.SubscriptionEnterprise().load(account.name):  # type: ignore
-        monitoring_hosts_day = (
-            int(
-                sub.metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE)
-            )  # pylint: disable=no-member
-            if sub.metadata
-            else MONITORING_HOSTS_CE
-        )
-        ondemand_hosts_month = (
-            int(
-                sub.metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE)
-            )  # pylint: disable=no-member
-            if sub.metadata
-            else ONDEMAND_HOSTS_CE
-        )
-        new_only = False
-    elif sub := models.stripe.SubscriptionUnlimited().load(account.name):  # type: ignore
-        unlimited_scans = True
-        unlimited_monitoring = True
+    product = None
+    if account.billing_client_id:
+        if customer := services.stripe.get_customer(account.billing_client_id):
+            if (
+                subscription_id := customer.get("invoice", {})
+                .get("subscription", {})
+                .get("id")
+            ):
+                if subscription := services.stripe.get_subscription(subscription_id):
+                    for item in subscription["items"]["data"]:
+                        product = services.stripe.PRODUCT_MAP.get(
+                            item["price"]["product"]
+                        )
+                        if product == services.stripe.Product.UNLIMITED_RESCANS:
+                            unlimited_scans = True
+                        if product == services.stripe.Product.UNLIMITED:
+                            unlimited_scans = True
+                            unlimited_monitoring = True
 
-    if unlimited_scans:
-        monitoring_hosts_day = 0
-        ondemand_hosts_month = 0
-        new_only = False
+    if not product:
+        product = services.stripe.Product.COMMUNITY_EDITION
+    if stripe_product := services.stripe.get_product(product):
+        if product == services.stripe.Product.COMMUNITY_EDITION:
+            monitoring_hosts_day = (
+                int(
+                    stripe_product.get("metadata", {}).get(
+                        "monitoring_hosts_day", MONITORING_HOSTS_CE
+                    )
+                )
+                if stripe_product.get("metadata")
+                else MONITORING_HOSTS_CE
+            )
+            new_only = True
+
+        elif product == services.stripe.Product.PROFESSIONAL:
+            monitoring_hosts_day = (
+                int(
+                    stripe_product.get("metadata", {}).get(
+                        "monitoring_hosts_day", MONITORING_HOSTS_CE
+                    )
+                )
+                if stripe_product.get("metadata")
+                else MONITORING_HOSTS_CE
+            )
+            ondemand_hosts_month = (
+                int(
+                    stripe_product.get("metadata", {}).get(
+                        "ondemand_hosts_month", ONDEMAND_HOSTS_CE
+                    )
+                )
+                if stripe_product.get("metadata")
+                else ONDEMAND_HOSTS_CE
+            )
+
+        elif product == services.stripe.Product.ENTERPRISE:
+            monitoring_hosts_day = (
+                int(
+                    stripe_product.get("metadata", {}).get(
+                        "monitoring_hosts_day", MONITORING_HOSTS_CE
+                    )
+                )
+                if stripe_product.get("metadata")
+                else MONITORING_HOSTS_CE
+            )
+            ondemand_hosts_month = (
+                int(
+                    stripe_product.get("metadata", {}).get(
+                        "ondemand_hosts_month", ONDEMAND_HOSTS_CE
+                    )
+                )
+                if stripe_product.get("metadata")
+                else ONDEMAND_HOSTS_CE
+            )
 
     return models.AccountQuotas(
         seen_hosts=list(seen_hosts),

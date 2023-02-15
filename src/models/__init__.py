@@ -5,6 +5,7 @@ from abc import ABCMeta, abstractmethod
 from enum import Enum
 from typing import Union, Any, Optional
 from datetime import datetime, timezone
+from uuid import UUID
 
 import validators
 from pydantic import (
@@ -194,14 +195,24 @@ class MemberAccount(AccountRegistration, DAL):
     )
     webhooks: Optional[list[Webhooks]] = Field(default=[])
 
-    def exists(self, account_name: Union[str, None] = None) -> bool:
-        return self.load(account_name)
+    def exists(
+        self,
+        account_name: Union[str, None] = None,
+        billing_client_id: Union[str, None] = None,
+    ) -> bool:
+        return self.load(account_name, billing_client_id)
 
-    def load(self, account_name: Union[str, None] = None) -> bool:
+    def load(
+        self,
+        account_name: Union[str, None] = None,
+        billing_client_id: Union[str, None] = None,
+    ) -> bool:
         if account_name:
             self.name = account_name
         if not self.name:
             return False
+        if billing_client_id:
+            self.billing_client_id = billing_client_id
         object_key = f"{internals.APP_ENV}/accounts/{self.name}/registration.json"
         raw = services.aws.get_s3(path_key=object_key)
         if not raw:
@@ -231,6 +242,64 @@ class MemberAccount(AccountRegistration, DAL):
         return services.aws.delete_s3(object_key)
 
     def load_billing(self) -> bool:
+        billing_description = ""
+        is_trial = False
+        has_invoice = False
+        display_amount = "FREE"
+        display_period = None
+        next_due = None
+        if self.billing_client_id:
+            if customer := services.stripe.get_customer(self.billing_client_id):
+                product = services.stripe.Product.COMMUNITY_EDITION
+                if (
+                    subscription_id := customer.get("invoice", {})
+                    .get("subscription", {})
+                    .get("id")
+                ):
+                    if subscription := services.stripe.get_subscription(
+                        subscription_id
+                    ):
+                        billing_description = (
+                            "Stripe Payments"
+                            if subscription["default_payment_method"]
+                            and subscription["collection_method"]
+                            == models.stripe.SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY
+                            else "Send Invoice"
+                        )
+                        for item in subscription["items"]["data"]:
+                            currency = item["price"]["currency"]
+                            amount = item["price"]["unit_amount_decimal"]
+                            display_amount = f"{currency.upper()} ${amount}"
+                            product = services.stripe.PRODUCT_MAP.get(
+                                item["price"]["product"]
+                            )
+                            display_period = item["price"]["recurring"][
+                                "interval"
+                            ].capitalize()
+                            break
+                        is_trial = (
+                            subscription["status"]
+                            == models.stripe.SubscriptionStatus.TRIALING
+                        )
+                        has_invoice = subscription.get("latest_invoice", "").startswith(
+                            "in_"
+                        )
+                        next_due = subscription["current_period_end"] * 1000
+
+                if product := services.stripe.get_product(
+                    product or services.stripe.Product.COMMUNITY_EDITION
+                ):
+                    self.billing = Billing(
+                        product_name=product["name"],
+                        description=billing_description,
+                        is_trial=is_trial,
+                        has_invoice=has_invoice,
+                        display_amount=display_amount,
+                        display_period=display_period,
+                        next_due=next_due,
+                    )
+                    return True
+
         if sub := models.stripe.SubscriptionAddon().load(self.name):  # type: ignore
             return self._billing(sub)
         elif sub := models.stripe.SubscriptionPro().load(self.name):  # type: ignore
@@ -797,7 +866,7 @@ class Host(BaseModel, DAL):
         peer_address: Union[str, None] = None,
         last_updated: Union[datetime, None] = None,
     ) -> bool:
-        return self.load(hostname, port, peer_address, last_updated) is not None
+        return self.load(hostname, port, peer_address, last_updated)
 
     def load(
         self,
@@ -805,7 +874,7 @@ class Host(BaseModel, DAL):
         port: Union[int, None] = 443,
         peer_address: Union[str, None] = None,
         last_updated: Union[datetime, None] = None,
-    ) -> Union["Host", None]:
+    ) -> bool:
         if last_updated:
             self.last_updated = last_updated
         if hostname:
@@ -822,17 +891,17 @@ class Host(BaseModel, DAL):
         raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             internals.logger.warning(f"Missing Host {object_key}")
-            return
+            return False
         try:
             data = json.loads(raw)
         except json.decoder.JSONDecodeError as err:
             internals.logger.debug(err, exc_info=True)
-            return
+            return False
         if not data or not isinstance(data, dict):
             internals.logger.warning(f"Missing Host {object_key}")
-            return
+            return False
         super().__init__(**data)
-        return self
+        return True
 
     def save(self) -> bool:
         data = self.dict()
@@ -841,12 +910,6 @@ class Host(BaseModel, DAL):
         if not services.aws.store_s3(object_key, json.dumps(data, default=str)):
             return False
         object_key = f"{internals.APP_ENV}/hosts/{self.transport.hostname}/{self.transport.port}/latest.json"
-        # preserve threat_intel
-        original = json.loads(services.aws.get_s3(object_key))
-        data.setdefault("threat_intel", [])
-        threat_intel: list = data["threat_intel"]
-        threat_intel.extend(original.get("threat_intel", []))
-        data["threat_intel"] = list(set(threat_intel))
         return services.aws.store_s3(object_key, json.dumps(data, default=str))
 
     def delete(self) -> bool:
@@ -986,9 +1049,11 @@ class ReferenceItem(BaseModel):
 
 
 class ScanRecordType(str, Enum):
+    INTERNAL = "Internal"
     MONITORING = "Managed Monitoring"
     ONDEMAND = "Managed On-demand"
     SELF_MANAGED = "Customer-managed"
+    SUBDOMAINS = "Subdomains"
 
 
 class ScanRecordCategory(str, Enum):
@@ -1278,6 +1343,7 @@ class HostResponse(BaseModel):
     reports: list[ReportSummary]
     versions: list[str]
     external_refs: dict[str, Union[AnyHttpUrl, str]]
+    related_domains: list[str]
 
 
 class CertificateResponse(BaseModel):
@@ -1310,6 +1376,7 @@ class WebhookEvent(str, Enum):
 
 
 class WebhookPayload(BaseModel):
+    event_id: UUID
     event_name: WebhookEvent
     timestamp: datetime
     payload: dict

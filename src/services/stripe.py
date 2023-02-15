@@ -134,12 +134,13 @@ def get_customer(customer_id: str) -> Union[stripe.Customer, None]:
         WithDecryption=True,
     )
     try:
-        return stripe.Customer.retrieve(customer_id)
+        return stripe.Customer.retrieve(customer_id, expand=["subscriptions"])
 
-    except InvalidRequestError:
+    except InvalidRequestError as ex:
         internals.logger.error(
             f"[get_customer] Invalid parameters were supplied to Stripe API: {customer_id}"
         )
+        internals.logger.exception(ex)
     except AuthenticationError:
         internals.logger.error("[get_customer] Authentication with Stripe API failed")
     except StripeError as ex:
@@ -176,7 +177,9 @@ def get_subscription(subscription_id: str) -> Union[stripe.Subscription, None]:
         WithDecryption=True,
     )
     try:
-        return stripe.Subscription.retrieve(subscription_id)
+        return stripe.Subscription.retrieve(
+            subscription_id, expand=["subscription", "items.data.price.product"]
+        )
 
     except InvalidRequestError:
         internals.logger.error(
