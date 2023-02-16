@@ -2,13 +2,16 @@ import contextlib
 import hashlib
 import json
 from time import time
+from datetime import timedelta
 from random import random
 from secrets import token_urlsafe
+from uuid import UUID
 
 import validators
 from fastapi import APIRouter, Response, status, Depends
 from starlette.requests import Request
 from pydantic import AnyHttpUrl
+from cachier import cachier
 
 import internals
 import models
@@ -494,6 +497,92 @@ async def disable_notification(
     return
 
 
+@router.get(
+    "/webhook/{event_name}/{event_id}",
+    # response_model=models.Webhooks,
+    # response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Account"],
+)
+@cachier(stale_after=timedelta(days=30), cache_dir=internals.CACHE_DIR)
+def webhook_event_download(
+    event_id: UUID,
+    event_name: models.WebhookEvent,
+):
+    """
+    Download webhook event
+    """
+    prefix_key = f"{internals.APP_ENV}/accounts/"
+    suffix_key = f"/webhooks/{event_name}/{event_id}.json"
+
+    prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
+    if len(prefix_matches) == 0:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    for object_key in prefix_matches:
+        if object_key.endswith(suffix_key):
+            return (
+                json.loads(raw)
+                if (raw := services.aws.get_s3(object_key))
+                else Response(status_code=status.HTTP_204_NO_CONTENT)
+            )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/webhook/events",
+    status_code=status.HTTP_200_OK,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Account"],
+)
+@cachier(
+    stale_after=timedelta(seconds=5),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: kw["authz"].account.name,
+)
+def webhook_event_logs(
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    webhook event logs
+    """
+    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account_name}/webhooks/"
+    logs = []
+    prefix_matches = services.aws.list_s3_objects(prefix_key=prefix_key)
+    if len(prefix_matches) == 0:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    for item in prefix_matches:
+        pieces = item["Key"].split("/")  # type: ignore
+        logs.append(
+            {
+                "event_id": pieces[-1].replace(".json", ""),
+                "event_name": pieces[-2],
+                "date": item["LastModified"],  # type: ignore
+            }
+        )
+    return logs or Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post(
     "/webhook/enable",
     response_model=models.Webhooks,
@@ -598,3 +687,34 @@ async def delete_webhook(
         webhooks.append(webhook)
     authz.account.webhooks = webhooks
     return bool(found and authz.account.save())
+
+
+@router.delete(
+    "/account",
+    response_model=bool,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Account"],
+)
+async def delete_account(
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    DANGER!!!
+    Deletes an account, cannot be undone
+    """
+    prefix_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/"
+    prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
+    if len(prefix_matches) == 0:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return all(services.aws.delete_s3(object_key) for object_key in prefix_matches)

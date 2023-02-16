@@ -60,7 +60,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
     ]
     resources = [
       data.terraform_remote_state.reconnaissance_queue.outputs.reconnaissance_queue_arn,
-      data.terraform_remote_state.subdomains_queue.outputs.trivialscan_subdomains_queue_arn
+      data.terraform_remote_state.subdomains_queue.outputs.subdomains_queue_arn
     ]
   }
 }

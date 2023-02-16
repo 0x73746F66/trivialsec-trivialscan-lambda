@@ -258,6 +258,7 @@ class AuthorizationRoute(str, Enum):
     WEBHOOK_ENABLE = "/webhook/enable"
     WEBHOOK_ENDPOINT = "/webhook/endpoint"
     WEBHOOK_DELETE = "/webhook"
+    DELETE_ACCOUNT = "/account"
 
 
 class Authorization:
@@ -309,6 +310,7 @@ class Authorization:
         AuthorizationRoute.WEBHOOK_ENABLE,
         AuthorizationRoute.WEBHOOK_DELETE,
         AuthorizationRoute.WEBHOOK_ENDPOINT,
+        AuthorizationRoute.DELETE_ACCOUNT,
     ]
     secret_allow: list[AuthorizationRoute] = []
 

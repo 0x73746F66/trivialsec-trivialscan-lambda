@@ -188,6 +188,59 @@ def list_s3(prefix_key: str, bucket_name: str = STORE_BUCKET) -> list[str]:
     delay=1.5,
     backoff=1,
 )
+def list_s3_objects(prefix_key: str, bucket_name: str = STORE_BUCKET) -> list[str]:
+    """
+    params:
+    - bucket_name: s3 bucket with target contents
+    - prefix_key: pattern to match in s3
+    """
+    internals.logger.info(f"list_s3 key prefix {prefix_key}")
+    items = []
+    next_token = ""
+    base_kwargs = {
+        "Bucket": bucket_name,
+        "Prefix": prefix_key,
+    }
+    base_kwargs.update()
+    while next_token is not None:
+        args = base_kwargs.copy()
+        if next_token != "":
+            args["ContinuationToken"] = next_token
+        try:
+            results = s3_client.list_objects_v2(**args)
+
+        except ClientError as err:
+            if err.response["Error"]["Code"] == "NoSuchBucket":  # type: ignore
+                internals.logger.error(
+                    f"The requested bucket {bucket_name} was not found"
+                )
+            elif err.response["Error"]["Code"] == "InvalidObjectState":  # type: ignore
+                internals.logger.error(f"The request was invalid due to: {err}")
+            elif err.response["Error"]["Code"] == "InvalidParameterException":  # type: ignore
+                internals.logger.error(f"The request had invalid params: {err}")
+            else:
+                internals.logger.exception(err)
+            return []
+        for item in results.get("Contents", []):
+            k = item["Key"]  # type: ignore
+            if k[-1] != "/":
+                items.append(item)
+        next_token = results.get("NextContinuationToken")
+
+    return items
+
+
+@retry(
+    (
+        ConnectionClosedError,
+        ReadTimeoutError,
+        ConnectTimeoutError,
+        CapacityNotAvailableError,
+    ),
+    tries=3,
+    delay=1.5,
+    backoff=1,
+)
 def get_s3(path_key: str, bucket_name: str = STORE_BUCKET, default: Any = None) -> Any:
     internals.logger.info(f"get_s3 object key {path_key}")
     try:
