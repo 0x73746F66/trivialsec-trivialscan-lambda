@@ -12,6 +12,7 @@ from fastapi import APIRouter, Response, status, Depends
 from starlette.requests import Request
 from pydantic import AnyHttpUrl
 from cachier import cachier
+from tldextract.tldextract import TLDExtract
 
 import internals
 import models
@@ -136,6 +137,46 @@ async def account_register(
             timestamp=round(time() * 1000),
             sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
         )
+        _, hostname = member.email.split("@")
+        if hostname not in internals.EMAIL_PROVIDERS:
+            with contextlib.suppress(Exception):
+                queue_name = f"{internals.APP_ENV.lower()}-reconnaissance"
+                queued_timestamp = round(time() * 1000)  # JavaScript support
+                internals.logger.info(f"queue {queue_name} {hostname}")
+                services.aws.store_sqs(
+                    queue_name=queue_name,
+                    message_body=json.dumps(
+                        {
+                            "hostname": hostname,
+                            "ports": [443],
+                            "path_names": ["/"],
+                            "type": models.ScanRecordType.MONITORING,
+                        },
+                        default=str,
+                    ),
+                    deduplicate=False,
+                    account=account.name,
+                    queued_by=member.email,
+                    queued_timestamp=queued_timestamp,
+                )
+                queue_name = f"{internals.APP_ENV.lower()}-subdomains"
+                internals.logger.info(f"queue {queue_name} {hostname}")
+                services.aws.store_sqs(
+                    queue_name=queue_name,
+                    message_body=json.dumps(
+                        {
+                            "hostname": TLDExtract(cache_dir=internals.CACHE_DIR)(
+                                f"http://{hostname}"
+                            ).registered_domain,
+                            "type": models.ScanRecordType.SUBDOMAINS,
+                        },
+                        default=str,
+                    ),
+                    deduplicate=False,
+                    account=account.name,
+                    queued_by=member.email,
+                    queued_timestamp=queued_timestamp,
+                )
         if link.save():
             return member
     except RuntimeError as err:

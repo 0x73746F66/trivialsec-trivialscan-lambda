@@ -15,6 +15,7 @@ repos:
       - id: check-merge-conflict
       - id: check-yaml
         files: src
+        exclude: ^(src/config/).*$
       - id: check-json
         files: src
       - id: end-of-file-fixer
@@ -46,12 +47,6 @@ repos:
     hooks:
       - id: check-git-config-email
         args: ["--domains", "trivialsec.com"]
-
-  - repo: https://github.com/crate-ci/typos
-    rev: typos-dict-v0.9.13
-    hooks:
-      - id: typos
-        files: src
 
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.3.1

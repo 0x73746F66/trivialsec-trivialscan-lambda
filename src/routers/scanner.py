@@ -3,7 +3,7 @@ from time import time
 
 import validators
 from fastapi import APIRouter, Response, status, Depends
-from tldextract import TLDExtract
+from tldextract.tldextract import TLDExtract
 
 import internals
 import models

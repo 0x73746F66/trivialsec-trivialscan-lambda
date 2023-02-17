@@ -113,6 +113,8 @@ def create_customer(email: str) -> Union[stripe.Customer, None]:
         WithDecryption=True,
     )
     try:
+        for customer in stripe.Customer.search(query=f"email:'{email}'", limit=1):
+            return customer
         return stripe.Customer.create(email=email)
 
     except InvalidRequestError:
@@ -128,13 +130,22 @@ def create_customer(email: str) -> Union[stripe.Customer, None]:
 
 
 @retry((RateLimitError, APIConnectionError), tries=5, delay=1.5, backoff=3)
-def get_customer(customer_id: str) -> Union[stripe.Customer, None]:
+def get_customer(
+    customer_id: Union[str, None] = None, email: Union[str, None] = None
+) -> Union[stripe.Customer, None]:
     stripe.api_key = services.aws.get_ssm(
         f"/{internals.APP_ENV}/{internals.APP_NAME}/Stripe/secret-key",
         WithDecryption=True,
     )
     try:
-        return stripe.Customer.retrieve(customer_id, expand=["subscriptions"])
+        if customer_id:
+            if customer := stripe.Customer.retrieve(
+                customer_id, expand=["subscriptions"]
+            ):
+                return customer
+        if email:
+            for customer in stripe.Customer.search(query=f"email:'{email}'", limit=1):
+                return customer
 
     except InvalidRequestError as ex:
         internals.logger.error(
