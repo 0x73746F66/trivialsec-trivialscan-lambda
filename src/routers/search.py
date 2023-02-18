@@ -66,7 +66,7 @@ async def search_hostname(
         }
     prefix_key = f"{internals.APP_ENV}/hosts/"
     matches = services.aws.list_s3(prefix_key=prefix_key)
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     scanner_record.load()
     for match in matches:
         if match.endswith("latest.json"):
@@ -218,7 +218,7 @@ async def search_ipaddr(
             continue
         report_id, _ = match.replace(prefix_key, "").split("/")
         report = None
-        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
         if scanner_record.load():
             for summary in scanner_record.history:
                 if summary.report_id == report_id:
@@ -275,7 +275,7 @@ async def search_ipaddr(
             if target in scans_map:
                 domain_map[hostname]["reports"].update(scans_map[target]["reports"])
 
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         for target in scanner_record.monitored_targets:
             if target.hostname in domain_map:

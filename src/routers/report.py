@@ -51,7 +51,7 @@ def retrieve_reports(
     """
     Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
     """
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         return sorted(scanner_record.history, key=lambda x: x.date, reverse=True)  # type: ignore
 
@@ -90,7 +90,7 @@ def retrieve_summary(
     """
     Retrieves a summary of a Trivial Scanner report for the provided report identifier
     """
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         for summary in scanner_record.history:
             if summary.report_id == report_id:
@@ -139,7 +139,7 @@ def retrieve_full_report(
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     report.evaluations = services.helpers.load_descriptions(report)
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         for host in report.targets:  # pylint: disable=not-an-iterable
             for target in scanner_record.monitored_targets:  # type: ignore
@@ -203,9 +203,9 @@ async def store(
             client=client_info,
             **data,
         )
-        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
         if not scanner_record.load():
-            scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+            scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
         scanner_record.history.append(report)
         if scanner_record.save():
             services.webhook.send(
@@ -465,7 +465,7 @@ async def delete_report(
     Deletes a specific ReportSummary within the ScannerRecord, the accompanying FullReport file, and eventually any aggregate evaluation records will be computed out also
     (as they are triggered from the deleted report file)
     """
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         found = False
         history = []

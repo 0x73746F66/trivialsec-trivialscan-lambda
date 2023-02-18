@@ -96,7 +96,7 @@ def dashboard_quotas(
     """
     Retrieves a collection of your clients
     """
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         return services.helpers.get_quotas(
             account=authz.account, scanner_record=scanner_record

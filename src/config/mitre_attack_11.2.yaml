@@ -54,7 +54,7 @@ data_sources:
   - description: |-
       <p>A directive given to a computer program, acting as an interpreter of some kind, in order to perform a specific task</p>
     id: DS0017
-    name: Command
+    name: Comman
   - description: |-
       <p>Data transmitted across a network (ex: Web, DNS, Mail, File, etc.), that is either summarized (ex: Netflow) and/or captured as raw data in an analyzable format (ex: PCAP)</p>
     id: DS0029
@@ -778,7 +778,7 @@ techniques:
   - description: |-
       <p>Adversaries may circumvent mechanisms designed to control elevate privileges to gain higher-level permissions. Most modern systems contain native elevation control mechanisms that are intended to limit privileges that a user can perform on a machine. Authorization has to be granted to specific users in order to perform tasks that can be considered of higher risk. An adversary can perform several methods to take advantage of built-in control mechanisms in order to escalate privileges on a system.</p>
     id: T1548
-    name: Abuse Elevation Control Mechanism
+    name: Abuse Elevation Control Mechanis
     sub_techniques:
       - description: |-
           <p>Adversaries may leverage the AuthorizationExecuteWithPrivileges API to escalate privileges by prompting the user for credentials. The purpose of this API is to give application developers an easy way to perform operations with root privileges, such as for application installation or updating. This API does not validate that the program requesting root privileges comes from a reputable source or has been maliciously modified.</p>
@@ -1235,7 +1235,7 @@ techniques:
   - description: |-
       <p>Adversaries may search local system sources, such as file systems and configuration files or local databases, to find files of interest and sensitive data prior to Exfiltration.</p>
     id: T1005
-    name: Data from Local System
+    name: Data from Local Syste
   - description: |-
       <p>An adversary may gather the system time and/or time zone from a local or remote system. The system time is set and stored by the Windows Time Service within a domain to maintain time synchronization between systems and services in an enterprise network.</p>
     id: T1124
@@ -1450,7 +1450,7 @@ techniques:
       - description: |-
           <p>Adversaries may use MSBuild to proxy execution of code through a trusted Windows utility. MSBuild.exe (Microsoft Build Engine) is a software build platform used by Visual Studio. It handles XML formatted project files that define requirements for loading and building various platforms and configurations.</p>
         id: "001"
-        name: MSBuild
+        name: MSBuil
   - description: |-
       <p>Adversaries may deploy a container into an environment to facilitate execution or evade defenses. In some cases, adversaries may deploy a new container to execute processes associated with a particular image or deployment, such as processes that execute or download malware. In others, an adversary may deploy a new container configured without network rules, user limitations, etc. to bypass existing defenses within the environment.</p>
     id: T1610
@@ -1503,7 +1503,7 @@ techniques:
   - description: |-
       <p>Adversaries may abuse a container administration service to execute commands within a container. A container administration service such as the Docker daemon, the Kubernetes API server, or the kubelet may allow remote management of containers within an environment.</p>
     id: T1609
-    name: Container Administration Command
+    name: Container Administration Comman
   - description: |-
       <p>Adversaries may reflectively load code into a process in order to conceal the execution of malicious payloads. Reflective loading involves allocating then executing payloads directly within the memory of the process, vice creating a thread or process backed by a file path on disk. Reflectively loaded payloads may be compiled binaries, anonymous files (only present in RAM), or just snubs of fileless executable code (ex: position-independent shellcode).</p>
     id: T1620
@@ -2388,7 +2388,7 @@ techniques:
       - description: |-
           <p>Adversaries may use a hidden file system to conceal malicious activity from users and security tools. File systems provide a structure to store and access data from physical storage. Typically, a user engages with a file system through applications that allow them to access files and directories, which are an abstraction from their physical location (ex: disk sector). Standard file systems include FAT, NTFS, ext4, and APFS. File systems can also contain other structures, such as the Volume Boot Record (VBR) and Master File Table (MFT) in NTFS.</p>
         id: "005"
-        name: Hidden File System
+        name: Hidden File Syste
       - description: |-
           <p>Adversaries may abuse resource forks to hide malicious code or executables to evade detection and bypass security applications. A resource fork provides applications a structured way to store resources such as thumbnail images, menu definitions, icons, dialog boxes, and code. Usage of a resource fork is identifiable when displaying a file's extended attributes, using ls -l@ or xattr -l commands. Resource forks have been deprecated and replaced with the application bundle structure. Non-localized resources are placed at the top level directory of an application bundle, while localized resources are placed in the /Resources folder.</p>
         id: 009

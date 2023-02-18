@@ -62,7 +62,7 @@ def retrieve_certificate(
 
         certificate = models.Certificate(**json.loads(ret))
         reports = []
-        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
         if scanner_record.load():
             for record in scanner_record.history:
                 reports.extend(

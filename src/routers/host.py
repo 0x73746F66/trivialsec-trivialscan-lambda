@@ -48,7 +48,7 @@ def retrieve_hosts(
     a distinct list of hosts and ports, optionally returning the latest host
     full record
     """
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if not scanner_record.load():
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -158,7 +158,7 @@ def retrieve_host(
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         host = models.Host(**json.loads(ret))
         reports = []
-        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
         if scanner_record.load():
             for target in scanner_record.monitored_targets:
                 if target.hostname == hostname:

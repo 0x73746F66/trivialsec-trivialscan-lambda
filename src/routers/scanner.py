@@ -41,12 +41,12 @@ async def scanner_config(
     """
     Fetches host monitoring configuration
     """
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         if len(scanner_record.monitored_targets) == 0:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         return scanner_record.monitored_targets
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     scanner_record.save()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -86,7 +86,7 @@ async def enable_monitoring(
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
     changed = False
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         quotas = services.helpers.get_quotas(
             account=authz.account,
@@ -115,7 +115,7 @@ async def enable_monitoring(
             )
     else:
         changed = True
-        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
         scanner_record.monitored_targets.append(
             models.MonitorHostname(
                 hostname=hostname,
@@ -175,7 +175,7 @@ async def deactivate_monitoring(
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
     changed = False
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         found = False
         for target in scanner_record.monitored_targets:
@@ -195,7 +195,7 @@ async def deactivate_monitoring(
             )
     else:
         changed = True
-        scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+        scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
         scanner_record.monitored_targets.append(
             models.MonitorHostname(
                 hostname=hostname,
@@ -258,7 +258,7 @@ async def queue_hostname(
     ]
     ports = [443]
     path_names = ["/"]
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         quotas = services.helpers.get_quotas(
             account=authz.account,
@@ -371,7 +371,7 @@ async def delete_config(
         return
     changed = False
     monitored_targets = []
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         for target in scanner_record.monitored_targets:
             if target.hostname == hostname:
@@ -433,7 +433,7 @@ async def update_config(
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
     changed = False
-    scanner_record = models.ScannerRecord(account=authz.account)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load():
         for target in scanner_record.monitored_targets:
             if target.hostname != data.hostname:
