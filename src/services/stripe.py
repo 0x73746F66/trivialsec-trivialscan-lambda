@@ -139,12 +139,16 @@ def get_customer(
     )
     try:
         if customer_id:
+            internals.logger.info(f"get_customer customer_id {customer_id}")
             if customer := stripe.Customer.retrieve(
                 customer_id, expand=["subscriptions"]
             ):
+                internals.logger.debug(customer)
                 return customer
         if email:
+            internals.logger.info(f"get_customer by email {email}")
             for customer in stripe.Customer.search(query=f"email:'{email}'", limit=1):
+                internals.logger.debug(customer)
                 return customer
 
     except InvalidRequestError as ex:
@@ -189,7 +193,7 @@ def get_subscription(subscription_id: str) -> Union[stripe.Subscription, None]:
     )
     try:
         return stripe.Subscription.retrieve(
-            subscription_id, expand=["subscription", "items.data.price.product"]
+            subscription_id, expand=["items.data.price.product"]
         )
 
     except InvalidRequestError:
@@ -272,7 +276,7 @@ class Webhook:
             item = subscription.copy()  # type: ignore
             item["subscription_item"] = _item.copy()
             del item["items"]
-            product_id = _item["price"]["product"]
+            product_id = _item["price"]["product"]["id"]
             results.append(
                 services.aws.store_s3(
                     f"{internals.APP_ENV}/accounts/{self.account.name}/subscriptions/{PRODUCT_MAP[product_id]}/{_item.get('id')}.json",  # type: ignore

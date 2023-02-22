@@ -36,7 +36,7 @@ router = APIRouter()
     tags=["Hostname"],
 )
 @cachier(
-    stale_after=timedelta(seconds=30),
+    stale_after=timedelta(seconds=5),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda _, kw: kw["authz"].account.name,
 )
@@ -49,7 +49,7 @@ def retrieve_hosts(
     full record
     """
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if not scanner_record.load():
+    if not scanner_record.load(load_history=True):
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     seen = set()
@@ -159,7 +159,7 @@ def retrieve_host(
         host = models.Host(**json.loads(ret))
         reports = []
         scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-        if scanner_record.load():
+        if scanner_record.load(load_history=True):
             for target in scanner_record.monitored_targets:
                 if target.hostname == hostname:
                     host.monitoring_enabled = target.enabled

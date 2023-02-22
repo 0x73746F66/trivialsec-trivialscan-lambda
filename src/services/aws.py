@@ -20,6 +20,14 @@ STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
 ssm_client = boto3.client(service_name="ssm")
 s3_client = boto3.client(service_name="s3")
 sqs_client = boto3.client(service_name="sqs")
+dynamodb = boto3.resource("dynamodb")
+
+
+class Tables(str, Enum):
+    LOGIN_SESSIONS = f"{internals.APP_ENV.lower()}_login_sessions"
+    REPORT_HISTORY = f"{internals.APP_ENV.lower()}_report_history"
+    OBSERVED_IDENTIFIERS = f"{internals.APP_ENV.lower()}_observed_identifiers"
+    EARLY_WARNING_SERVICE = f"{internals.APP_ENV.lower()}_early_warning_service"
 
 
 class StorageClass(str, Enum):
@@ -387,7 +395,8 @@ def store_sqs(
     message_group_id: Union[str, None] = None,
     **kwargs,
 ) -> bool:
-    internals.logger.info(f"storing {queue_name} message {message_body}")
+    internals.logger.info(f"storing {queue_name}")
+    internals.logger.debug(f"message {message_body}")
     if queue_name.endswith(".fifo"):
         if deduplicate and not deduplication_id:
             deduplication_id = sha256(message_body.encode()).hexdigest()
@@ -424,3 +433,111 @@ def store_sqs(
         else:
             internals.logger.exception(err)
     return False
+
+
+@retry(
+    (
+        ConnectionClosedError,
+        ReadTimeoutError,
+        ConnectTimeoutError,
+        CapacityNotAvailableError,
+    ),
+    tries=3,
+    delay=1.5,
+    backoff=1,
+)
+def get_dynamodb(
+    item_key: dict, table_name: Tables, default: Any = None
+) -> Union[dict, None]:
+    internals.logger.info(f"get_dynamodb table: {table_name.value}")
+    internals.logger.debug(f"item_key: {item_key}")
+    try:
+        table = dynamodb.Table(table_name.value)
+        response = table.get_item(Key=item_key)
+        internals.logger.debug(response)
+        return response.get("Item", default)
+
+    except Exception as err:
+        internals.logger.exception(err)
+    return default
+
+
+@retry(
+    (
+        ConnectionClosedError,
+        ReadTimeoutError,
+        ConnectTimeoutError,
+        CapacityNotAvailableError,
+    ),
+    tries=3,
+    delay=1.5,
+    backoff=1,
+)
+def put_dynamodb(item: dict, table_name: Tables) -> bool:
+    internals.logger.info(f"put_dynamodb table: {table_name.value}")
+    internals.logger.debug(f"item: {item}")
+    try:
+        raw = json.dumps(item, cls=internals.JSONEncoder)
+        data = json.loads(raw, parse_float=str, parse_int=str)
+    except json.JSONDecodeError as err:
+        internals.logger.error(err, exc_info=True)
+        return False
+    try:
+        table = dynamodb.Table(table_name.value)
+        response = table.put_item(Item=data)
+        return response.get("ResponseMetadata", {}).get("RequestId") is not None
+
+    except Exception as err:
+        internals.logger.exception(err)
+        internals.logger.info(f"data: {data}")
+    return False
+
+
+@retry(
+    (
+        ConnectionClosedError,
+        ReadTimeoutError,
+        ConnectTimeoutError,
+        CapacityNotAvailableError,
+    ),
+    tries=3,
+    delay=1.5,
+    backoff=1,
+)
+def delete_dynamodb(item_key: dict, table_name: Tables) -> bool:
+    internals.logger.info(f"get_dynamodb table: {table_name.value}")
+    internals.logger.debug(f"item_key: {item_key}")
+    try:
+        table = dynamodb.Table(table_name.value)
+        response = table.delete_item(Key=item_key)
+        internals.logger.debug(response)
+        return response.get("ResponseMetadata", {}).get("RequestId") is not None
+
+    except Exception as err:
+        internals.logger.exception(err)
+    return False
+
+
+@retry(
+    (
+        ConnectionClosedError,
+        ReadTimeoutError,
+        ConnectTimeoutError,
+        CapacityNotAvailableError,
+    ),
+    tries=3,
+    delay=1.5,
+    backoff=1,
+)
+def query_dynamodb(table_name: Tables, **kwargs) -> list[dict]:
+    internals.logger.info(f"query_dynamodb table: {table_name.value}")
+    internals.logger.debug(f"arguments: {kwargs}")
+    try:
+        table = dynamodb.Table(table_name.value)
+        response = table.query(**kwargs)
+        internals.logger.debug(response)
+        return response.get("Items", [])
+
+    except Exception as err:
+        internals.logger.exception(err)
+    return []

@@ -41,7 +41,7 @@ router = APIRouter()
     tags=["Scan Reports"],
 )
 @cachier(
-    stale_after=timedelta(seconds=30),
+    stale_after=timedelta(seconds=5),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda _, kw: kw["authz"].account.name,
 )
@@ -52,7 +52,7 @@ def retrieve_reports(
     Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
     """
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         return sorted(scanner_record.history, key=lambda x: x.date, reverse=True)  # type: ignore
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -91,7 +91,7 @@ def retrieve_summary(
     Retrieves a summary of a Trivial Scanner report for the provided report identifier
     """
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         for summary in scanner_record.history:
             if summary.report_id == report_id:
                 return summary
@@ -140,7 +140,7 @@ def retrieve_full_report(
 
     report.evaluations = services.helpers.load_descriptions(report)
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         for host in report.targets:  # pylint: disable=not-an-iterable
             for target in scanner_record.monitored_targets:  # type: ignore
                 if target.hostname == host.transport.hostname:
@@ -204,7 +204,7 @@ async def store(
             **data,
         )
         scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-        if not scanner_record.load():
+        if not scanner_record.load(load_history=True):
             scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
         scanner_record.history.append(report)
         if scanner_record.save():
@@ -465,19 +465,9 @@ async def delete_report(
     Deletes a specific ReportSummary within the ScannerRecord, the accompanying FullReport file, and eventually any aggregate evaluation records will be computed out also
     (as they are triggered from the deleted report file)
     """
-    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
-        found = False
-        history = []
-        for summary in scanner_record.history:
-            if summary.report_id == report_id:
-                found = True
-                continue
-            history.append(summary)
-        if found:
-            scanner_record.history = history
-            scanner_record.save()
-
+    services.aws.delete_dynamodb(
+        table_name=services.aws.Tables.REPORT_HISTORY, item_key={"report_id": report_id}
+    )
     report = models.FullReport(report_id=report_id, account_name=authz.account.name)  # type: ignore
     if report.load():
         report.delete()

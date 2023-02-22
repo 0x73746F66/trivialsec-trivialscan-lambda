@@ -1,9 +1,10 @@
 import contextlib
-import json
 import socket
 from datetime import datetime
 
-from fastapi import APIRouter, Response, status, Depends
+import validators
+from fastapi import APIRouter, Response, Request, status, Depends
+from fastapi.responses import RedirectResponse
 from pydantic import IPvAnyAddress
 from tldextract.tldextract import TLDExtract
 
@@ -13,6 +14,43 @@ import services.helpers
 import services.aws
 
 router = APIRouter()
+
+
+@router.get(
+    "/any/{query}",
+    response_model=list[models.SearchResult],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No search results matching this query"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Search"],
+)
+async def search_any(
+    query: str,
+    request: Request,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Search hostnam or ip addresse, returning exact matches and knowm (scanned, if any) subdomains
+    """
+    if validators.ipv4(query) or validators.ipv6(query):  # type: ignore
+        return RedirectResponse(
+            url=f"/search/ip/{query}", status_code=status.HTTP_303_SEE_OTHER
+        )
+    return RedirectResponse(
+        url=f"/search/host/{query}", status_code=status.HTTP_303_SEE_OTHER
+    )
 
 
 @router.get(
@@ -46,112 +84,48 @@ async def search_hostname(
     if len(resolved_ip) == 0:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     tldext = TLDExtract(cache_dir=internals.CACHE_DIR)(f"http://{hostname}")
-    domain_map = {
-        hostname: {
-            "timestamps": set(),
-            "resolved_ip": set(resolved_ip),
-            "ip_addr": set(),
-            "monitoring": False,
-            "ports": set(),
-            "reports": set(),
-        }
-    }
-    if tldext.registered_domain != hostname:
-        domain_map[tldext.registered_domain] = {
-            "timestamps": set(),
-            "ip_addr": set(),
-            "monitoring": False,
-            "ports": set(),
-            "reports": set(),
-        }
+    domain_map = {}
     prefix_key = f"{internals.APP_ENV}/hosts/"
     matches = services.aws.list_s3(prefix_key=prefix_key)
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    scanner_record.load()
+    scanner_record.load(load_history=True)
     for match in matches:
         if match.endswith("latest.json"):
             continue
         _, _, host, port, peer_address, scan_date = match.split("/")
 
-        if hostname == host:
+        if host in [tldext.registered_domain, hostname] or host.endswith(
+            f".{tldext.registered_domain}"
+        ):
             timestamp = (
                 datetime.strptime(scan_date.replace(".json", ""), "%Y%m%d").timestamp()
                 * 1000
             )
-            domain_map[hostname]["timestamps"].add(timestamp)
-            domain_map[hostname]["ip_addr"].add(peer_address)
-            domain_map[hostname]["ports"].add(int(port))
-            if scanner_record.history:
-                domain_map[hostname]["reports"].update(
-                    [
-                        report.report_id
-                        for report in scanner_record.history
-                        if hostname
-                        in [host.transport.hostname for host in report.targets]
-                    ]
-                )
-
-        elif tldext.registered_domain == host:
-            timestamp = (
-                datetime.strptime(scan_date.replace(".json", ""), "%Y%m%d").timestamp()
-                * 1000
+            domain_map.setdefault(
+                host,
+                {
+                    "timestamps": set(),
+                    "ip_addr": set(),
+                    "monitoring": False,
+                    "ports": set(),
+                    "reports": set(),
+                },
             )
-            domain_map[tldext.registered_domain]["timestamps"].add(timestamp)
-            domain_map[tldext.registered_domain]["ip_addr"].add(peer_address)
-            domain_map[tldext.registered_domain]["ports"].add(int(port))
+            domain_map[host]["timestamps"].add(timestamp)
+            domain_map[host]["ip_addr"].add(peer_address)
+            domain_map[host]["ports"].add(int(port))
             if scanner_record.history:
-                domain_map[tldext.registered_domain]["reports"].update(
+                domain_map[host]["reports"].update(
                     [
                         report.report_id
                         for report in scanner_record.history
-                        if tldext.registered_domain
-                        in [host.transport.hostname for host in report.targets]
+                        if host in [host.transport.hostname for host in report.targets]
                     ]
                 )
 
-    if scanner_record.history:
-        for report in scanner_record.history:
-            for host in report.targets:
-                if hostname == host.transport.hostname:
-                    domain_map.setdefault(
-                        hostname,
-                        {
-                            "timestamps": set(),
-                            "ip_addr": set(),
-                            "ports": set(),
-                            "reports": set(),
-                            "monitoring": False,
-                        },
-                    )
-                    domain_map[hostname]["timestamps"].add(report.date.timestamp() * 1000)  # type: ignore
-                    domain_map[hostname]["ip_addr"].add(
-                        str(host.transport.peer_address)
-                    )
-                    domain_map[hostname]["ports"].add(int(host.transport.port))
-                    domain_map[hostname]["reports"].add(report.report_id)
-                elif host.transport.hostname.endswith(tldext.registered_domain):
-                    domain_map.setdefault(
-                        host.transport.hostname,
-                        {
-                            "timestamps": set(),
-                            "ip_addr": set(),
-                            "ports": set(),
-                            "reports": set(),
-                            "monitoring": False,
-                        },
-                    )
-                    domain_map[host.transport.hostname]["timestamps"].add(report.date.timestamp() * 1000)  # type: ignore
-                    domain_map[host.transport.hostname]["ip_addr"].add(
-                        str(host.transport.peer_address)
-                    )
-                    domain_map[host.transport.hostname]["ports"].add(
-                        int(host.transport.port)
-                    )
-                    domain_map[host.transport.hostname]["reports"].add(report.report_id)
-        if scanner_record.monitored_targets:
-            for target in scanner_record.monitored_targets:
-                if target.hostname in domain_map:
-                    domain_map[target.hostname]["monitoring"] = target.enabled
+    for target in scanner_record.monitored_targets:
+        if target.hostname in domain_map:
+            domain_map[target.hostname]["monitoring"] = target.enabled
 
     results: list[models.SearchResult] = []
     for host, data in domain_map.items():
@@ -210,30 +184,6 @@ async def search_ipaddr(
     """
     Search matching hostname, returning exact matches and knowm (scanned, if any) subdomains
     """
-    scans_map = {}
-    prefix_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/results/"
-    matches = services.aws.list_s3(prefix_key=prefix_key)
-    for match in matches:
-        if not match.endswith("summary.json"):
-            continue
-        report_id, _ = match.replace(prefix_key, "").split("/")
-        report = None
-        scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-        if scanner_record.load():
-            for summary in scanner_record.history:
-                if summary.report_id == report_id:
-                    report = summary
-                    break
-        if report:
-            for host in report.targets:
-                scans_map.setdefault(host.transport.hostname, {"reports": []})
-                scans_map[host.transport.hostname]["reports"].append(report_id)
-
-    if history_raw := services.aws.get_s3(
-        path_key=f"{internals.APP_ENV}/accounts/{authz.account.name}/scan-history.json"
-    ):
-        scans_map: dict[str, dict[str, list[str]]] = json.loads(history_raw)
-
     rdns = None
     with contextlib.suppress(Exception):
         rdns = socket.getnameinfo((str(ip_addr), 0), 0)[0]
@@ -272,11 +222,9 @@ async def search_ipaddr(
             )
             domain_map[hostname]["timestamps"].add(timestamp)
             domain_map[hostname]["ports"].add(int(port))
-            if target in scans_map:
-                domain_map[hostname]["reports"].update(scans_map[target]["reports"])
 
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         for target in scanner_record.monitored_targets:
             if target.hostname in domain_map:
                 domain_map[target.hostname]["monitoring"] = target.enabled

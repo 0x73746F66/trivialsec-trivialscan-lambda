@@ -14,3 +14,4 @@ detect-secrets
 pip-audit
 uvicorn==0.18.2
 markdown
+checkov

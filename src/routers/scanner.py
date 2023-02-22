@@ -42,7 +42,7 @@ async def scanner_config(
     Fetches host monitoring configuration
     """
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         if len(scanner_record.monitored_targets) == 0:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         return scanner_record.monitored_targets
@@ -87,7 +87,7 @@ async def enable_monitoring(
         return
     changed = False
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         quotas = services.helpers.get_quotas(
             account=authz.account,
             scanner_record=scanner_record,
@@ -139,6 +139,8 @@ async def enable_monitoring(
                 "user_agent": authz.user_agent.ua_string,
             },
         )
+    else:
+        response.status_code = status.HTTP_304_NOT_MODIFIED
 
     return scanner_record
 
@@ -176,7 +178,7 @@ async def deactivate_monitoring(
         return
     changed = False
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         found = False
         for target in scanner_record.monitored_targets:
             if target.hostname == hostname:
@@ -259,7 +261,7 @@ async def queue_hostname(
     ports = [443]
     path_names = ["/"]
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         quotas = services.helpers.get_quotas(
             account=authz.account,
             scanner_record=scanner_record,
@@ -370,9 +372,9 @@ async def delete_config(
         response.status_code = status.HTTP_406_NOT_ACCEPTABLE
         return
     changed = False
-    monitored_targets = []
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
+        monitored_targets = []
         for target in scanner_record.monitored_targets:
             if target.hostname == hostname:
                 changed = True
@@ -434,7 +436,7 @@ async def update_config(
         return
     changed = False
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         for target in scanner_record.monitored_targets:
             if target.hostname != data.hostname:
                 continue

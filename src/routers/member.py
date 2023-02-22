@@ -12,6 +12,7 @@ from user_agents import parse as ua_parser
 from fastapi import Header, APIRouter, Response, status, Depends
 from starlette.requests import Request
 from cachier import cachier
+from boto3.dynamodb.conditions import Key
 
 import internals
 import models
@@ -133,15 +134,20 @@ async def member_sessions(
     """
     Return active sessions for the current authorized user
     """
-    prefix_key = f"{internals.APP_ENV}/accounts/{authz.member.account_name}/members/{authz.member.email}/sessions/"
-    sessions: list[models.MemberSessionForList] = []
-    prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
-    if len(prefix_matches) == 0:
-        return []
-    for object_path in prefix_matches:
-        if raw := services.aws.get_s3(path_key=object_path):
-            sessions.append(models.MemberSessionForList(**json.loads(raw)))
-    if not sessions:
+    sessions = [
+        models.MemberSessionForList(
+            **services.aws.get_dynamodb(  # type: ignore
+                table_name=services.aws.Tables.LOGIN_SESSIONS,
+                item_key={"session_token": item["session_token"]},
+            )
+        )
+        for item in services.aws.query_dynamodb(
+            table_name=services.aws.Tables.LOGIN_SESSIONS,
+            IndexName="member_email-index",
+            KeyConditionExpression=Key("member_email").eq(authz.member.email),
+        )
+    ]
+    if len(sessions) == 0:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     for session in sessions:
         session.current = session.session_token == authz.session.session_token

@@ -6,6 +6,7 @@ import hmac
 import hashlib
 import threading
 from base64 import b64encode, b64decode
+from time import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from os import getenv
@@ -151500,6 +151501,7 @@ class AuthorizationRoute(str, Enum):
     DASHBOARD_QUOTAS = "/dashboard/quotas"
     SEARCH_HOST = "/search/host/"
     SEARCH_IP = "/search/ip/"
+    SEARCH_ANY = "/search/any/"
     CERTIFICATE_SHA1 = "/certificate/"
     SCANNER_CONFIG = "/scanner/config"
     ENABLE_MONITOR = "/scanner/monitor/"
@@ -151554,6 +151556,7 @@ class Authorization:
         AuthorizationRoute.DASHBOARD_LATEST_ISSUES,
         AuthorizationRoute.SEARCH_HOST,
         AuthorizationRoute.SEARCH_IP,
+        AuthorizationRoute.SEARCH_ANY,
         AuthorizationRoute.CERTIFICATE_SHA1,
         AuthorizationRoute.SCANNER_CONFIG,
         AuthorizationRoute.ENABLE_MONITOR,
@@ -151680,6 +151683,7 @@ class Authorization:
             if not self.session.load():
                 logger.critical(f"DENY missing MemberSession {self.hmac.id}")
                 return
+            self.session.timestamp = round(time() * 1000)
             if self.session.save():
                 secret_key = self.session.access_token
                 self.token_type = TokenTypes.SESSION_TOKEN
@@ -151766,6 +151770,8 @@ class JSONEncoder(json.JSONEncoder):
     def default(self, o):
         if isinstance(o, datetime):
             return o.replace(microsecond=0).isoformat()
+        if isinstance(o, int) and o > 10 ^ 38 - 1:
+            return str(o)
         if isinstance(
             o,
             (

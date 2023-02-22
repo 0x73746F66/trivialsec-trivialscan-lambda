@@ -50,75 +50,36 @@ def get_quotas(
     product = None
     if account.billing_client_id:
         if customer := services.stripe.get_customer(account.billing_client_id):
-            if (
-                subscription_id := customer.get("invoice", {})
-                .get("subscription", {})
-                .get("id")
-            ):
-                if subscription := services.stripe.get_subscription(subscription_id):
-                    for item in subscription["items"]["data"]:
-                        product = services.stripe.PRODUCT_MAP.get(
-                            item["price"]["product"]
+            if customer.get("subscriptions", {}).get("data"):
+                for subscription in customer.get("subscriptions", {}).get("data", []):
+                    metadata: dict = subscription["plan"]["metadata"]
+                    product = services.stripe.PRODUCT_MAP.get(
+                        subscription["plan"]["product"],
+                        services.stripe.Product.COMMUNITY_EDITION,
+                    )
+                    if product == services.stripe.Product.UNLIMITED_RESCANS:
+                        unlimited_scans = True
+                    elif product == services.stripe.Product.UNLIMITED:
+                        unlimited_scans = True
+                        unlimited_monitoring = True
+                    elif product in [
+                        services.stripe.Product.PROFESSIONAL,
+                        services.stripe.Product.ENTERPRISE,
+                    ]:
+                        monitoring_hosts_day = int(
+                            metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE)
                         )
-                        if product == services.stripe.Product.UNLIMITED_RESCANS:
-                            unlimited_scans = True
-                        if product == services.stripe.Product.UNLIMITED:
-                            unlimited_scans = True
-                            unlimited_monitoring = True
+                        ondemand_hosts_month = int(
+                            metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE)
+                        )
 
     if not product:
         product = services.stripe.Product.COMMUNITY_EDITION
-    if stripe_product := services.stripe.get_product(product):
-        if product == services.stripe.Product.COMMUNITY_EDITION:
-            monitoring_hosts_day = (
-                int(
-                    stripe_product.get("metadata", {}).get(
-                        "monitoring_hosts_day", MONITORING_HOSTS_CE
-                    )
-                )
-                if stripe_product.get("metadata")
-                else MONITORING_HOSTS_CE
-            )
-            new_only = True
-
-        elif product == services.stripe.Product.PROFESSIONAL:
-            monitoring_hosts_day = (
-                int(
-                    stripe_product.get("metadata", {}).get(
-                        "monitoring_hosts_day", MONITORING_HOSTS_CE
-                    )
-                )
-                if stripe_product.get("metadata")
-                else MONITORING_HOSTS_CE
-            )
-            ondemand_hosts_month = (
-                int(
-                    stripe_product.get("metadata", {}).get(
-                        "ondemand_hosts_month", ONDEMAND_HOSTS_CE
-                    )
-                )
-                if stripe_product.get("metadata")
-                else ONDEMAND_HOSTS_CE
-            )
-
-        elif product == services.stripe.Product.ENTERPRISE:
-            monitoring_hosts_day = (
-                int(
-                    stripe_product.get("metadata", {}).get(
-                        "monitoring_hosts_day", MONITORING_HOSTS_CE
-                    )
-                )
-                if stripe_product.get("metadata")
-                else MONITORING_HOSTS_CE
-            )
-            ondemand_hosts_month = (
-                int(
-                    stripe_product.get("metadata", {}).get(
-                        "ondemand_hosts_month", ONDEMAND_HOSTS_CE
-                    )
-                )
-                if stripe_product.get("metadata")
-                else ONDEMAND_HOSTS_CE
+        new_only = True
+        if stripe_product := services.stripe.get_product(product):
+            metadata: dict = stripe_product["metadata"]
+            monitoring_hosts_day = int(
+                metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE)
             )
 
     return models.AccountQuotas(

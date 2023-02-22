@@ -62,7 +62,6 @@ def dashboard_compliance(
     except RuntimeError as err:
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
 
 
 @router.get(
@@ -97,7 +96,7 @@ def dashboard_quotas(
     Retrieves a collection of your clients
     """
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load():
+    if scanner_record.load(load_history=True):
         return services.helpers.get_quotas(
             account=authz.account, scanner_record=scanner_record
         )
