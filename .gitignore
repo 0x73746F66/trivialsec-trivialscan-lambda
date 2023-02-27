@@ -96,3 +96,6 @@ cert_dot_sh/*.csv.part
 .development/python*/
 .development/sqlite3-builder/
 .development/*.log
+.development/*.crt
+.development/*.key
+

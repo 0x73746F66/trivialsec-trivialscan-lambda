@@ -83,8 +83,25 @@ async def search_hostname(
     resolved_ip = services.helpers.retrieve_ip_for_host(hostname)
     if len(resolved_ip) == 0:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+    domain_map = {
+        hostname: {
+            "timestamps": set(),
+            "resolved_ip": set(resolved_ip),
+            "ip_addr": set(),
+            "monitoring": False,
+            "ports": set(),
+            "reports": set(),
+        }
+    }
     tldext = TLDExtract(cache_dir=internals.CACHE_DIR)(f"http://{hostname}")
-    domain_map = {}
+    if tldext.registered_domain != hostname:
+        domain_map[tldext.registered_domain] = {
+            "timestamps": set(),
+            "ip_addr": set(),
+            "monitoring": False,
+            "ports": set(),
+            "reports": set(),
+        }
     prefix_key = f"{internals.APP_ENV}/hosts/"
     matches = services.aws.list_s3(prefix_key=prefix_key)
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore

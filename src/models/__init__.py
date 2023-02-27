@@ -108,8 +108,6 @@ class ThreatIntelSource(str, Enum):
 class MfaSetting(str, Enum):
     ENROLL = "enroll"
     OPT_OUT = "opt_out"
-    TOTP = "totp"
-    WEBAUTHN = "webauthn"
 
 
 class ScanRecordType(str, Enum):
@@ -179,6 +177,10 @@ class DataPlaneCategory(str, Enum):
     VNC_REMOTE_FRAME_BUFFER = "vncrfb"
 
 
+class WebauthnEnrollType(str, Enum):
+    PUBLIC_KEY = "public-key"
+
+
 class AccountRegistration(BaseModel):
     name: str
     display: Optional[str]
@@ -237,12 +239,26 @@ class WebhooksRedacted(Webhooks):
         return None
 
 
-class Webauthn(BaseModel):
+class WebauthnEnrollResponse(BaseModel):
+    attestationObject: str
+    clientDataJSON: str
+
+
+class WebauthnEnroll(BaseModel):
     id: str
-    public_key: str
-    challenge: str
-    alias: str
-    created_at: datetime
+    rawId: str
+    type: WebauthnEnrollType
+    response: WebauthnEnrollResponse
+
+
+class MemberFido(BaseModel):
+    record_id: UUID
+    member_email: str
+    challenge: Optional[str]
+    device_name: Optional[str]
+    device_id: Optional[bytes]
+    public_key: Optional[bytes]
+    created_at: Optional[datetime]
 
     class Config:
         validate_assignment = True
@@ -250,6 +266,41 @@ class Webauthn(BaseModel):
     @validator("created_at")
     def set_created_at(cls, created_at: datetime):
         return created_at.replace(tzinfo=timezone.utc)
+
+    def exists(
+        self,
+        record_id: Union[UUID, None] = None,
+    ) -> bool:
+        return self.load(record_id)
+
+    def load(
+        self,
+        record_id: Union[UUID, None] = None,
+    ) -> bool:
+        if record_id:
+            self.record_id = record_id
+        response = services.aws.get_dynamodb(
+            table_name=services.aws.Tables.MEMBER_FIDO,
+            item_key={"record_id": str(self.record_id)},
+        )
+        if not response:
+            internals.logger.warning(
+                f"Missing FIDO data for record_id: {self.record_id}"
+            )
+            return False
+        super().__init__(**response)
+        return True
+
+    def save(self) -> bool:
+        return services.aws.put_dynamodb(
+            table_name=services.aws.Tables.MEMBER_FIDO, item=self.dict()
+        )
+
+    def delete(self) -> bool:
+        return services.aws.delete_dynamodb(
+            table_name=services.aws.Tables.MEMBER_FIDO,
+            item_key={"record_id": self.record_id},
+        )
 
 
 class Totp(BaseModel):
@@ -275,7 +326,7 @@ class MemberAccount(AccountRegistration, DAL):
     ip_addr: Optional[IPvAnyAddress]
     user_agent: Optional[str]
     timestamp: Optional[int]
-    # mfa: Optional[MfaSetting] = Field(default=MfaSetting.ENROLL)
+    mfa: MfaSetting = Field(default=MfaSetting.ENROLL)
     billing: Union[Billing, None] = Field(default=None)
     notifications: Optional[AccountNotifications] = Field(
         default=AccountNotifications()
@@ -323,9 +374,9 @@ class MemberAccount(AccountRegistration, DAL):
         display_amount = "FREE"
         display_period = None
         next_due = None
+        product = services.stripe.Product.COMMUNITY_EDITION
         if self.billing_client_id:
             if customer := services.stripe.get_customer(self.billing_client_id):
-                product = services.stripe.Product.COMMUNITY_EDITION
                 if customer.get("subscriptions", {}).get("data"):
                     for subscription in customer.get("subscriptions", {}).get(
                         "data", []
@@ -355,27 +406,14 @@ class MemberAccount(AccountRegistration, DAL):
                             == models.stripe.SubscriptionCollectionMethod.CHARGE_AUTOMATICALLY
                             else "Send Invoice"
                         )
-                        self.billing = Billing(
-                            product_name=product.value.capitalize(),
-                            description=billing_description,
-                            is_trial=is_trial,
-                            has_invoice=has_invoice,
-                            display_amount=display_amount,
-                            display_period=display_period,
-                            next_due=next_due,
-                        )
-                        return True
-        # Fallback to data from Webhooks if API is not responding
-        if sub := models.stripe.SubscriptionAddon().load(self.name):  # type: ignore
-            return self._billing(sub)
-        elif sub := models.stripe.SubscriptionPro().load(self.name):  # type: ignore
-            return self._billing(sub)  # NOSONAR
-        elif sub := models.stripe.SubscriptionEnterprise().load(self.name):  # type: ignore
-            return self._billing(sub)  # NOSONAR
-        elif sub := models.stripe.SubscriptionUnlimited().load(self.name):  # type: ignore
-            return self._billing(sub)  # NOSONAR
         self.billing = Billing(
-            product_name=services.stripe.PRODUCTS.get(services.stripe.Product.COMMUNITY_EDITION).get("name")  # type: ignore
+            product_name=services.stripe.PRODUCTS[product].get("name"),  # type: ignore
+            description=billing_description,
+            is_trial=is_trial,
+            has_invoice=has_invoice,
+            display_amount=display_amount,
+            display_period=display_period,
+            next_due=next_due,
         )
         return True
 

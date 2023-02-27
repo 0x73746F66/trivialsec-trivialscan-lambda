@@ -135,3 +135,32 @@ resource "aws_dynamodb_table" "early_warning_service" {
   hash_key = "id"
   tags = local.tags
 }
+
+resource "aws_dynamodb_table" "member_fido" {
+  name           = "${lower(var.app_env)}_member_fido"
+  billing_mode   = "PAY_PER_REQUEST"
+  table_class    = "STANDARD"
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  attribute {
+    name = "record_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "member_email"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name               = "member_email-index"
+    hash_key           = "member_email"
+    projection_type    = "KEYS_ONLY"
+  }
+
+  hash_key = "record_id"
+  tags = local.tags
+}

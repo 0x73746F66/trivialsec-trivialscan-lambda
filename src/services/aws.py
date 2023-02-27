@@ -17,10 +17,19 @@ from botocore.exceptions import (
 import internals
 
 STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
-ssm_client = boto3.client(service_name="ssm")
-s3_client = boto3.client(service_name="s3")
-sqs_client = boto3.client(service_name="sqs")
-dynamodb = boto3.resource("dynamodb")
+AWS_REGION = getenv("AWS_REGION", "ap-southeast-2")
+if getenv("AWS_EXECUTION_ENV") is None:
+    boto3.setup_default_session(
+        profile_name=getenv("AWS_PROFILE_NAME"),
+        aws_access_key_id=getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=getenv("AWS_SECRET_ACCESS_KEY"),
+        aws_session_token=getenv("AWS_SESSION_TOKEN"),
+    )
+
+ssm_client = boto3.client(service_name="ssm", region_name=AWS_REGION)
+s3_client = boto3.client(service_name="s3", region_name=AWS_REGION)
+sqs_client = boto3.client(service_name="sqs", region_name=AWS_REGION)
+dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 
 
 class Tables(str, Enum):
@@ -28,6 +37,7 @@ class Tables(str, Enum):
     REPORT_HISTORY = f"{internals.APP_ENV.lower()}_report_history"
     OBSERVED_IDENTIFIERS = f"{internals.APP_ENV.lower()}_observed_identifiers"
     EARLY_WARNING_SERVICE = f"{internals.APP_ENV.lower()}_early_warning_service"
+    MEMBER_FIDO = f"{internals.APP_ENV.lower()}_member_fido"
 
 
 class StorageClass(str, Enum):

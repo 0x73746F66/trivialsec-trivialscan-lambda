@@ -624,6 +624,33 @@ def webhook_event_logs(
     return logs or Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get(
+    "/account/mfa/{setting}",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Account"],
+)
+def account_mfa_setting(
+    setting: models.MfaSetting,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Change account MFA setting
+    """
+    authz.account.mfa = setting
+    return authz.account.save()
+
+
 @router.post(
     "/webhook/enable",
     response_model=models.Webhooks,

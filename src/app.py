@@ -5,7 +5,6 @@ from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
-import boto3
 
 import internals
 from routers import (
@@ -22,12 +21,15 @@ from routers import (
     sendgrid,
 )
 
-DEFAULT_LOG_LEVEL = "WARNING"
-LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
-
 app = FastAPI(
     title="Trivial Scanner Dashboard API",
 )
+if getenv("AWS_EXECUTION_ENV"):
+    from fastapi.middleware.httpsredirect import (
+        HTTPSRedirectMiddleware,
+    )  # pylint: disable=ungrouped-imports
+
+    app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
@@ -62,8 +64,6 @@ app.include_router(stripe.router, include_in_schema=False, prefix="/stripe")
 async def startup_event():
     if getenv("AWS_EXECUTION_ENV") is None:
         internals.logger = logging.getLogger("uvicorn.default")
-    boto3.set_stream_logger("boto3", getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
-    internals.logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
 
 
 handler = Mangum(app, lifespan="off")

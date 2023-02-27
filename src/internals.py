@@ -17,7 +17,26 @@ from ipaddress import (
     IPv6Address,
 )
 from uuid import UUID
+from webauthn import (
+    generate_registration_options,
+    verify_registration_response,
+    options_to_json,
+    base64url_to_bytes,
+    generate_authentication_options,
+    verify_authentication_response,
+)
+from webauthn.helpers.structs import (
+    PublicKeyCredentialDescriptor,
+    RegistrationCredential,
+    UserVerificationRequirement,
+    AuthenticationCredential,
+    AttestationConveyancePreference,
+    AuthenticatorSelectionCriteria,
+    AuthenticatorAttachment,
+    ResidentKeyRequirement,
+)
 
+import boto3
 import validators
 import requests
 from user_agents.parsers import UserAgent, parse as ua_parser
@@ -34,21 +53,24 @@ CACHE_DIR = getenv("CACHE_DIR", "/tmp")
 JITTER_SECONDS = int(getenv("JITTER_SECONDS", default="30"))
 APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
+DEFAULT_LOG_LEVEL = "WARNING"
+LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
 ALLOWED_ORIGINS = (
     [
         "https://dev.trivialsec.com",
         "http://localhost:5173",
+        "https://localhost:5173",
         "http://jager:5173",
+        "https://jager.tail55052.ts.net:5173",
     ]
     if APP_ENV == "Dev"
     else [
         "https://www.trivialsec.com",
     ]
 )
-DASHBOARD_URL = (
-    "https://dev.trivialsec.com" if APP_ENV == "Dev" else "https://www.trivialsec.com"
-)
+ORIGIN_HOST = "dev.trivialsec.com" if APP_ENV == "Dev" else "www.trivialsec.com"
+DASHBOARD_URL = f"http://{ORIGIN_HOST}"
 AUTHZ_REALM = 'HMAC realm="trivialscan"'
 ERR_INVALID_AUTHORIZATION = "Invalid Authorization"
 ERR_MISSING_AUTHORIZATION = "Missing Authorization header"
@@ -151326,8 +151348,9 @@ EMAIL_PROVIDERS = {
     "robo.poker",
     "crebbo.org",
 }
-
 logger = logging.getLogger()
+boto3.set_stream_logger("boto3", getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))  # type: ignore
+logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
 
 
 class HMAC:
@@ -151535,6 +151558,8 @@ class AuthorizationRoute(str, Enum):
     WEBHOOK_ENDPOINT = "/webhook/endpoint"
     WEBHOOK_DELETE = "/webhook"
     DELETE_ACCOUNT = "/account"
+    FIDO_REGISTER = "/webauthn/register"
+    FIDO_ENROLL = "/webauthn/enroll"
 
 
 class Authorization:
@@ -151588,6 +151613,8 @@ class Authorization:
         AuthorizationRoute.WEBHOOK_DELETE,
         AuthorizationRoute.WEBHOOK_ENDPOINT,
         AuthorizationRoute.DELETE_ACCOUNT,
+        AuthorizationRoute.FIDO_REGISTER,
+        AuthorizationRoute.FIDO_ENROLL,
     ]
     secret_allow: list[AuthorizationRoute] = []
 
@@ -151615,11 +151642,16 @@ class Authorization:
         self.member: models.MemberProfile
         self.ip_addr: IPvAnyAddress
         self.user_agent: UserAgent = ua_parser(
-            user_agent or request.headers.get("User-Agent")
+            user_agent or request.headers.get("User-Agent", "")
         )
 
         if postman_token := request.headers.get("Postman-Token"):
             logger.info(f"Postman-Token: {postman_token}")
+
+        if is_trivial_scanner := self.user_agent.ua_string.startswith(
+            "Trivial Scanner"
+        ):
+            logger.info(user_agent)
 
         self.hmac = HMAC(
             authorization_header=request.headers.get("Authorization"),
@@ -151652,6 +151684,7 @@ class Authorization:
                 ]
             )
             and not postman_token
+            and not is_trivial_scanner
         ):
             logger.critical(f"DENY unrecognisable User-Agent {self.user_agent}")
             return
@@ -151871,3 +151904,112 @@ def post_beacon(url: AnyHttpUrl, body: dict, headers: dict = None):  # type: ign
     if headers is None:
         headers = {"Content-Type": "application/json"}
     threading.Thread(target=_request_task, args=(url, body, headers)).start()
+
+
+class fido:
+    """
+    FIDO authentication support.
+    """
+
+    @staticmethod
+    def register(user_email: str):
+        """Start FIDO auth registration process
+
+        Arguments:
+            userID -- User's ID
+
+            userName -- The User's username
+
+        Returns:
+            registration options and registration challenge
+        """
+        registration_options = generate_registration_options(
+            rp_id=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
+            rp_name=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
+            user_id=user_email,
+            user_name=user_email,
+            attestation=AttestationConveyancePreference.DIRECT,
+            authenticator_selection=AuthenticatorSelectionCriteria(
+                authenticator_attachment=AuthenticatorAttachment.CROSS_PLATFORM,
+                resident_key=ResidentKeyRequirement.DISCOURAGED,
+            ),
+        )
+        options = options_to_json(registration_options)
+        return options, registration_options.challenge
+
+    @staticmethod
+    def register_verification(credentials, challenge):
+        """Complete registration
+
+        Arguments:
+            credentials -- The user's fido credentials, recieved from the browser
+
+            challenge -- The expected challenge
+
+        Raises:
+            AuthError: registration failure
+
+        Returns:
+            credential id and credential public key
+        """
+        registration_creds = RegistrationCredential.parse_raw(credentials)
+        registration_verification = verify_registration_response(
+            credential=registration_creds,
+            expected_challenge=challenge,
+            expected_origin=DASHBOARD_URL
+            if getenv("AWS_EXECUTION_ENV")
+            else "http://localhost:5173",
+            expected_rp_id=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
+            require_user_verification=True,
+        )
+        if registration_verification.credential_id == base64url_to_bytes(
+            registration_creds.id
+        ):
+            return (
+                registration_verification.credential_id,
+                registration_verification.credential_public_key,
+            )
+
+    @staticmethod
+    def authenticate(cred_id):
+        """Begin user authentication
+
+        Arguments:
+            cred_id -- The user's credential's id
+
+        Returns:
+            verification options, expected challange
+        """
+        authentication_options = generate_authentication_options(
+            rp_id=ORIGIN_HOST,
+            timeout=60000,
+            user_verification=UserVerificationRequirement.PREFERRED,
+            allow_credentials=[PublicKeyCredentialDescriptor(id=cred_id)],
+        )
+        options = options_to_json(authentication_options)
+        return options, authentication_options.challenge
+
+    @staticmethod
+    def authenticate_verify(challenge: bytes, credential_public_key, credentials):
+        """Complete Authentication
+
+        Arguments:
+            challenge -- The expected challange from authenticate
+
+            credential_public_key -- The user's public key
+
+            credentials -- The credentials provided by the user
+
+        Returns:
+            True on success, False otherwise
+        """
+        authentication_verification = verify_authentication_response(
+            credential=AuthenticationCredential.parse_raw(credentials),
+            expected_challenge=challenge,
+            expected_rp_id=ORIGIN_HOST,
+            expected_origin=DASHBOARD_URL,
+            credential_public_key=credential_public_key,
+            credential_current_sign_count=0,
+        )
+        success = authentication_verification.new_sign_count > 0
+        return success

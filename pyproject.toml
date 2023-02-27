@@ -35,6 +35,7 @@ dependencies = [
     "tldextract >= 3.4.0",
     "pyyaml >= 6.0",
     "pusher >= 3.3.0",
+    "webauthn >= 1.7.2",
 ]
 
 [tool.coverage.run]

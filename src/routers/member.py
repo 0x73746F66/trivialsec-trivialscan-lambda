@@ -1,18 +1,24 @@
 import hashlib
 import json
 from time import time
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from random import random
 from typing import Union
 from secrets import token_urlsafe
+from uuid import uuid4
 
 import geocoder
 import validators
 from user_agents import parse as ua_parser
-from fastapi import Header, APIRouter, Response, status, Depends
+from fastapi import Header, APIRouter, Response, status, Depends, HTTPException
 from starlette.requests import Request
 from cachier import cachier
 from boto3.dynamodb.conditions import Key
+from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
+from webauthn.helpers.exceptions import (
+    # InvalidAuthenticationResponse,
+    InvalidRegistrationResponse,
+)
 
 import internals
 import models
@@ -39,12 +45,30 @@ router = APIRouter()
     tags=["CLI"],
 )
 async def validate_authorization(
-    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+    request: Request,
+    authorization: str = Header(
+        alias="Authorization", title="HMAC-SHA512 Signed Request"
+    ),
+    x_trivialscan_account: Union[str, None] = Header(
+        default=None, alias="X-Trivialscan-Account", title="CLI Client Token hint"
+    ),
     x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Checks registration status of the provided account name, client name, and access token (or API key)
     """
+    try:
+        authz = await internals.auth_required(
+            request, authorization, x_trivialscan_account
+        )
+    except HTTPException:
+        event = request.scope.get("aws.event", {})
+        authz = internals.Authorization(
+            request=request,
+            user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+            ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+            account_name=x_trivialscan_account,
+        )
     services.webhook.send(
         event_name=models.WebhookEvent.CLIENT_ACTIVITY,
         account=authz.account,
@@ -788,3 +812,104 @@ async def delete_member(
             },
         )
         return True
+
+
+@router.get(
+    "/webauthn/register",
+    # response_model=models.AcceptEdit,
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        412: {"description": "The email address is not valid"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Profile"],
+)
+async def webauthn_register(
+    response: Response,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Webauthn FIDO registration.
+    """
+    try:
+        options, challenge = internals.fido.register(authz.member.email)
+        record_id = uuid4()
+        internals.logger.info(f"challenge_bytes {challenge}")
+        challenge_b64 = bytes_to_base64url(challenge)
+        internals.logger.info(f"challenge_b64 {challenge_b64}")
+        mfa = models.MemberFido(
+            record_id=record_id,
+            member_email=authz.member.email,
+            challenge=challenge_b64,
+            created_at=datetime.now(tz=timezone.utc),
+        )  # type: ignore
+        if mfa.save():
+            return {"enrollId": record_id, "options": json.loads(options)}
+    except InvalidRegistrationResponse as ex:
+        internals.logger.warning(ex, exc_info=True)
+    response.status_code = status.HTTP_412_PRECONDITION_FAILED
+
+
+@router.post(
+    "/webauthn/enroll/{record_id}/{device_name}",
+    response_model=bool,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        # 400: {"description": "The email address is not valid"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Profile"],
+)
+async def webauthn_enroll(
+    response: Response,
+    data: models.WebauthnEnroll,
+    record_id: str,
+    device_name: str,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Complete Webauthn FIDO enrollment
+    """
+    try:
+        credentials = json.dumps(data.dict(), default=str)
+        mfa = models.MemberFido(
+            record_id=record_id,
+            member_email=authz.member.email,
+        )  # type: ignore
+        if not mfa.load():
+            response.status_code = status.HTTP_404_NOT_FOUND
+            return False
+        internals.logger.info(f"challenge_b64 {mfa.challenge}")
+        challenge = base64url_to_bytes(mfa.challenge)  # type: ignore
+        internals.logger.info(f"challenge_bytes {challenge}")
+
+        if result := internals.fido.register_verification(credentials, challenge):
+            mfa.device_id, mfa.public_key = result
+            mfa.device_name = device_name
+            if not mfa.save():
+                response.status_code = status.HTTP_412_PRECONDITION_FAILED
+                return False
+            return True
+
+    except InvalidRegistrationResponse as ex:
+        internals.logger.warning(ex, exc_info=True)
+    response.status_code = status.HTTP_400_BAD_REQUEST
+    return False
