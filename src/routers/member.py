@@ -14,7 +14,7 @@ from fastapi import Header, APIRouter, Response, status, Depends, HTTPException
 from starlette.requests import Request
 from cachier import cachier
 from boto3.dynamodb.conditions import Key
-from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
+from webauthn.helpers import base64url_to_bytes, bytes_to_base64url, options_to_json
 from webauthn.helpers.exceptions import (
     # InvalidAuthenticationResponse,
     InvalidRegistrationResponse,
@@ -125,10 +125,28 @@ def member_profile(
     Return Member Profile for authorized user
     """
     authz.account.load_billing()
+    fido_devices = []
+    for item in services.aws.query_dynamodb(
+        table_name=services.aws.Tables.MEMBER_FIDO,
+        IndexName="member_email-index",
+        KeyConditionExpression=Key("member_email").eq(authz.member.email),
+    ):
+        if data := services.aws.get_dynamodb(  # type: ignore
+            table_name=services.aws.Tables.MEMBER_FIDO,
+            item_key={"record_id": item["record_id"]},
+        ):
+            fido = models.MemberFidoPublic(**data)
+            if fido.device_id:
+                fido_devices.append(fido)  #TODO: send only the data needed for FIDO, and UI display 
+                continue
+            if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):
+                fido.delete()
+
     return models.MyProfile(
-        session=authz.session,  # type: ignore
-        member=authz.member,  # type: ignore
-        account=authz.account,  # type: ignore
+        session=authz.session,
+        member=authz.member,
+        account=authz.account,
+        fido_devices=fido_devices
     )
 
 
@@ -842,11 +860,9 @@ async def webauthn_register(
     Webauthn FIDO registration.
     """
     try:
-        options, challenge = internals.fido.register(authz.member.email)
+        options = internals.fido.register(authz.member.email)
         record_id = uuid4()
-        internals.logger.info(f"challenge_bytes {challenge}")
-        challenge_b64 = bytes_to_base64url(challenge)
-        internals.logger.info(f"challenge_b64 {challenge_b64}")
+        challenge_b64 = bytes_to_base64url(options.challenge)
         mfa = models.MemberFido(
             record_id=record_id,
             member_email=authz.member.email,
@@ -854,7 +870,7 @@ async def webauthn_register(
             created_at=datetime.now(tz=timezone.utc),
         )  # type: ignore
         if mfa.save():
-            return {"enrollId": record_id, "options": json.loads(options)}
+            return {"enrollId": record_id, "options": json.loads(options_to_json(options))}
     except InvalidRegistrationResponse as ex:
         internals.logger.warning(ex, exc_info=True)
     response.status_code = status.HTTP_412_PRECONDITION_FAILED
@@ -897,17 +913,18 @@ async def webauthn_enroll(
         if not mfa.load():
             response.status_code = status.HTTP_404_NOT_FOUND
             return False
-        internals.logger.info(f"challenge_b64 {mfa.challenge}")
         challenge = base64url_to_bytes(mfa.challenge)  # type: ignore
-        internals.logger.info(f"challenge_bytes {challenge}")
-
-        if result := internals.fido.register_verification(credentials, challenge):
-            mfa.device_id, mfa.public_key = result
+        if result := internals.fido.register_verification(credentials, challenge, require_user_verification=False):
+            device_id, public_key = result
+            mfa.device_id = bytes_to_base64url(device_id)
+            mfa.public_key = bytes_to_base64url(public_key)
             mfa.device_name = device_name
             if not mfa.save():
                 response.status_code = status.HTTP_412_PRECONDITION_FAILED
                 return False
-            return True
+            authz.member.mfa = True
+            if authz.member.save():
+                return True
 
     except InvalidRegistrationResponse as ex:
         internals.logger.warning(ex, exc_info=True)

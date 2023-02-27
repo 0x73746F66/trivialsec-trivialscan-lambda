@@ -250,14 +250,28 @@ class WebauthnEnroll(BaseModel):
     type: WebauthnEnrollType
     response: WebauthnEnrollResponse
 
+class MemberFidoPublic(BaseModel):
+    record_id: UUID
+    device_name: Optional[str]
+    device_id: Optional[str]
+    public_key: Optional[str]
+    created_at: datetime
+
+    class Config:
+        validate_assignment = True
+
+    @validator("created_at")
+    def set_created_at(cls, created_at: datetime):
+        return created_at.replace(tzinfo=timezone.utc)
+
 
 class MemberFido(BaseModel):
     record_id: UUID
     member_email: str
     challenge: Optional[str]
     device_name: Optional[str]
-    device_id: Optional[bytes]
-    public_key: Optional[bytes]
+    device_id: Optional[str]
+    public_key: Optional[str]
     created_at: Optional[datetime]
 
     class Config:
@@ -477,6 +491,7 @@ class MemberProfile(BaseModel):
     email_md5: Optional[str]
     confirmed: bool = Field(default=False)
     confirmation_token: Optional[str]
+    mfa: bool = Field(default=False)
     timestamp: Optional[int]
 
     def __init__(self, **kwargs):
@@ -1610,6 +1625,7 @@ class MyProfile(BaseModel):
     session: MemberSessionRedacted
     member: MemberProfileRedacted
     account: MemberAccountRedacted
+    fido_devices: list[MemberFido]
 
 
 class LoginResponse(BaseModel):

@@ -25,6 +25,7 @@ from webauthn import (
     generate_authentication_options,
     verify_authentication_response,
 )
+from webauthn.helpers import parse_client_data_json
 from webauthn.helpers.structs import (
     PublicKeyCredentialDescriptor,
     RegistrationCredential,
@@ -151934,11 +151935,10 @@ class fido:
                 resident_key=ResidentKeyRequirement.DISCOURAGED,
             ),
         )
-        options = options_to_json(registration_options)
-        return options, registration_options.challenge
+        return registration_options
 
     @staticmethod
-    def register_verification(credentials, challenge):
+    def register_verification(credentials: str, challenge: bytes, require_user_verification: bool = True):
         """Complete registration
 
         Arguments:
@@ -151952,15 +151952,17 @@ class fido:
         Returns:
             credential id and credential public key
         """
+
         registration_creds = RegistrationCredential.parse_raw(credentials)
+        client_data = parse_client_data_json(registration_creds.response.client_data_json)
         registration_verification = verify_registration_response(
             credential=registration_creds,
-            expected_challenge=challenge,
+            expected_challenge=client_data.challenge,
             expected_origin=DASHBOARD_URL
             if getenv("AWS_EXECUTION_ENV")
             else "http://localhost:5173",
             expected_rp_id=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
-            require_user_verification=True,
+            require_user_verification=require_user_verification,
         )
         if registration_verification.credential_id == base64url_to_bytes(
             registration_creds.id
