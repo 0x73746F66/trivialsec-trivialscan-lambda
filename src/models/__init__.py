@@ -250,6 +250,7 @@ class WebauthnEnroll(BaseModel):
     type: WebauthnEnrollType
     response: WebauthnEnrollResponse
 
+
 class MemberFidoPublic(BaseModel):
     record_id: UUID
     device_name: Optional[str]
@@ -313,7 +314,7 @@ class MemberFido(BaseModel):
     def delete(self) -> bool:
         return services.aws.delete_dynamodb(
             table_name=services.aws.Tables.MEMBER_FIDO,
-            item_key={"record_id": self.record_id},
+            item_key={"record_id": str(self.record_id)},
         )
 
 
@@ -1450,12 +1451,12 @@ class ScannerRecord(BaseModel, DAL):
         for ews in self.ews:
             services.aws.delete_dynamodb(
                 table_name=services.aws.Tables.EARLY_WARNING_SERVICE,
-                item_key={"id": ews.id},
+                item_key={"id": str(ews.id)},
             )
         for identifier in self.observed_identifiers:
             services.aws.delete_dynamodb(
                 table_name=services.aws.Tables.OBSERVED_IDENTIFIERS,
-                item_key={"id": identifier.id},
+                item_key={"id": str(identifier.id)},
             )
         return services.aws.delete_s3(self.object_key)
 
@@ -1589,6 +1590,11 @@ class MemberSessionForList(MemberSessionRedacted):
     current: Optional[bool] = Field(default=False)
 
 
+class MemberSecurity(BaseModel):
+    sessions: list[MemberSessionForList]
+    fido_devices: list[MemberFidoPublic]
+
+
 class MemberProfileForList(MemberProfileRedacted):
     current: Optional[bool] = Field(default=False)
 
@@ -1625,7 +1631,6 @@ class MyProfile(BaseModel):
     session: MemberSessionRedacted
     member: MemberProfileRedacted
     account: MemberAccountRedacted
-    fido_devices: list[MemberFido]
 
 
 class LoginResponse(BaseModel):

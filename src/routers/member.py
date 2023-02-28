@@ -125,34 +125,16 @@ def member_profile(
     Return Member Profile for authorized user
     """
     authz.account.load_billing()
-    fido_devices = []
-    for item in services.aws.query_dynamodb(
-        table_name=services.aws.Tables.MEMBER_FIDO,
-        IndexName="member_email-index",
-        KeyConditionExpression=Key("member_email").eq(authz.member.email),
-    ):
-        if data := services.aws.get_dynamodb(  # type: ignore
-            table_name=services.aws.Tables.MEMBER_FIDO,
-            item_key={"record_id": item["record_id"]},
-        ):
-            fido = models.MemberFidoPublic(**data)
-            if fido.device_id:
-                fido_devices.append(fido)  #TODO: send only the data needed for FIDO, and UI display 
-                continue
-            if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):
-                fido.delete()
-
     return models.MyProfile(
-        session=authz.session,
-        member=authz.member,
-        account=authz.account,
-        fido_devices=fido_devices
+        session=authz.session,  # type: ignore
+        member=authz.member,  # type: ignore
+        account=authz.account,  # type: ignore
     )
 
 
 @router.get(
     "/sessions",
-    response_model=list[models.MemberSessionForList],
+    response_model=models.MemberSecurity,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -193,7 +175,27 @@ async def member_sessions(
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     for session in sessions:
         session.current = session.session_token == authz.session.session_token
-    return sessions
+
+    fido_devices = []
+    for item in services.aws.query_dynamodb(
+        table_name=services.aws.Tables.MEMBER_FIDO,
+        IndexName="member_email-index",
+        KeyConditionExpression=Key("member_email").eq(authz.member.email),
+    ):
+        if data := services.aws.get_dynamodb(
+            table_name=services.aws.Tables.MEMBER_FIDO,
+            item_key={"record_id": item["record_id"]},
+        ):
+            fido = models.MemberFido(**data)
+            if fido.device_id:
+                fido_devices.append(
+                    models.MemberFidoPublic(**fido.dict())
+                )  # TODO: send only the data needed for FIDO, and UI display
+                continue
+            if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
+                fido.delete()
+
+    return models.MemberSecurity(sessions=sessions, fido_devices=fido_devices)
 
 
 @router.get(
@@ -870,7 +872,10 @@ async def webauthn_register(
             created_at=datetime.now(tz=timezone.utc),
         )  # type: ignore
         if mfa.save():
-            return {"enrollId": record_id, "options": json.loads(options_to_json(options))}
+            return {
+                "enrollId": record_id,
+                "options": json.loads(options_to_json(options)),
+            }
     except InvalidRegistrationResponse as ex:
         internals.logger.warning(ex, exc_info=True)
     response.status_code = status.HTTP_412_PRECONDITION_FAILED
@@ -914,7 +919,9 @@ async def webauthn_enroll(
             response.status_code = status.HTTP_404_NOT_FOUND
             return False
         challenge = base64url_to_bytes(mfa.challenge)  # type: ignore
-        if result := internals.fido.register_verification(credentials, challenge, require_user_verification=False):
+        if result := internals.fido.register_verification(
+            credentials, challenge, require_user_verification=False
+        ):
             device_id, public_key = result
             mfa.device_id = bytes_to_base64url(device_id)
             mfa.public_key = bytes_to_base64url(public_key)
