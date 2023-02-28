@@ -883,16 +883,16 @@ async def webauthn_register(
 
 @router.post(
     "/webauthn/enroll/{record_id}/{device_name}",
-    response_model=bool,
+    response_model=models.MemberFidoPublic,
     status_code=status.HTTP_202_ACCEPTED,
     responses={
-        # 400: {"description": "The email address is not valid"},
         401: {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
         },
         403: {
             "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
         },
+        409: {"description": "The device is already registered"},
         500: {
             "description": "An unhandled error occurred during an AWS request for data access"
         },
@@ -909,15 +909,31 @@ async def webauthn_enroll(
     """
     Complete Webauthn FIDO enrollment
     """
+    mfa = models.MemberFido(
+        record_id=record_id,
+        member_email=authz.member.email,
+    )  # type: ignore
+    if not mfa.load():
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return
+    registered_devices = set()
+    for item in services.aws.query_dynamodb(
+        table_name=services.aws.Tables.MEMBER_FIDO,
+        IndexName="member_email-index",
+        KeyConditionExpression=Key("member_email").eq(authz.member.email),
+    ):
+        if _data := services.aws.get_dynamodb(
+            table_name=services.aws.Tables.MEMBER_FIDO,
+            item_key={"record_id": item["record_id"]},
+        ):
+            fido = models.MemberFido(**_data)
+            if fido.device_id:
+                registered_devices.add(fido.device_id)
+                continue
+            if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
+                fido.delete()
     try:
         credentials = json.dumps(data.dict(), default=str)
-        mfa = models.MemberFido(
-            record_id=record_id,
-            member_email=authz.member.email,
-        )  # type: ignore
-        if not mfa.load():
-            response.status_code = status.HTTP_404_NOT_FOUND
-            return False
         challenge = base64url_to_bytes(mfa.challenge)  # type: ignore
         if result := internals.fido.register_verification(
             credentials, challenge, require_user_verification=False
@@ -926,14 +942,85 @@ async def webauthn_enroll(
             mfa.device_id = bytes_to_base64url(device_id)
             mfa.public_key = bytes_to_base64url(public_key)
             mfa.device_name = device_name
+            if mfa.device_id in registered_devices:
+                return Response(status_code=status.HTTP_409_CONFLICT)
             if not mfa.save():
                 response.status_code = status.HTTP_412_PRECONDITION_FAILED
-                return False
+                return
             authz.member.mfa = True
             if authz.member.save():
-                return True
+                return models.MemberFidoPublic(**mfa.dict())
 
     except InvalidRegistrationResponse as ex:
         internals.logger.warning(ex, exc_info=True)
     response.status_code = status.HTTP_400_BAD_REQUEST
-    return False
+
+
+@router.delete(
+    "/webauthn/delete/{record_id}",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        204: {"description": "No matching FIDO device, was it already deleted?"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        424: {
+            "description": "Everything appeared to be correct until actually attempting to delete the device record, probably a race condition with simultaneous delete attempts"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Profile"],
+)
+async def delete_fido_device(
+    response: Response,
+    record_id: str,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Delete a FIDO device
+    """
+    device = models.MemberFido(member_email=authz.member.email, record_id=record_id)
+    if not device.load():
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    if not device.delete():
+        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+
+    services.webhook.send(
+        event_name=models.WebhookEvent.MEMBER_ACTIVITY,
+        account=authz.account,
+        data={
+            "type": "delete_fido_device",
+            "timestamp": round(time() * 1000),
+            "account": authz.account.name,
+            "member": authz.member.email,
+            "record_id": record_id,
+            "ip_addr": authz.ip_addr,
+            "user_agent": authz.user_agent.ua_string,
+        },
+    )
+
+    fido_devices = set()
+    for item in services.aws.query_dynamodb(
+        table_name=services.aws.Tables.MEMBER_FIDO,
+        IndexName="member_email-index",
+        KeyConditionExpression=Key("member_email").eq(authz.member.email),
+    ):
+        if data := services.aws.get_dynamodb(
+            table_name=services.aws.Tables.MEMBER_FIDO,
+            item_key={"record_id": item["record_id"]},
+        ):
+            fido = models.MemberFido(**data)
+            if fido.device_id:
+                fido_devices.add(fido.device_id)
+                continue
+            if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
+                fido.delete()
+
+    if len(fido_devices) == 0:
+        authz.member.mfa = False
+        authz.member.save()

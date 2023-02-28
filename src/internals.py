@@ -151561,6 +151561,7 @@ class AuthorizationRoute(str, Enum):
     DELETE_ACCOUNT = "/account"
     FIDO_REGISTER = "/webauthn/register"
     FIDO_ENROLL = "/webauthn/enroll"
+    FIDO_DELETE = "/webauthn/delete"
 
 
 class Authorization:
@@ -151616,6 +151617,7 @@ class Authorization:
         AuthorizationRoute.DELETE_ACCOUNT,
         AuthorizationRoute.FIDO_REGISTER,
         AuthorizationRoute.FIDO_ENROLL,
+        AuthorizationRoute.FIDO_DELETE,
     ]
     secret_allow: list[AuthorizationRoute] = []
 
