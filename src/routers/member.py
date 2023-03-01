@@ -16,7 +16,7 @@ from cachier import cachier
 from boto3.dynamodb.conditions import Key
 from webauthn.helpers import base64url_to_bytes, bytes_to_base64url, options_to_json
 from webauthn.helpers.exceptions import (
-    # InvalidAuthenticationResponse,
+    InvalidAuthenticationResponse,
     InvalidRegistrationResponse,
 )
 
@@ -471,28 +471,49 @@ async def login(
             return
         if member.confirmation_token == magic_token:
             member.confirmed = True
-        if member.save() and link.delete():
-            services.webhook.send(
-                event_name=models.WebhookEvent.MEMBER_ACTIVITY,
-                account=account,
-                data={
-                    "type": "login",
-                    "timestamp": round(time() * 1000),
-                    "account": account.name,
-                    "member": member.email,
-                    "session_token": session_token,
-                    "ip_addr": ip_addr,
-                    "user_agent": user_agent,
-                    "browser": session.browser,
-                    "platform": session.platform,
-                },
-            )
-            return models.LoginResponse(
-                session=session,  # type: ignore
-                member=member,  # type: ignore
-                account=account,  # type: ignore
-            )
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        if not member.save() or not link.delete():
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+            return
+
+        services.webhook.send(
+            event_name=models.WebhookEvent.MEMBER_ACTIVITY,
+            account=account,
+            data={
+                "type": "login",
+                "timestamp": round(time() * 1000),
+                "account": account.name,
+                "member": member.email,
+                "session_token": session_token,
+                "ip_addr": ip_addr,
+                "user_agent": user_agent,
+                "browser": session.browser,
+                "platform": session.platform,
+            },
+        )
+        fido_devices = []
+        for item in services.aws.query_dynamodb(
+            table_name=services.aws.Tables.MEMBER_FIDO,
+            IndexName="member_email-index",
+            KeyConditionExpression=Key("member_email").eq(member.email),
+        ):
+            if data := services.aws.get_dynamodb(
+                table_name=services.aws.Tables.MEMBER_FIDO,
+                item_key={"record_id": item["record_id"]},
+            ):
+                fido = models.MemberFido(**data)
+                if fido.device_id:
+                    fido_devices.append(models.MemberFidoPublic(**fido.dict()))
+                    continue
+                if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
+                    fido.delete()
+
+        return models.LoginResponse(
+            session=session,  # type: ignore
+            member=member,  # type: ignore
+            account=account,  # type: ignore
+            fido_devices=fido_devices,  # type: ignore
+        )
+
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
@@ -938,18 +959,18 @@ async def webauthn_enroll(
         if result := internals.fido.register_verification(
             credentials, challenge, require_user_verification=False
         ):
-            device_id, public_key = result
-            mfa.device_id = bytes_to_base64url(device_id)
-            mfa.public_key = bytes_to_base64url(public_key)
+            mfa.device_id = bytes_to_base64url(result.credential_id)
+            mfa.public_key = bytes_to_base64url(result.credential_public_key)
             mfa.device_name = device_name
             if mfa.device_id in registered_devices:
                 return Response(status_code=status.HTTP_409_CONFLICT)
             if not mfa.save():
                 response.status_code = status.HTTP_412_PRECONDITION_FAILED
                 return
-            authz.member.mfa = True
-            if authz.member.save():
-                return models.MemberFidoPublic(**mfa.dict())
+            if authz.member.mfa is not True:
+                authz.member.mfa = True
+                authz.member.save()
+            return models.MemberFidoPublic(**mfa.dict())
 
     except InvalidRegistrationResponse as ex:
         internals.logger.warning(ex, exc_info=True)
@@ -984,7 +1005,7 @@ async def delete_fido_device(
     """
     Delete a FIDO device
     """
-    device = models.MemberFido(member_email=authz.member.email, record_id=record_id)
+    device = models.MemberFido(member_email=authz.member.email, record_id=record_id)  # type: ignore
     if not device.load():
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     if not device.delete():
@@ -1024,3 +1045,53 @@ async def delete_fido_device(
     if len(fido_devices) == 0:
         authz.member.mfa = False
         authz.member.save()
+
+
+@router.get(
+    "/webauthn/login",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Member Profile"],
+)
+async def webauthn_initiate_auth(
+    response: Response,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Webauthn FIDO options for authn.
+    """
+
+    fido_devices = []
+    for item in services.aws.query_dynamodb(
+        table_name=services.aws.Tables.MEMBER_FIDO,
+        IndexName="member_email-index",
+        KeyConditionExpression=Key("member_email").eq(authz.member.email),
+    ):
+        if data := services.aws.get_dynamodb(
+            table_name=services.aws.Tables.MEMBER_FIDO,
+            item_key={"record_id": item["record_id"]},
+        ):
+            fido = models.MemberFido(**data)
+            if fido.device_id:
+                fido_devices.append(fido)
+                continue
+            if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
+                fido.delete()
+    if not fido_devices:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    try:
+        return internals.fido.authenticate(fido_devices)
+    except InvalidAuthenticationResponse as ex:
+        internals.logger.warning(ex, exc_info=True)
+    response.status_code = status.HTTP_412_PRECONDITION_FAILED

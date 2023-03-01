@@ -1637,3 +1637,4 @@ class LoginResponse(BaseModel):
     session: MemberSession
     member: MemberProfileRedacted
     account: MemberAccountRedacted
+    fido_devices: list[MemberFidoPublic]

@@ -57,21 +57,19 @@ APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 DEFAULT_LOG_LEVEL = "WARNING"
 LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
+ORIGIN_HOST = "dev.trivialsec.com" if APP_ENV == "Dev" else "www.trivialsec.com"
+DASHBOARD_URL = f"https://{ORIGIN_HOST}"
 ALLOWED_ORIGINS = (
     [
-        "https://dev.trivialsec.com",
+        DASHBOARD_URL,
         "http://localhost:5173",
         "https://localhost:5173",
         "http://jager:5173",
         "https://jager.tail55052.ts.net:5173",
     ]
     if APP_ENV == "Dev"
-    else [
-        "https://www.trivialsec.com",
-    ]
+    else [DASHBOARD_URL]
 )
-ORIGIN_HOST = "dev.trivialsec.com" if APP_ENV == "Dev" else "www.trivialsec.com"
-DASHBOARD_URL = f"http://{ORIGIN_HOST}"
 AUTHZ_REALM = 'HMAC realm="trivialscan"'
 ERR_INVALID_AUTHORIZATION = "Invalid Authorization"
 ERR_MISSING_AUTHORIZATION = "Missing Authorization header"
@@ -151562,6 +151560,7 @@ class AuthorizationRoute(str, Enum):
     FIDO_REGISTER = "/webauthn/register"
     FIDO_ENROLL = "/webauthn/enroll"
     FIDO_DELETE = "/webauthn/delete"
+    FIDO_LOGIN = "/webauthn/login"
 
 
 class Authorization:
@@ -151618,6 +151617,7 @@ class Authorization:
         AuthorizationRoute.FIDO_REGISTER,
         AuthorizationRoute.FIDO_ENROLL,
         AuthorizationRoute.FIDO_DELETE,
+        AuthorizationRoute.FIDO_LOGIN,
     ]
     secret_allow: list[AuthorizationRoute] = []
 
@@ -151940,7 +151940,9 @@ class fido:
         return registration_options
 
     @staticmethod
-    def register_verification(credentials: str, challenge: bytes, require_user_verification: bool = True):
+    def register_verification(
+        credentials: str, challenge: bytes, require_user_verification: bool = True
+    ):
         """Complete registration
 
         Arguments:
@@ -151956,7 +151958,9 @@ class fido:
         """
 
         registration_creds = RegistrationCredential.parse_raw(credentials)
-        client_data = parse_client_data_json(registration_creds.response.client_data_json)
+        client_data = parse_client_data_json(
+            registration_creds.response.client_data_json
+        )
         registration_verification = verify_registration_response(
             credential=registration_creds,
             expected_challenge=client_data.challenge,
@@ -151969,13 +151973,10 @@ class fido:
         if registration_verification.credential_id == base64url_to_bytes(
             registration_creds.id
         ):
-            return (
-                registration_verification.credential_id,
-                registration_verification.credential_public_key,
-            )
+            return registration_verification
 
     @staticmethod
-    def authenticate(cred_id):
+    def authenticate(credentials: list):
         """Begin user authentication
 
         Arguments:
@@ -151988,10 +151989,11 @@ class fido:
             rp_id=ORIGIN_HOST,
             timeout=60000,
             user_verification=UserVerificationRequirement.PREFERRED,
-            allow_credentials=[PublicKeyCredentialDescriptor(id=cred_id)],
+            allow_credentials=[
+                PublicKeyCredentialDescriptor(id=cred.device_id) for cred in credentials
+            ],
         )
-        options = options_to_json(authentication_options)
-        return options, authentication_options.challenge
+        return options_to_json(authentication_options)
 
     @staticmethod
     def authenticate_verify(challenge: bytes, credential_public_key, credentials):
