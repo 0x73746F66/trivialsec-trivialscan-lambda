@@ -1,0 +1,16 @@
+---
+# https://docs.sourcery.ai/Configuration/Project-Settings/
+version: '1'
+ignore:
+- .git
+- .venv
+
+rule_settings:
+  python_version: '3.9'
+  enable:
+  - default
+  disable: []
+  rule_types:
+  - refactoring
+  - suggestion
+  - comment

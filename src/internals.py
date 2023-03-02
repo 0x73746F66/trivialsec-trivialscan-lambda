@@ -151973,7 +151973,7 @@ class fido:
         if registration_verification.credential_id == base64url_to_bytes(
             registration_creds.id
         ):
-            return registration_verification
+            return registration_verification, client_data.challenge
 
     @staticmethod
     def authenticate(credentials: list):
@@ -151986,14 +151986,14 @@ class fido:
             verification options, expected challange
         """
         authentication_options = generate_authentication_options(
-            rp_id=ORIGIN_HOST,
+            rp_id=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
             timeout=60000,
             user_verification=UserVerificationRequirement.PREFERRED,
             allow_credentials=[
                 PublicKeyCredentialDescriptor(id=cred.device_id) for cred in credentials
             ],
         )
-        return options_to_json(authentication_options)
+        return json.loads(options_to_json(authentication_options))
 
     @staticmethod
     def authenticate_verify(challenge: bytes, credential_public_key, credentials):
@@ -152012,8 +152012,10 @@ class fido:
         authentication_verification = verify_authentication_response(
             credential=AuthenticationCredential.parse_raw(credentials),
             expected_challenge=challenge,
-            expected_rp_id=ORIGIN_HOST,
-            expected_origin=DASHBOARD_URL,
+            expected_origin=DASHBOARD_URL
+            if getenv("AWS_EXECUTION_ENV")
+            else "http://localhost:5173",
+            expected_rp_id=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
             credential_public_key=credential_public_key,
             credential_current_sign_count=0,
         )

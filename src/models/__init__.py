@@ -239,16 +239,27 @@ class WebhooksRedacted(Webhooks):
         return None
 
 
-class WebauthnEnrollResponse(BaseModel):
-    attestationObject: str
+class WebauthnClientResponse(BaseModel):
     clientDataJSON: str
+    attestationObject: Optional[str]
+    authenticatorData: Optional[str]
+    signature: Optional[str]
+    userHandle: Optional[str]
 
 
 class WebauthnEnroll(BaseModel):
     id: str
     rawId: str
     type: WebauthnEnrollType
-    response: WebauthnEnrollResponse
+    response: WebauthnClientResponse
+
+    
+class WebauthnLogin(BaseModel):
+    member_email: str
+    id: str
+    rawId: str
+    type: WebauthnEnrollType
+    response: WebauthnClientResponse
 
 
 class MemberFidoPublic(BaseModel):
@@ -1637,4 +1648,4 @@ class LoginResponse(BaseModel):
     session: MemberSession
     member: MemberProfileRedacted
     account: MemberAccountRedacted
-    fido_devices: list[MemberFidoPublic]
+    fido_options: Union[dict, None]
