@@ -73,9 +73,7 @@ tfinstall:
 	sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(shell lsb_release -cs) main"
 	sudo apt-get update
 	sudo apt-get install -y terraform
-	terraform -install-autocomplete || true
-
-init: env ## Runs tf init tf
+	terraform -install-autocomplete || truefrom webauthn.helpers import parse_client_data_json
 	terraform -chdir=plans init -backend-config=${APP_ENV}-backend.conf -reconfigure -upgrade=true
 
 plan: ## Runs tf validate and tf plan

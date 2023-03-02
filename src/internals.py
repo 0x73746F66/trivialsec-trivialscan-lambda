@@ -24,7 +24,6 @@ from webauthn import (
     generate_authentication_options,
     verify_authentication_response,
 )
-from webauthn.helpers import parse_client_data_json
 from webauthn.helpers.structs import (
     PublicKeyCredentialDescriptor,
     RegistrationCredential,
@@ -151975,7 +151974,9 @@ class fido:
             return registration_verification
 
     @staticmethod
-    def authenticate(allow_credentials: list[PublicKeyCredentialDescriptor]) -> PublicKeyCredentialRequestOptions:
+    def authenticate(
+        allow_credentials: list[PublicKeyCredentialDescriptor],
+    ) -> PublicKeyCredentialRequestOptions:
         """Begin user authentication
 
         Arguments:

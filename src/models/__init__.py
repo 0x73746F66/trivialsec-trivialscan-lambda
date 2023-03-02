@@ -253,7 +253,8 @@ class WebauthnEnroll(BaseModel):
     type: WebauthnEnrollType
     response: WebauthnClientResponse
     record_id: UUID
-    
+
+
 class WebauthnLogin(BaseModel):
     member_email: str
     id: str

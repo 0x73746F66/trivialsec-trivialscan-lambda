@@ -23,7 +23,10 @@ from webauthn.helpers.exceptions import (
     InvalidAuthenticationResponse,
     InvalidRegistrationResponse,
 )
-from webauthn.helpers.structs import PublicKeyCredentialCreationOptions, PublicKeyCredentialDescriptor
+from webauthn.helpers.structs import (
+    PublicKeyCredentialCreationOptions,
+    PublicKeyCredentialDescriptor,
+)
 import internals
 import models
 import services.aws
@@ -192,9 +195,7 @@ async def member_sessions(
         ):
             fido = models.MemberFido(**data)
             if fido.device_id:
-                fido_devices.append(
-                    models.MemberFidoPublic(**fido.dict())
-                )
+                fido_devices.append(models.MemberFidoPublic(**fido.dict()))
                 continue
             if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
                 fido.delete()
@@ -429,7 +430,9 @@ async def login(
         member = models.MemberProfileRedacted(email=link.email)
         if not member.load():
             response.status_code = status.HTTP_400_BAD_REQUEST
-            internals.logger.info(f'"login","","{link.email}","{ip_addr}","{user_agent}",""')
+            internals.logger.info(
+                f'"login","","{link.email}","{ip_addr}","{user_agent}",""'
+            )
             return
         internals.logger.info(
             f'"login","{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
@@ -437,7 +440,9 @@ async def login(
         account = models.MemberAccount(name=member.account_name)  # type: ignore pylint: disable=no-member
         if not account.load() or not account.load_billing():
             response.status_code = status.HTTP_400_BAD_REQUEST
-            internals.logger.info(f'"login","","{link.email}","{ip_addr}","{user_agent}",""')
+            internals.logger.info(
+                f'"login","","{link.email}","{ip_addr}","{user_agent}",""'
+            )
             return
         internals.logger.info(
             f'"login","{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
@@ -513,12 +518,14 @@ async def login(
 
         fido_options = None
         if fido_devices:
-            authentication_options = internals.fido.authenticate([
-                PublicKeyCredentialDescriptor(
-                    id=base64url_to_bytes(device.device_id)
-                )
-                for device in fido_devices
-            ])
+            authentication_options = internals.fido.authenticate(
+                [
+                    PublicKeyCredentialDescriptor(
+                        id=base64url_to_bytes(device.device_id)
+                    )
+                    for device in fido_devices
+                ]
+            )
             for device in fido_devices:
                 device.challenge = bytes_to_base64url(authentication_options.challenge)
                 device.save()
@@ -530,7 +537,7 @@ async def login(
             else session,
             member=member,
             account=account,
-            fido_options=fido_options
+            fido_options=fido_options,
         )
 
     except RuntimeError as err:
@@ -1078,9 +1085,7 @@ async def delete_fido_device(
     tags=["Member Profile"],
 )
 async def webauthn_verify(
-    request: Request,
-    response: Response,
-    data: models.WebauthnLogin
+    request: Request, response: Response, data: models.WebauthnLogin
 ):
     """
     Webauthn FIDO verification
@@ -1103,12 +1108,16 @@ async def webauthn_verify(
     member = models.MemberProfileRedacted(email=data.member_email)
     if not member.load():
         response.status_code = status.HTTP_400_BAD_REQUEST
-        internals.logger.info(f'"login","","{member.email}","{ip_addr}","{user_agent}",""')
+        internals.logger.info(
+            f'"login","","{member.email}","{ip_addr}","{user_agent}",""'
+        )
         return
     account = models.MemberAccount(name=member.account_name)  # type: ignore pylint: disable=no-member
     if not account.load() or not account.load_billing():
         response.status_code = status.HTTP_400_BAD_REQUEST
-        internals.logger.info(f'"login","","{member.email}","{ip_addr}","{user_agent}",""')
+        internals.logger.info(
+            f'"login","","{member.email}","{ip_addr}","{user_agent}",""'
+        )
         return
 
     if not user_agent:
@@ -1133,7 +1142,7 @@ async def webauthn_verify(
                     if success := internals.fido.authenticate_verify(
                         challenge=base64url_to_bytes(fido.challenge),
                         public_key=base64url_to_bytes(fido.public_key),
-                        credential_json=json.dumps(data.dict(), default=str)
+                        credential_json=json.dumps(data.dict(), default=str),
                     ):
                         break
                 except InvalidAuthenticationResponse as ex:
@@ -1169,11 +1178,15 @@ async def webauthn_verify(
         return
 
     if not match:
-        internals.logger.info(f'"webauthn_verify","","{member.email}","{ip_addr}","{user_agent}",""')
+        internals.logger.info(
+            f'"webauthn_verify","","{member.email}","{ip_addr}","{user_agent}",""'
+        )
         response.status_code = status.HTTP_403_FORBIDDEN
         return
     if not success:
-        internals.logger.info(f'"webauthn_verify","","{member.email}","{ip_addr}","{user_agent}",""')
+        internals.logger.info(
+            f'"webauthn_verify","","{member.email}","{ip_addr}","{user_agent}",""'
+        )
         response.status_code = status.HTTP_401_UNAUTHORIZED
         return
 

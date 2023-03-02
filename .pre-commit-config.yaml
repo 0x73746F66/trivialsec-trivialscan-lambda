@@ -117,5 +117,6 @@ repos:
   - repo: https://github.com/sourcery-ai/sourcery
     rev: v1.0.5
     hooks:
-    - id: sourcery
-      args: [--diff=git diff HEAD, --no-summary]
+      - id: sourcery
+        args: [--diff=git diff HEAD, --no-summary]
+        stages: [post-commit]
