@@ -20,7 +20,6 @@ from uuid import UUID
 from webauthn import (
     generate_registration_options,
     verify_registration_response,
-    options_to_json,
     base64url_to_bytes,
     generate_authentication_options,
     verify_authentication_response,
@@ -35,6 +34,7 @@ from webauthn.helpers.structs import (
     AuthenticatorSelectionCriteria,
     AuthenticatorAttachment,
     ResidentKeyRequirement,
+    PublicKeyCredentialRequestOptions,
 )
 
 import boto3
@@ -151915,7 +151915,7 @@ class fido:
     """
 
     @staticmethod
-    def register(user_email: str):
+    def register(user_email: str, record_id: UUID):
         """Start FIDO auth registration process
 
         Arguments:
@@ -151928,13 +151928,15 @@ class fido:
         """
         registration_options = generate_registration_options(
             rp_id=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
-            rp_name=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
+            rp_name="Trivial Security",
             user_id=user_email,
-            user_name=user_email,
+            user_name=str(record_id),
+            user_display_name=user_email,
             attestation=AttestationConveyancePreference.DIRECT,
             authenticator_selection=AuthenticatorSelectionCriteria(
                 authenticator_attachment=AuthenticatorAttachment.CROSS_PLATFORM,
                 resident_key=ResidentKeyRequirement.DISCOURAGED,
+                user_verification=UserVerificationRequirement.DISCOURAGED,
             ),
         )
         return registration_options
@@ -151958,12 +151960,9 @@ class fido:
         """
 
         registration_creds = RegistrationCredential.parse_raw(credentials)
-        client_data = parse_client_data_json(
-            registration_creds.response.client_data_json
-        )
         registration_verification = verify_registration_response(
             credential=registration_creds,
-            expected_challenge=client_data.challenge,
+            expected_challenge=challenge,
             expected_origin=DASHBOARD_URL
             if getenv("AWS_EXECUTION_ENV")
             else "http://localhost:5173",
@@ -151973,10 +151972,10 @@ class fido:
         if registration_verification.credential_id == base64url_to_bytes(
             registration_creds.id
         ):
-            return registration_verification, client_data.challenge
+            return registration_verification
 
     @staticmethod
-    def authenticate(credentials: list):
+    def authenticate(allow_credentials: list[PublicKeyCredentialDescriptor]) -> PublicKeyCredentialRequestOptions:
         """Begin user authentication
 
         Arguments:
@@ -151985,18 +151984,15 @@ class fido:
         Returns:
             verification options, expected challange
         """
-        authentication_options = generate_authentication_options(
+        return generate_authentication_options(
             rp_id=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
             timeout=60000,
-            user_verification=UserVerificationRequirement.PREFERRED,
-            allow_credentials=[
-                PublicKeyCredentialDescriptor(id=cred.device_id) for cred in credentials
-            ],
+            user_verification=UserVerificationRequirement.DISCOURAGED,
+            allow_credentials=allow_credentials,
         )
-        return json.loads(options_to_json(authentication_options))
 
     @staticmethod
-    def authenticate_verify(challenge: bytes, credential_public_key, credentials):
+    def authenticate_verify(challenge: bytes, public_key: bytes, credential_json: str):
         """Complete Authentication
 
         Arguments:
@@ -152010,13 +152006,13 @@ class fido:
             True on success, False otherwise
         """
         authentication_verification = verify_authentication_response(
-            credential=AuthenticationCredential.parse_raw(credentials),
+            credential=AuthenticationCredential.parse_raw(credential_json),
             expected_challenge=challenge,
             expected_origin=DASHBOARD_URL
             if getenv("AWS_EXECUTION_ENV")
             else "http://localhost:5173",
             expected_rp_id=ORIGIN_HOST if getenv("AWS_EXECUTION_ENV") else "localhost",
-            credential_public_key=credential_public_key,
+            credential_public_key=public_key,
             credential_current_sign_count=0,
         )
         success = authentication_verification.new_sign_count > 0

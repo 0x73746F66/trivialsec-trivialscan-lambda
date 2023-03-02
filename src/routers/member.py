@@ -14,12 +14,16 @@ from fastapi import Header, APIRouter, Response, status, Depends, HTTPException
 from starlette.requests import Request
 from cachier import cachier
 from boto3.dynamodb.conditions import Key
-from webauthn.helpers import base64url_to_bytes, bytes_to_base64url, options_to_json
+from webauthn.helpers import (
+    base64url_to_bytes,
+    bytes_to_base64url,
+    options_to_json,
+)
 from webauthn.helpers.exceptions import (
     InvalidAuthenticationResponse,
     InvalidRegistrationResponse,
 )
-
+from webauthn.helpers.structs import PublicKeyCredentialCreationOptions, PublicKeyCredentialDescriptor
 import internals
 import models
 import services.aws
@@ -171,7 +175,7 @@ async def member_sessions(
             KeyConditionExpression=Key("member_email").eq(authz.member.email),
         )
     ]
-    if len(sessions) == 0:
+    if not sessions:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     for session in sessions:
         session.current = session.session_token == authz.session.session_token
@@ -190,7 +194,7 @@ async def member_sessions(
             if fido.device_id:
                 fido_devices.append(
                     models.MemberFidoPublic(**fido.dict())
-                )  # TODO: send only the data needed for FIDO, and UI display
+                )
                 continue
             if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
                 fido.delete()
@@ -416,27 +420,27 @@ async def login(
         object_key = f"{internals.APP_ENV}/magic-links/{magic_token}.json"
         ret = services.aws.get_s3(path_key=object_key)
         if not ret:
-            internals.logger.info(f'"","","{ip_addr}","{user_agent}",""')
+            internals.logger.info(f'"login","","","{ip_addr}","{user_agent}",""')
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         link = models.MagicLink(**json.loads(ret))
         if not link:
-            internals.logger.info(f'"","","{ip_addr}","{user_agent}",""')
+            internals.logger.info(f'"login","","","{ip_addr}","{user_agent}",""')
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         member = models.MemberProfileRedacted(email=link.email)
         if not member.load():
             response.status_code = status.HTTP_400_BAD_REQUEST
-            internals.logger.info(f'"","{link.email}","{ip_addr}","{user_agent}",""')
+            internals.logger.info(f'"login","","{link.email}","{ip_addr}","{user_agent}",""')
             return
         internals.logger.info(
-            f'"{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
+            f'"login","{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
         )
         account = models.MemberAccount(name=member.account_name)  # type: ignore pylint: disable=no-member
         if not account.load() or not account.load_billing():
             response.status_code = status.HTTP_400_BAD_REQUEST
-            internals.logger.info(f'"","{link.email}","{ip_addr}","{user_agent}",""')
+            internals.logger.info(f'"login","","{link.email}","{ip_addr}","{user_agent}",""')
             return
         internals.logger.info(
-            f'"{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
+            f'"login","{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
         )
         if not user_agent:
             response.status_code = status.HTTP_424_FAILED_DEPENDENCY
@@ -490,7 +494,7 @@ async def login(
                 "platform": session.platform,
             },
         )
-        fido_devices = []
+        fido_devices: list[models.MemberFido] = []
         for item in services.aws.query_dynamodb(
             table_name=services.aws.Tables.MEMBER_FIDO,
             IndexName="member_email-index",
@@ -502,10 +506,23 @@ async def login(
             ):
                 fido = models.MemberFido(**data)
                 if fido.device_id:
-                    fido_devices.append(models.MemberFidoPublic(**fido.dict()))
+                    fido_devices.append(fido)
                     continue
                 if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
                     fido.delete()
+
+        fido_options = None
+        if fido_devices:
+            authentication_options = internals.fido.authenticate([
+                PublicKeyCredentialDescriptor(
+                    id=base64url_to_bytes(device.device_id)
+                )
+                for device in fido_devices
+            ])
+            for device in fido_devices:
+                device.challenge = bytes_to_base64url(authentication_options.challenge)
+                device.save()
+            fido_options = json.loads(options_to_json(authentication_options))
 
         return models.LoginResponse(
             session=models.MemberSessionRedacted(**session.dict())
@@ -513,9 +530,7 @@ async def login(
             else session,
             member=member,
             account=account,
-            fido_options=internals.fido.authenticate(fido_devices)
-            if fido_devices
-            else None,
+            fido_options=fido_options
         )
 
     except RuntimeError as err:
@@ -861,7 +876,7 @@ async def delete_member(
 
 @router.get(
     "/webauthn/register",
-    # response_model=models.AcceptEdit,
+    response_model=PublicKeyCredentialCreationOptions,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_201_CREATED,
@@ -887,27 +902,23 @@ async def webauthn_register(
     Webauthn FIDO registration.
     """
     try:
-        options = internals.fido.register(authz.member.email)
         record_id = uuid4()
-        challenge_b64 = bytes_to_base64url(options.challenge)
+        options = internals.fido.register(authz.member.email, record_id)
         mfa = models.MemberFido(
             record_id=record_id,
             member_email=authz.member.email,
-            challenge=challenge_b64,
+            challenge=bytes_to_base64url(options.challenge),
             created_at=datetime.now(tz=timezone.utc),
         )  # type: ignore
         if mfa.save():
-            return {
-                "enrollId": record_id,
-                "options": json.loads(options_to_json(options)),
-            }
+            return options
     except InvalidRegistrationResponse as ex:
         internals.logger.warning(ex, exc_info=True)
     response.status_code = status.HTTP_412_PRECONDITION_FAILED
 
 
 @router.post(
-    "/webauthn/enroll/{record_id}/{device_name}",
+    "/webauthn/enroll/{device_name}",
     response_model=models.MemberFidoPublic,
     status_code=status.HTTP_202_ACCEPTED,
     responses={
@@ -927,15 +938,15 @@ async def webauthn_register(
 async def webauthn_enroll(
     response: Response,
     data: models.WebauthnEnroll,
-    record_id: str,
     device_name: str,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Complete Webauthn FIDO enrollment
     """
+    credentials = json.dumps(data.dict(), default=str)
     mfa = models.MemberFido(
-        record_id=record_id,
+        record_id=data.record_id,
         member_email=authz.member.email,
     )  # type: ignore
     if not mfa.load():
@@ -958,14 +969,11 @@ async def webauthn_enroll(
             if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
                 fido.delete()
     try:
-        credentials = json.dumps(data.dict(), default=str)
         if result := internals.fido.register_verification(
             credentials, base64url_to_bytes(mfa.challenge), require_user_verification=False  # type: ignore
         ):
-            verification, challenge = result
-            mfa.device_id = bytes_to_base64url(verification.credential_id)
-            mfa.public_key = bytes_to_base64url(verification.credential_public_key)
-            mfa.challenge = bytes_to_base64url(challenge)
+            mfa.device_id = bytes_to_base64url(result.credential_id)
+            mfa.public_key = bytes_to_base64url(result.credential_public_key)
             mfa.device_name = device_name
             if mfa.device_id in registered_devices:
                 return Response(status_code=status.HTTP_409_CONFLICT)
@@ -1054,6 +1062,7 @@ async def delete_fido_device(
 
 @router.post(
     "/webauthn/login",
+    response_model=models.LoginResponse,
     status_code=status.HTTP_200_OK,
     responses={
         401: {
@@ -1069,36 +1078,107 @@ async def delete_fido_device(
     tags=["Member Profile"],
 )
 async def webauthn_verify(
+    request: Request,
     response: Response,
     data: models.WebauthnLogin
 ):
     """
     Webauthn FIDO verification
     """
-    match: models.MemberFido = None
+    event = request.scope.get("aws.event", {})
+    ip_addr = (
+        event.get("requestContext", {})
+        .get("http", {})
+        .get(
+            "sourceIp",
+            request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")),
+        )
+    )
+    user_agent = (
+        event.get("requestContext", {})
+        .get("http", {})
+        .get("userAgent", request.headers.get("User-Agent"))
+    )
+
+    member = models.MemberProfileRedacted(email=data.member_email)
+    if not member.load():
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        internals.logger.info(f'"login","","{member.email}","{ip_addr}","{user_agent}",""')
+        return
+    account = models.MemberAccount(name=member.account_name)  # type: ignore pylint: disable=no-member
+    if not account.load() or not account.load_billing():
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        internals.logger.info(f'"login","","{member.email}","{ip_addr}","{user_agent}",""')
+        return
+
+    if not user_agent:
+        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+        return
+
+    match = False
+    success = False
     for item in services.aws.query_dynamodb(
         table_name=services.aws.Tables.MEMBER_FIDO,
         IndexName="member_email-index",
-        KeyConditionExpression=Key("member_email").eq(data.member_email),
+        KeyConditionExpression=Key("member_email").eq(member.email),
     ):
-        if data := services.aws.get_dynamodb(
+        if _data := services.aws.get_dynamodb(
             table_name=services.aws.Tables.MEMBER_FIDO,
             item_key={"record_id": item["record_id"]},
         ):
-            fido = models.MemberFido(**data)
+            fido = models.MemberFido(**_data)
             if fido.device_id == data.id:
-                match = fido
-                continue
-            if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
-                fido.delete()
-    if not match:
-        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
+                match = True
+                try:
+                    if success := internals.fido.authenticate_verify(
+                        challenge=base64url_to_bytes(fido.challenge),
+                        public_key=base64url_to_bytes(fido.public_key),
+                        credential_json=json.dumps(data.dict(), default=str)
+                    ):
+                        break
+                except InvalidAuthenticationResponse as ex:
+                    internals.logger.warning(ex, exc_info=True)
 
-    try:
-        credentials = json.dumps(data.response.dict(), default=str)
-        challenge = base64url_to_bytes(match.challenge)  # type: ignore
-        public_key = base64url_to_bytes(match.public_key)  # type: ignore
-        return internals.fido.authenticate_verify(challenge, public_key, credentials)
-    except InvalidAuthenticationResponse as ex:
-        internals.logger.warning(ex, exc_info=True)
-    response.status_code = status.HTTP_403_FORBIDDEN
+    ua = ua_parser(user_agent)
+    session_token = hashlib.sha224(
+        bytes(
+            f"{member.email}{ua.get_browser()}{ua.get_os()}{ua.get_device()}",
+            "ascii",
+        )
+    ).hexdigest()
+    session = models.MemberSession(
+        member_email=member.email,
+        session_token=session_token,
+        access_token=token_urlsafe(nbytes=23),
+        ip_addr=ip_addr,
+        user_agent=user_agent,
+        timestamp=round(time() * 1000),
+    )  # type: ignore
+    session.browser = ua.get_browser()
+    session.platform = (
+        "Postman"
+        if session.browser.startswith("PostmanRuntime")
+        else f"{ua.get_os()} {ua.get_device()}"
+    )
+    if ip_addr:
+        geo_ip = geocoder.ip(str(ip_addr))
+        session.lat = geo_ip.latlng[0]
+        session.lon = geo_ip.latlng[1]
+    if not session.save():
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return
+
+    if not match:
+        internals.logger.info(f'"webauthn_verify","","{member.email}","{ip_addr}","{user_agent}",""')
+        response.status_code = status.HTTP_403_FORBIDDEN
+        return
+    if not success:
+        internals.logger.info(f'"webauthn_verify","","{member.email}","{ip_addr}","{user_agent}",""')
+        response.status_code = status.HTTP_401_UNAUTHORIZED
+        return
+
+    return models.LoginResponse(
+        session=session,
+        member=member,
+        account=account,
+    )
