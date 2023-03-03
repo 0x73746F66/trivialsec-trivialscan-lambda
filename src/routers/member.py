@@ -334,47 +334,96 @@ async def magic_link(
         .get("http", {})
         .get("userAgent", request.headers.get("User-Agent"))
     )
+    if not user_agent:
+        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+        return
     if validators.email(data.email) is not True:  # type: ignore
         response.status_code = status.HTTP_400_BAD_REQUEST
         return
+
+    member = models.MemberProfile(email=data.email)
+    print(f"member {member.dict()}")
+    if not member.load():
+        response.status_code = status.HTTP_412_PRECONDITION_FAILED
+        return
+    print(f"member {member.dict()}")
+
+    if member.mfa:
+        account = models.MemberAccount(name=member.account_name)  # type: ignore pylint: disable=no-member
+        if not account.load() or not account.load_billing():
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            internals.logger.info(
+                f'"magic_link","","{member.email}","{ip_addr}","{user_agent}",""'
+            )
+            return
+
+        fido_devices: list[models.MemberFido] = []
+        for item in services.aws.query_dynamodb(
+            table_name=services.aws.Tables.MEMBER_FIDO,
+            IndexName="member_email-index",
+            KeyConditionExpression=Key("member_email").eq(member.email),
+        ):
+            if data := services.aws.get_dynamodb(
+                table_name=services.aws.Tables.MEMBER_FIDO,
+                item_key={"record_id": item["record_id"]},
+            ):
+                fido = models.MemberFido(**data)
+                if fido.device_id:
+                    fido_devices.append(fido)
+                    continue
+
+        if fido_devices:
+            try:
+                authentication_options = internals.fido.authenticate(
+                    [
+                        PublicKeyCredentialDescriptor(
+                            id=base64url_to_bytes(device.device_id)
+                        )
+                        for device in fido_devices
+                    ]
+                )
+                for device in fido_devices:
+                    device.challenge = bytes_to_base64url(
+                        authentication_options.challenge
+                    )
+                    device.save()
+                response.status_code = status.HTTP_200_OK
+                return json.loads(options_to_json(authentication_options))
+            except InvalidAuthenticationResponse as err:
+                internals.logger.exception(err)
+
     magic_token = hashlib.sha224(bytes(str(random()), "ascii")).hexdigest()
     login_url = f"{internals.DASHBOARD_URL}/login/{magic_token}"
     try:
-        member = models.MemberProfile(email=data.email)
-        if member.load():
-            if not member.confirmed:
-                response.status_code = status.HTTP_412_PRECONDITION_FAILED
-                return
-            sendgrid_message_id = None
-            if not request.headers.get("Postman-Token"):
-                sendgrid = services.sendgrid.send_email(
-                    recipient=data.email,
-                    subject="Trivial Security Magic Link",
-                    template="magic_link",
-                    data={"magic_link": login_url},
-                )
-                sendgrid_message_id = sendgrid.headers.get("X-Message-Id")
-            link = models.MagicLink(
-                email=data.email,
-                magic_token=magic_token,
-                ip_addr=ip_addr,
-                user_agent=user_agent,
-                timestamp=round(time() * 1000),
-                sendgrid_message_id=sendgrid_message_id,
+        sendgrid_message_id = None
+        if not request.headers.get("Postman-Token"):
+            sendgrid = services.sendgrid.send_email(
+                recipient=data.email,
+                subject="Trivial Security Magic Link",
+                template="magic_link",
+                data={"magic_link": login_url},
             )
-            if link.save():
-                internals.logger.info(
-                    f"Magic Link for {member.account_name}"
-                )  # pylint: disable=no-member
-                return f"/login/{link.magic_token}"
-
-        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-        return
+            sendgrid_message_id = sendgrid.headers.get("X-Message-Id")
+        link = models.MagicLink(
+            email=data.email,
+            magic_token=magic_token,
+            ip_addr=ip_addr,
+            user_agent=user_agent,
+            timestamp=round(time() * 1000),
+            sendgrid_message_id=sendgrid_message_id,
+        )
+        if link.save():
+            internals.logger.info(
+                f"Magic Link for {member.account_name}"
+            )  # pylint: disable=no-member
+            return f"/login/{link.magic_token}"
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
         return
+
+    response.status_code = status.HTTP_424_FAILED_DEPENDENCY
 
 
 @router.get(
@@ -518,18 +567,23 @@ async def login(
 
         fido_options = None
         if fido_devices:
-            authentication_options = internals.fido.authenticate(
-                [
-                    PublicKeyCredentialDescriptor(
-                        id=base64url_to_bytes(device.device_id)
+            try:
+                authentication_options = internals.fido.authenticate(
+                    [
+                        PublicKeyCredentialDescriptor(
+                            id=base64url_to_bytes(device.device_id)
+                        )
+                        for device in fido_devices
+                    ]
+                )
+                for device in fido_devices:
+                    device.challenge = bytes_to_base64url(
+                        authentication_options.challenge
                     )
-                    for device in fido_devices
-                ]
-            )
-            for device in fido_devices:
-                device.challenge = bytes_to_base64url(authentication_options.challenge)
-                device.save()
-            fido_options = json.loads(options_to_json(authentication_options))
+                    device.save()
+                fido_options = json.loads(options_to_json(authentication_options))
+            except InvalidAuthenticationResponse as err:
+                internals.logger.exception(err)
 
         return models.LoginResponse(
             session=models.MemberSessionRedacted(**session.dict())

@@ -531,11 +531,11 @@ class MemberProfile(BaseModel):
             )
             internals.logger.info(matches)
         if not matches:
-            internals.logger.warning(f"Missing member for: {member_email}")
+            internals.logger.warning(f"Missing member for: {self.email}")
             return False
         raw = services.aws.get_s3(path_key=matches[0])
         if not raw:
-            internals.logger.warning(f"Missing member for: {member_email}")
+            internals.logger.warning(f"Missing member for: {self.email}")
             return False
         try:
             data = json.loads(raw)
@@ -543,7 +543,7 @@ class MemberProfile(BaseModel):
             internals.logger.debug(err, exc_info=True)
             return False
         if not data or not isinstance(data, dict):
-            internals.logger.warning(f"Missing member data for: {member_email}")
+            internals.logger.warning(f"Missing member data for: {self.email}")
             return False
 
         super().__init__(**data)
