@@ -76,6 +76,9 @@ tfinstall:
 	terraform -install-autocomplete || truefrom webauthn.helpers import parse_client_data_json
 	terraform -chdir=plans init -backend-config=${APP_ENV}-backend.conf -reconfigure -upgrade=true
 
+init: env ## Runs tf init tf
+	terraform -chdir=plans init -backend-config=${APP_ENV}-backend.conf -reconfigure -upgrade=true
+
 plan: ## Runs tf validate and tf plan
 	terraform -chdir=plans validate
 	terraform -chdir=plans plan -no-color -out=.tfplan
