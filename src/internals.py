@@ -8,7 +8,7 @@ import threading
 from base64 import b64encode, b64decode
 from time import time
 from datetime import datetime, timedelta, timezone
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 from os import getenv
 from typing import Union
 from enum import Enum
@@ -151393,7 +151393,7 @@ class HMAC:
         port = 443 if parsed_url.port is None else parsed_url.port
         bits = [self.request_method.upper()]
         bits.extend(
-            (parsed_url.hostname.lower(), str(port), parsed_url.path, str(self.ts))  # type: ignore
+            (parsed_url.hostname.lower(), str(port), unquote(parsed_url.path), str(self.ts))  # type: ignore
         )
         if self.contents:
             bits.append(b64encode(self.contents.encode("utf8")).decode("utf8"))
