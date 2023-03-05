@@ -948,6 +948,7 @@ class ThreatIntel(BaseModel):
     feed_identifier: Any
     feed_date: datetime
     feed_data: Any
+    matching_data: Optional[Any]
 
     class Config:
         validate_assignment = True
