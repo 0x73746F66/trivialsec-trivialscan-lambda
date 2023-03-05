@@ -103,6 +103,7 @@ class ThreatIntelSource(str, Enum):
     DATAPLANE = "DataPlane"
     TALOS_INTELLIGENCE = "TalosIntelligence"
     DARKLIST = "Darklist"
+    PROOFPOINT = "ProofPoint"
 
 
 class MfaSetting(str, Enum):
@@ -1488,7 +1489,7 @@ class WebhookPayload(BaseModel):
 
 
 class CharlesHaley(BaseModel):
-    ip_address: Union[IPv4Address, IPv6Address]
+    ip_address: Union[IPv4Address, IPv6Address, IPv4Network, IPv6Network]
     last_seen: datetime
     category: str
 
@@ -1496,7 +1497,7 @@ class CharlesHaley(BaseModel):
 class DataPlane(BaseModel):
     asn: Optional[int]
     asn_text: Optional[str]
-    ip_address: Union[IPv4Address, IPv6Address]
+    ip_address: Union[IPv4Address, IPv6Address, IPv4Network, IPv6Network]
     last_seen: datetime
     category: DataPlaneCategory
 
@@ -1511,6 +1512,12 @@ class TalosIntelligence(BaseModel):
 class Darklist(BaseModel):
     ip_address: Optional[Union[IPv4Address, IPv6Address]]
     cidr: Optional[IPv4Network]
+    last_seen: datetime
+    category: str
+
+
+class ProofPoint(BaseModel):
+    ip_address: Union[IPv4Address, IPv6Address, IPv4Network, IPv6Network]
     last_seen: datetime
     category: str
 
@@ -1549,7 +1556,7 @@ class FeedState(BaseModel):
     def exit(self, record: str):
         if item := self.records.get(record):
             item.current = False
-            item.exits.append(datetime.utcnow())
+            item.exits.append(datetime.now(timezone.utc))
             self.records[record] = item
 
     def load(self) -> bool:
