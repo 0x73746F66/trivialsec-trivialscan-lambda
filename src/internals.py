@@ -151560,6 +151560,7 @@ class AuthorizationRoute(str, Enum):
     FIDO_ENROLL = "/webauthn/enroll"
     FIDO_DELETE = "/webauthn/delete"
     FIDO_LOGIN = "/webauthn/login"
+    EWS_ALERTS = "/early-warning-service/alerts"
 
 
 class Authorization:
@@ -151617,6 +151618,7 @@ class Authorization:
         AuthorizationRoute.FIDO_ENROLL,
         AuthorizationRoute.FIDO_DELETE,
         AuthorizationRoute.FIDO_LOGIN,
+        AuthorizationRoute.EWS_ALERTS,
     ]
     secret_allow: list[AuthorizationRoute] = []
 

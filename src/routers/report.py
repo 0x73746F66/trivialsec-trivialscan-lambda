@@ -122,10 +122,7 @@ def retrieve_summary(
 @cachier(
     stale_after=timedelta(minutes=15),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: kw["authz"].account.name
-    + str(kw.get("report_id"))
-    + str(kw.get("full_certs"))
-    + str(kw.get("full_hosts")),
+    hash_params=lambda _, kw: kw["authz"].account.name + str(kw.get("report_id")),
 )
 def retrieve_full_report(
     report_id: str,
@@ -483,3 +480,40 @@ async def delete_report(
                 "user_agent": authz.user_agent.ua_string,
             },
         )
+
+
+@router.get(
+    "/early-warning-service/alerts",
+    response_model=list[models.ThreatIntel],
+    response_model_exclude_unset=True,
+    response_model_exclude_none=True,
+    status_code=status.HTTP_200_OK,
+    responses={
+        204: {"description": "No alert data is present for this account"},
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Early Warning Service"],
+)
+@cachier(
+    stale_after=timedelta(seconds=15),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: kw["authz"].account.name,
+)
+def early_warning_service_alerts(
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    Retrieves early warning service alert
+    """
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
+    if scanner_record.load(load_ews=True):
+        return scanner_record.ews
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
