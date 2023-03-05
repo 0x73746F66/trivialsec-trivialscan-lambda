@@ -342,11 +342,9 @@ async def magic_link(
         return
 
     member = models.MemberProfile(email=data.email)
-    print(f"member {member.dict()}")
     if not member.load():
         response.status_code = status.HTTP_412_PRECONDITION_FAILED
         return
-    print(f"member {member.dict()}")
 
     if member.mfa:
         account = models.MemberAccount(name=member.account_name)  # type: ignore pylint: disable=no-member

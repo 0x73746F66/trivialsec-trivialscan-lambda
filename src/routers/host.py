@@ -132,7 +132,7 @@ def retrieve_host(
             )
             versions.append(f"{_port}/{date}/{_ip}")
         except ValueError:
-            print(match)
+            internals.logger.error(f"retrieve_host: bad object path {match}")
 
     if last_updated:
         object_key = None
