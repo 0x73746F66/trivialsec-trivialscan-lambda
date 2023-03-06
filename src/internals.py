@@ -151346,6 +151346,64 @@ EMAIL_PROVIDERS = {
     "robo.poker",
     "crebbo.org",
 }
+ALERT_DETAIL = {
+    "CharlesHaley": {
+        "sshclient": {
+            "description": "IP addresses that has been seen initiating an SSH connection to a remote host. This report lists hosts that are suspicious of more than just port scanning. These hosts may be SSH server cataloging or conducting authentication attack attempts",
+            "summary": "SSH Port Scanning, dictionary attacks, and Bruteforcing Authentication",
+            "abuse": "contact@frogfishtech.com",
+        },
+    },
+    "Darklist": {
+        "sshclient": {
+            "description": "Darklist.de is an IP blacklist that uses multiple sensors to identify network attacks (e.g. SSH brute force) and spam incidents. All reports are evaluated and in case of too many incidents the responsible IP holder is informed to solve the problem. After reporting an incident as solved the IP is removed from the blacklist",
+            "summary": "SSH dictionary attacks, and Bruteforcing Authentication",
+            "abuse": "https://www.darklist.de/removal.php",
+        }
+    },
+    "TalosIntelligence": {
+        "ipreputation": {
+            "description": "Talos' IP and Domain Data Center is the world's most comprehensive real-time threat detection network. The data is made up of daily security intelligence across millions of deployed web, email, firewall and IPS appliances. Talos detects and correlates threats in real time using the largest threat detection network in the world spanning web requests, emails, malware samples, open-source data sets, endpoint intelligence, and network intrusions.",
+            "summary": "Spam or Malware origin",
+            "abuse": "https://www.talosintelligence.com/reputation_center/sender_ip",
+        }
+    },
+    "DataPlane": {
+        "sshclient": {
+            "description": "IP addresses that has been seen initiating an SSH connection to a remote host. This report lists hosts that are suspicious of more than just port scanning. These hosts may be SSH server cataloging or conducting authentication attack attempts",
+            "summary": "SSH Port Scanning and Bruteforcing Authentication",
+            "abuse": "info@dataplane.org",
+        },
+        "sshpwauth": {
+            "description": "IP addresses that has been seen attempting to remotely login to a host using SSH password authentication. This report lists hosts that are highly suspicious and are likely conducting malicious SSH password authentication attacks",
+            "summary": "SSH dictionary attacks",
+            "abuse": "info@dataplane.org",
+        },
+        "dnsrd": {
+            "description": "IP addresses that have been identified as sending recursive DNS queries to a remote host. This report lists addresses that may be cataloging open DNS resolvers or evaluating cache entries",
+            "summary": "Recursive DNS query cataloging",
+            "abuse": "info@dataplane.org",
+        },
+        "vncrfb": {
+            "description": "IP addresses that have been seen initiating a VNC remote frame buffer (RFB) session to a remote host. This report lists hosts that are suspicious of more than just port scanning. These hosts may be VNC server cataloging or conducting various forms of remote access abuse",
+            "summary": "Suspicious VNC remote frame buffer (RFB) sessions",
+            "abuse": "info@dataplane.org",
+        },
+    },
+    "ProofPoint": {
+        "ipreputation": {
+            "description": "Emerging Threat (ET) Intelligence provides actionable threat intel feeds to identify IPs and domains involved in suspicious and malicious activity. All threat intelligence feeds are based on behavior observed directly by Proofpoint ET Labs",
+            "summary": "Spam or Malware origin",
+            "abuse": "https://feedback.emergingthreats.net/feedback",
+        },
+        "compromised-ips": {
+            "description": "Emerging Threat (ET) intelligence helps you identify hosts that are performing malicious activities, using a network of honeypots all hosts listed were caught launch attacks from the identified IP addresses",
+            "summary": "Exploit kit threat indicators, origins are compromised and performing attacks on others",
+            "abuse": "https://feedback.emergingthreats.net/feedback",
+        },
+    },
+}
+
 logger = logging.getLogger()
 boto3.set_stream_logger("boto3", getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))  # type: ignore
 logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))

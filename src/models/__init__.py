@@ -12,6 +12,7 @@ import validators
 from pydantic import (
     BaseModel,
     Field,
+    HttpUrl,
     AnyHttpUrl,
     validator,
     conint,
@@ -713,7 +714,7 @@ class MemberSession(BaseModel, DAL):
         if session_token:
             self.session_token = session_token
         # type: ignore
-        if not self.session_token or validators.email(self.member_email) is False:
+        if not self.session_token or validators.email(self.member_email) is False:  # type: ignore
             return False
         response = services.aws.get_dynamodb(
             table_name=services.aws.Tables.LOGIN_SESSIONS,
@@ -957,6 +958,13 @@ class ThreatIntel(BaseModel):
     @validator("feed_date")
     def set_feed_date(cls, feed_date: datetime):
         return feed_date.replace(tzinfo=timezone.utc)
+
+
+class EarlyWarningAlert(ThreatIntel):
+    summary: str
+    description: str
+    abuse: str
+    reference_url: Optional[HttpUrl]
 
 
 class Host(BaseModel, DAL):
@@ -1547,7 +1555,7 @@ class FeedState(BaseModel):
     source: str
     feed_name: str
     url: Optional[AnyHttpUrl]
-    records: Optional[dict[str, FeedStateItem]]
+    records: Optional[dict[str, FeedStateItem]] = Field(default={})
     last_checked: Optional[datetime]
 
     @property
@@ -1555,6 +1563,8 @@ class FeedState(BaseModel):
         return f"{internals.APP_ENV}/feeds/{self.source}/{self.feed_name}/state.json"
 
     def exit(self, record: str):
+        if not self.records:
+            self.records = {}
         if item := self.records.get(record):
             item.current = False
             item.exits.append(datetime.now(timezone.utc))

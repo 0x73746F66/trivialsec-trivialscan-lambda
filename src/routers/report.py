@@ -412,8 +412,8 @@ async def store(
                 )
             return {"results_uri": f"/result/{full_report.report_id}/details"}
 
-    if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".pem"):
-        sha1_fingerprint = file.filename.replace(".pem", "")
+    if report_type is models.ReportType.CERTIFICATE and file.filename.endswith(".pem"):  # type: ignore
+        sha1_fingerprint = file.filename.replace(".pem", "")  # type: ignore
         object_key = path.join(
             internals.APP_ENV, "certificates", f"{sha1_fingerprint}.pem"
         )
@@ -484,7 +484,7 @@ async def delete_report(
 
 @router.get(
     "/early-warning-service/alerts",
-    response_model=list[models.ThreatIntel],
+    response_model=list[models.EarlyWarningAlert],
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -513,7 +513,38 @@ def early_warning_service_alerts(
     """
     Retrieves early warning service alert
     """
+
+    def make_reference_url(item: models.ThreatIntel) -> Union[str, None]:
+        if item.feed_data.get("cidr"):
+            if item.source == models.ThreatIntelSource.DARKLIST:
+                return (
+                    f'https://www.darklist.de/view.php?ip={item.feed_data.get("cidr")}'
+                )
+            if item.source == models.ThreatIntelSource.TALOS_INTELLIGENCE:
+                return f'https://www.talosintelligence.com/reputation_center/lookup?search={item.feed_data.get("cidr")}'
+        if item.feed_data.get("ip_address"):
+            if item.source == models.ThreatIntelSource.DARKLIST:
+                return f'https://www.darklist.de/view.php?ip={item.feed_data.get("ip_address")}'
+            if item.source == models.ThreatIntelSource.TALOS_INTELLIGENCE:
+                return f'https://www.talosintelligence.com/reputation_center/lookup?search={item.feed_data.get("ip_address")}'
+        return None
+
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load(load_ews=True):
-        return scanner_record.ews
+        return [
+            models.EarlyWarningAlert(
+                summary=internals.ALERT_DETAIL[threat_intel.source][
+                    threat_intel.feed_data.get("category")
+                ]["summary"],
+                description=internals.ALERT_DETAIL[threat_intel.source][
+                    threat_intel.feed_data.get("category")
+                ]["description"],
+                abuse=internals.ALERT_DETAIL[threat_intel.source][
+                    threat_intel.feed_data.get("category")
+                ]["abuse"],
+                reference_url=make_reference_url(threat_intel),  # type: ignore
+                **threat_intel.dict(),
+            )
+            for threat_intel in scanner_record.ews
+        ]
     return Response(status_code=status.HTTP_204_NO_CONTENT)

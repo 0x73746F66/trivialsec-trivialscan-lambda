@@ -64,6 +64,7 @@
             "boto",
             "cachier",
             "CCADB",
+            "DARKLIST",
             "fastapi",
             "mkcert",
             "NOSONAR",
