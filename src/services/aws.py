@@ -38,6 +38,7 @@ class Tables(str, Enum):
     OBSERVED_IDENTIFIERS = f"{internals.APP_ENV.lower()}_observed_identifiers"
     EARLY_WARNING_SERVICE = f"{internals.APP_ENV.lower()}_early_warning_service"
     MEMBER_FIDO = f"{internals.APP_ENV.lower()}_member_fido"
+    FINDINGS = f"{internals.APP_ENV.lower()}_findings"
 
 
 class StorageClass(str, Enum):

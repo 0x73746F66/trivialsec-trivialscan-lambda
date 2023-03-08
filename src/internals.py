@@ -55,6 +55,7 @@ APP_ENV = getenv("APP_ENV", "Dev")
 APP_NAME = getenv("APP_NAME", "trivialscan-lambda")
 DEFAULT_LOG_LEVEL = "WARNING"
 LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
+NAMESPACE = UUID("bc6e2cd5-1f59-487f-b05b-49946bd078b2")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
 ORIGIN_HOST = "dev.trivialsec.com" if APP_ENV == "Dev" else "www.trivialsec.com"
 DASHBOARD_URL = f"https://{ORIGIN_HOST}"

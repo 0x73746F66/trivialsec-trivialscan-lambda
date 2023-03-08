@@ -164,3 +164,32 @@ resource "aws_dynamodb_table" "member_fido" {
   hash_key = "record_id"
   tags = local.tags
 }
+
+resource "aws_dynamodb_table" "findings" {
+  name           = "${lower(var.app_env)}_findings"
+  billing_mode   = "PAY_PER_REQUEST"
+  table_class    = "STANDARD"
+
+  server_side_encryption {
+    enabled = true
+  }
+
+  attribute {
+    name = "finding_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "account_name"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name               = "account_name-index"
+    hash_key           = "account_name"
+    projection_type    = "KEYS_ONLY"
+  }
+
+  hash_key = "finding_id"
+  tags = local.tags
+}
