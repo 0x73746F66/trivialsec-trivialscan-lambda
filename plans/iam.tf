@@ -64,6 +64,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
       "arn:aws:dynamodb:${local.aws_default_region}:${local.aws_master_account_id}:table/${lower(var.app_env)}_report_history",
       "arn:aws:dynamodb:${local.aws_default_region}:${local.aws_master_account_id}:table/${lower(var.app_env)}_observed_identifiers",
       "arn:aws:dynamodb:${local.aws_default_region}:${local.aws_master_account_id}:table/${lower(var.app_env)}_early_warning_service",
+      "arn:aws:dynamodb:${local.aws_default_region}:${local.aws_master_account_id}:table/${lower(var.app_env)}_findings",
     ]
   }
   statement {
@@ -77,6 +78,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
       "arn:aws:dynamodb:${local.aws_default_region}:${local.aws_master_account_id}:table/${lower(var.app_env)}_report_history/*",
       "arn:aws:dynamodb:${local.aws_default_region}:${local.aws_master_account_id}:table/${lower(var.app_env)}_observed_identifiers/*",
       "arn:aws:dynamodb:${local.aws_default_region}:${local.aws_master_account_id}:table/${lower(var.app_env)}_early_warning_service/*",
+      "arn:aws:dynamodb:${local.aws_default_region}:${local.aws_master_account_id}:table/${lower(var.app_env)}_findings/*",
     ]
   }
   statement {
