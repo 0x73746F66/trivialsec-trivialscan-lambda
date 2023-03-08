@@ -161,8 +161,6 @@ class WebhookEvent(str, Enum):
     EARLY_WARNING_IP = "early_warning_ip"
     NEW_FINDINGS_CERTIFICATES = "new_findings_certificates"
     NEW_FINDINGS_DOMAINS = "new_findings_domains"
-    INCLUDE_WARNING = "include_warning"
-    INCLUDE_INFO = "include_info"
     CLIENT_STATUS = "client_status"
     CLIENT_ACTIVITY = "client_activity"
     SCANNER_CONFIGURATIONS = "scanner_configurations"
@@ -181,6 +179,14 @@ class DataPlaneCategory(str, Enum):
 
 class WebauthnEnrollType(str, Enum):
     PUBLIC_KEY = "public-key"
+
+
+class FindingStatus(str, Enum):
+    DISCOVERED = "discovered"  # last_seen
+    TRIAGED = "triaged"
+    WONT_FIX = "wont_fix"  # closed
+    DEFERRED = "deferred"
+    REMEDIATED = "remediated"
 
 
 class AccountRegistration(BaseModel):
@@ -206,8 +212,6 @@ class AccountNotifications(BaseModel):
     early_warning: Optional[bool] = Field(default=False)
     new_findings_certificates: Optional[bool] = Field(default=False)
     new_findings_domains: Optional[bool] = Field(default=False)
-    include_warning: Optional[bool] = Field(default=False)
-    include_info: Optional[bool] = Field(default=False)
 
 
 class Webhooks(BaseModel):
@@ -221,8 +225,6 @@ class Webhooks(BaseModel):
     early_warning_ip: Optional[bool] = Field(default=False)
     new_findings_certificates: Optional[bool] = Field(default=False)
     new_findings_domains: Optional[bool] = Field(default=False)
-    include_warning: Optional[bool] = Field(default=False)
-    include_info: Optional[bool] = Field(default=False)
     client_status: Optional[bool] = Field(default=False)
     client_activity: Optional[bool] = Field(default=False)
     scanner_configurations: Optional[bool] = Field(default=False)
@@ -1589,6 +1591,69 @@ class FeedState(BaseModel):
     def save(self) -> bool:
         return services.aws.store_s3(
             self.object_key, json.dumps(self.dict(), default=str)
+        )
+
+
+class Finding(BaseModel, DAL):
+    rule_id: int
+    group_id: int
+    key: str
+    group: str
+    name: str
+    observed_at: Optional[datetime]
+    result_value: Union[bool, str, None]
+    result_label: str
+    result_level: Optional[str]
+    cvss2: Union[str, Any] = Field(default=None)
+    cvss3: Union[str, Any] = Field(default=None)
+
+    finding_id: UUID
+    account_name: str
+    last_seen: Optional[datetime]
+    report_ids: list[str] = Field(default=[])
+    hosts: list[str] = Field(default=[])
+    certificates: list[str] = Field(default=[])
+    status: Optional[FindingStatus] = Field(default=FindingStatus.DISCOVERED)
+    triaged_at: Optional[datetime] = Field(default=None)
+    deferred_to: Optional[datetime] = Field(default=None)
+    closed_at: Optional[datetime] = Field(default=None)
+    remediated_at: Optional[datetime] = Field(default=None)
+    customer_cvss3: Optional[str] = Field(default=None)
+    false_positive: Optional[str] = Field(default="")
+
+    def exists(
+        self,
+        finding_id: Union[str, None] = None,
+    ) -> bool:
+        return self.load(finding_id)
+
+    def load(
+        self,
+        finding_id: Union[str, None] = None,
+    ) -> bool:
+        if finding_id:
+            self.finding_id = finding_id
+        response = services.aws.get_dynamodb(
+            table_name=services.aws.Tables.FINDINGS,
+            item_key={"finding_id": str(self.finding_id)},
+        )
+        if not response:
+            internals.logger.warning(
+                f"Missing finding data for finding_id: {self.finding_id}"
+            )
+            return False
+        super().__init__(**response)
+        return True
+
+    def save(self) -> bool:
+        return services.aws.put_dynamodb(
+            table_name=services.aws.Tables.FINDINGS, item=self.dict()
+        )
+
+    def delete(self) -> bool:
+        return services.aws.delete_dynamodb(
+            table_name=services.aws.Tables.FINDINGS,
+            item_key={"finding_id": str(self.finding_id)},
         )
 
 
