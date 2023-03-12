@@ -7,8 +7,9 @@ from typing import Union
 from secrets import token_urlsafe
 from uuid import uuid4
 
-import geocoder
 import validators
+import geocoder
+from geocoder.location import Location
 from user_agents import parse as ua_parser
 from fastapi import Header, APIRouter, Response, status, Depends, HTTPException
 from starlette.requests import Request
@@ -519,9 +520,9 @@ async def login(
             else f"{ua.get_os()} {ua.get_device()}"
         )
         if ip_addr:
-            geo_ip = geocoder.ip(str(ip_addr))
-            session.lat = geo_ip.latlng[0]
-            session.lon = geo_ip.latlng[1]
+            geo_ip: Location = geocoder.ip(str(ip_addr))
+            session.lat = geo_ip.lat
+            session.lon = geo_ip.lng
         if not session.save():
             response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
             return
@@ -1222,9 +1223,9 @@ async def webauthn_verify(
         else f"{ua.get_os()} {ua.get_device()}"
     )
     if ip_addr:
-        geo_ip = geocoder.ip(str(ip_addr))
-        session.lat = geo_ip.latlng[0]
-        session.lon = geo_ip.latlng[1]
+        geo_ip: Location = geocoder.ip(str(ip_addr))
+        session.lat = geo_ip.lat
+        session.lon = geo_ip.lng
     if not session.save():
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return
