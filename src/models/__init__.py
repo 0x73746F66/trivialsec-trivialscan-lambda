@@ -187,6 +187,7 @@ class FindingStatus(str, Enum):
     WONT_FIX = "wont_fix"  # closed
     DEFERRED = "deferred"
     REMEDIATED = "remediated"
+    REGRESSION = "regression"
 
 
 class AccountRegistration(BaseModel):
@@ -1594,32 +1595,35 @@ class FeedState(BaseModel):
         )
 
 
-class Finding(BaseModel, DAL):
-    rule_id: int
-    group_id: int
-    key: str
-    group: str
-    name: str
-    observed_at: Optional[datetime]
-    result_value: Union[bool, str, None]
-    result_label: str
-    result_level: Optional[str]
-    cvss2: Union[str, Any] = Field(default=None)
-    cvss3: Union[str, Any] = Field(default=None)
-
-    finding_id: UUID
-    account_name: str
+class FindingOccurrence(BaseModel):
+    report_ids: Optional[list[str]] = Field(default=[])
+    hostname: str
+    port: int
     last_seen: Optional[datetime]
-    report_ids: list[str] = Field(default=[])
-    hosts: list[str] = Field(default=[])
-    certificates: list[str] = Field(default=[])
+    certificate_sha1: Optional[str]
     status: Optional[FindingStatus] = Field(default=FindingStatus.DISCOVERED)
     triaged_at: Optional[datetime] = Field(default=None)
     deferred_to: Optional[datetime] = Field(default=None)
     closed_at: Optional[datetime] = Field(default=None)
     remediated_at: Optional[datetime] = Field(default=None)
+    regressed_at: Optional[datetime] = Field(default=None)
+    false_positive_reason: Optional[str] = Field(default="")
+
+
+class Finding(BaseModel, DAL):
+    finding_id: UUID
+    account_name: str
+    observed_at: Optional[datetime]
+    occurrences: list[FindingOccurrence] = Field(default=[])
+    rule_id: int
+    group_id: int
+    key: str
+    group: str
+    name: str
+    description: Optional[str]
+    cvss2: Union[str, Any] = Field(default=None)
+    cvss3: Union[str, Any] = Field(default=None)
     customer_cvss3: Optional[str] = Field(default=None)
-    false_positive: Optional[str] = Field(default="")
 
     def exists(
         self,

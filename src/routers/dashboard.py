@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Response, status, Depends
 from cachier import cachier
+from boto3.dynamodb.conditions import Key
 
 import internals
 import models
@@ -162,7 +163,7 @@ def certificate_issues(
 
 @router.get(
     "/findings/latest",
-    response_model=list[models.EvaluationItem],
+    response_model=list[models.Finding],
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -187,7 +188,7 @@ def certificate_issues(
 )
 def latest_findings(
     response: Response,
-    limit: int = 20,
+    limit: int = 50,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
@@ -195,78 +196,25 @@ def latest_findings(
     a list of host findings filtered to include only the highest risk issues
     and ordered by last seen
     """
-    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-findings.json"
     try:
-        raw = services.aws.get_s3(path_key=object_key)
-        if not raw:
-            return Response(status_code=status.HTTP_204_NO_CONTENT)
-        data = json.loads(raw)
-        latest_data: list[dict] = data[:limit]
-        enriched_data = []
-        for _item in latest_data:
-            item = models.EvaluationItem(**_item)
-            if not item.description:
-                item.description = config.get_rule_desc(
-                    f"{item.group_id}.{item.rule_id}"
+        latest = [
+            models.Finding(
+                **services.aws.get_dynamodb(  # type: ignore
+                    table_name=services.aws.Tables.FINDINGS,
+                    item_key={"finding_id": item["finding_id"]},
                 )
+            )
+            for item in services.aws.query_dynamodb(
+                table_name=services.aws.Tables.FINDINGS,
+                IndexName="account_name-index",
+                KeyConditionExpression=Key("account_name").eq(authz.account.name),
+                Limit=limit,
+            )
+        ]
+        for item in latest:
+            item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
 
-            for group in item.compliance or []:  # pylint: disable=not-an-iterable
-                if (
-                    config.pcidss4
-                    and group.compliance == models.ComplianceName.PCI_DSS
-                    and group.version == "4.0"
-                ):
-                    pci4_items = []
-                    for compliance in group.items or []:
-                        compliance.description = (
-                            config.pcidss4.requirements.get(compliance.requirement, "")
-                            if compliance.requirement
-                            else None
-                        )
-                        pci4_items.append(compliance)
-                    group.items = pci4_items
-                if (
-                    config.pcidss3
-                    and group.compliance == models.ComplianceName.PCI_DSS
-                    and group.version == "3.2.1"
-                ):
-                    pci3_items = []
-                    for compliance in group.items or []:
-                        compliance.description = (
-                            config.pcidss3.requirements.get(compliance.requirement, "")
-                            if compliance.requirement
-                            else None
-                        )
-                        pci3_items.append(compliance)
-                    group.items = pci3_items
-                if group.compliance in [
-                    models.ComplianceName.NIST_SP800_131A,
-                    models.ComplianceName.FIPS_140_2,
-                ]:
-                    group.items = None
-
-            if config.mitre_attack:
-                for threat in item.threats or []:  # pylint: disable=not-an-iterable
-                    for tactic in config.mitre_attack.tactics:
-                        if tactic.id == threat.tactic_id:
-                            threat.tactic_description = tactic.description
-                    for data_source in config.mitre_attack.data_sources:
-                        if data_source.id == threat.data_source_id:
-                            threat.data_source_description = data_source.description
-                    for mitigation in config.mitre_attack.mitigations:
-                        if mitigation.id == threat.mitigation_id:
-                            threat.mitigation_description = mitigation.description
-                    for technique in config.mitre_attack.techniques:
-                        if technique.id == threat.technique_id:
-                            threat.technique_description = technique.description
-                        for sub_technique in technique.sub_techniques or []:
-                            if sub_technique.id == threat.sub_technique_id:
-                                threat.sub_technique_description = (
-                                    sub_technique.description
-                                )
-
-            enriched_data.append(item)
-        return list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))
+        return list(reversed(sorted(latest, key=lambda x: x.observed_at)))
     except RuntimeError as err:
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
