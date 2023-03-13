@@ -1,5 +1,4 @@
 import contextlib
-import re
 from typing import Union
 from datetime import datetime, timezone
 
@@ -100,33 +99,6 @@ def get_quotas(
             models.Quota.USED: len(ondemand_hosts),
         },
     )
-
-
-def parse_authorization_header(authorization_header: str) -> dict[str, str]:
-    auth_param_re = r'([a-zA-Z0-9_\-]+)=(([a-zA-Z0-9_\-]+)|("")|(".*[^\\]"))'
-    auth_param_re = re.compile(r"^\s*" + auth_param_re + r"\s*$")
-    unesc_quote_re = re.compile(r'(^")|([^\\]")')
-    scheme, pairs_str = authorization_header.split(None, 1)
-    parsed_header = {"scheme": scheme}
-    pairs = []
-    if pairs_str:
-        for pair in pairs_str.split(","):
-            if not pairs or auth_param_re.match(pairs[-1]):
-                pairs.append(pair)
-            else:
-                pairs[-1] = f"{pairs[-1]},{pair}"
-        if not auth_param_re.match(pairs[-1]):
-            raise ValueError("Malformed auth parameters")
-    for pair in pairs:
-        (key, value) = pair.strip().split("=", 1)
-        # For quoted strings, remove quotes and backslash-escapes.
-        if value.startswith('"'):
-            value = value[1:-1]
-            if unesc_quote_re.search(value):
-                raise ValueError("Unescaped quote in quoted-string")
-            value = re.compile(r"\\.").sub(lambda m: m.group(0)[1], value)
-        parsed_header[key] = value
-    return parsed_header
 
 
 def dns_query(

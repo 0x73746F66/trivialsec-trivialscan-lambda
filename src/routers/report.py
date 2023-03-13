@@ -224,8 +224,7 @@ async def store(
     if report_type is models.ReportType.EVALUATIONS:
         full_report = models.FullReport(**data)
         if not full_report:
-            response.status_code = status.HTTP_412_PRECONDITION_FAILED
-            return
+            return Response(status_code=status.HTTP_412_PRECONDITION_FAILED)
         if full_report.client_name:
             client = models.Client(account_name=authz.account.name, name=full_report.client_name)  # type: ignore
             if client.load():

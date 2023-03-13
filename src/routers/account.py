@@ -54,14 +54,11 @@ async def account_register(
     """
     event = request.scope.get("aws.event", {})
     if not data.display:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     if validators.email(data.primary_email) is not True:  # type: ignore
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     if models.MemberProfile(email=data.primary_email).exists():
-        response.status_code = status.HTTP_409_CONFLICT
-        return
+        return Response(status_code=status.HTTP_409_CONFLICT)
     ip_addr = (
         event.get("requestContext", {})
         .get("http", {})
@@ -86,8 +83,7 @@ async def account_register(
         timestamp=round(time() * 1000),  # JavaScript support
     )  # type: ignore
     if not account.name:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     if not ip_addr or not user_agent:
         internals.logger.warning(f"ip_addr {ip_addr} user_agent {user_agent}")
     member = models.MemberProfile(
@@ -99,17 +95,14 @@ async def account_register(
     )
     try:
         if models.MemberAccount(name=account.name).exists():  # type: ignore
-            response.status_code = status.HTTP_208_ALREADY_REPORTED
-            return
+            return Response(status_code=status.HTTP_208_ALREADY_REPORTED)
         if not member.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         with contextlib.suppress(Exception):
             customer = services.stripe.create_customer(email=account.billing_email)  # type: ignore
             account.billing_client_id = customer.id  # type: ignore
         if not account.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         services.sendgrid.upsert_contact(
             recipient_email=member.email, list_name="members"
         )
@@ -127,8 +120,7 @@ async def account_register(
             )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
-                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-                return
+                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         link = models.MagicLink(
             email=member.email,
             magic_token=member.confirmation_token,  # type: ignore
@@ -233,8 +225,7 @@ async def support_request(
             )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
-                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-                return
+                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
 
         support = models.Support(
             member=authz.member,  # type: ignore
@@ -283,8 +274,7 @@ async def update_billing_email(
     Updates the billing email address for the logged in members account.
     """
     if validators.email(data.email) is not True:  # type: ignore
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
         sendgrid = services.sendgrid.send_email(
             subject="Change of Billing Email Address notice",
@@ -304,8 +294,7 @@ async def update_billing_email(
             )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
-                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-                return
+                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         internals.logger.info(
             f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
         )
@@ -316,8 +305,7 @@ async def update_billing_email(
             )
             authz.account.billing_client_id = customer.id  # type: ignore
         if not authz.account.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         services.webhook.send(
             event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
             account=authz.account,
@@ -368,8 +356,7 @@ async def update_primary_email(
     Updates the primary contact email address for the account.
     """
     if validators.email(data.email) is not True:  # type: ignore
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
         sendgrid = services.sendgrid.send_email(
             subject="Change of Billing Email Address notice",
@@ -389,15 +376,13 @@ async def update_primary_email(
             )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
-                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-                return
+                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         internals.logger.info(
             f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
         )
         authz.account.primary_email = data.email
         if not authz.account.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         services.webhook.send(
             event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
             account=authz.account,
@@ -446,8 +431,7 @@ async def update_account_display_name(
     try:
         authz.account.display = data.name
         if not authz.account.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         services.webhook.send(
             event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
             account=authz.account,
@@ -500,7 +484,6 @@ async def enable_notification(
             return authz.account.notifications
     except AttributeError:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
 
 
 @router.get(
@@ -535,7 +518,6 @@ async def disable_notification(
             return authz.account.notifications
     except AttributeError:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
 
 
 @router.get(
@@ -719,7 +701,6 @@ async def enable_webhook(
 
     internals.logger.warning(f"found {found} changed {changed}")
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
 
 
 @router.delete(

@@ -83,8 +83,7 @@ async def enable_monitoring(
     Adds and enables host monitoring
     """
     if validators.email(f"nobody@{hostname}") is not True:  # type: ignore
-        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-        return
+        return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
     changed = False
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load(load_history=True):
@@ -140,7 +139,7 @@ async def enable_monitoring(
             },
         )
     else:
-        response.status_code = status.HTTP_304_NOT_MODIFIED
+        response.status_code = status.HTTP_204_NO_CONTENT
 
     return scanner_record
 
@@ -166,7 +165,6 @@ async def enable_monitoring(
     tags=["Scanner"],
 )
 async def deactivate_monitoring(
-    response: Response,
     hostname: str,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
@@ -174,8 +172,7 @@ async def deactivate_monitoring(
     Adds and enables host monitoring
     """
     if validators.email(f"nobody@{hostname}") is not True:  # type: ignore
-        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-        return
+        return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
     changed = False
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load(load_history=True):
@@ -253,8 +250,7 @@ async def queue_hostname(
     Adds a host for on-demand scanning, scanner configuration stores the ports and path names to be used
     """
     if validators.email(f"nobody@{hostname}") is not True:  # type: ignore
-        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-        return
+        return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
     ce_name = services.stripe.PRODUCTS[services.stripe.Product.COMMUNITY_EDITION][
         "name"
     ]
@@ -361,7 +357,6 @@ async def queue_hostname(
     tags=["Scanner"],
 )
 async def delete_config(
-    response: Response,
     hostname: str,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
@@ -369,8 +364,7 @@ async def delete_config(
     Deletes a host monitoring configuration
     """
     if validators.email(f"nobody@{hostname}") is not True:  # type: ignore
-        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-        return
+        return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
     changed = False
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load(load_history=True):
@@ -424,7 +418,6 @@ async def delete_config(
     tags=["Scanner"],
 )
 async def update_config(
-    response: Response,
     data: models.ConfigUpdateRequest,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
@@ -432,8 +425,7 @@ async def update_config(
     Deletes a host monitoring configuration
     """
     if validators.email(f"nobody@{data.hostname}") is not True:  # type: ignore
-        response.status_code = status.HTTP_406_NOT_ACCEPTABLE
-        return
+        return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
     changed = False
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load(load_history=True):

@@ -55,12 +55,10 @@ async def claim_client(
     # api_key Auth
     if validators.email(client_name) is True:  # type: ignore
         internals.logger.warning(f"Email {client_name} can not be used for client name")
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
         if models.Client(account_name=authz.account.name, name=client_name).exists():  # type: ignore
-            response.status_code = status.HTTP_409_CONFLICT
-            return
+            return Response(status_code=status.HTTP_409_CONFLICT)
 
         client = models.Client(
             account_name=authz.account.name,
@@ -127,8 +125,7 @@ async def auth_client(
     """
     if validators.email(client_name) is True:  # type: ignore
         internals.logger.warning(f"Email {client_name} can not be used for client name")
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
         authz.client.client_info = client_info
         authz.client.cli_version = x_trivialscan_version
@@ -199,7 +196,7 @@ def retrieve_clients(
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
-        return []
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     if not object_keys:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -255,8 +252,7 @@ async def activate_client(
     if client.active is not True:
         client.active = True
         if not client.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     services.webhook.send(
         event_name=models.WebhookEvent.CLIENT_STATUS,
         account=authz.account,
@@ -307,8 +303,7 @@ async def deactivated_client(
     if client.active is not False:
         client.active = False
         if not client.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     services.webhook.send(
         event_name=models.WebhookEvent.CLIENT_STATUS,
         account=authz.account,
@@ -351,14 +346,12 @@ async def delete_client(
     Deletes a specific MemberProfile within the same account as the authorized requester
     """
     if validators.email(client_name) is True:  # type: ignore
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     client = models.Client(account_name=authz.account.name, name=client_name)  # type: ignore
     if not client.load():
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     if authz.account.name != client.account_name:  # pylint: disable=no-member
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        return
+        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
     services.webhook.send(
         event_name=models.WebhookEvent.CLIENT_STATUS,
         account=authz.account,

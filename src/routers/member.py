@@ -239,7 +239,7 @@ def list_members(
     members: list[models.MemberProfileForList] = []
     prefix_matches = services.aws.list_s3(prefix_key=prefix_key)
     if len(prefix_matches) == 0:
-        return []
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     for object_path in prefix_matches:
         if not object_path.endswith("profile.json"):
             continue
@@ -336,25 +336,21 @@ async def magic_link(
         .get("userAgent", request.headers.get("User-Agent"))
     )
     if not user_agent:
-        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-        return
+        return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
     if validators.email(data.email) is not True:  # type: ignore
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
 
     member = models.MemberProfile(email=data.email)
     if not member.load():
-        response.status_code = status.HTTP_412_PRECONDITION_FAILED
-        return
+        return Response(status_code=status.HTTP_412_PRECONDITION_FAILED)
 
     if member.mfa:
         account = models.MemberAccount(name=member.account_name)  # type: ignore pylint: disable=no-member
         if not account.load() or not account.load_billing():
-            response.status_code = status.HTTP_400_BAD_REQUEST
             internals.logger.info(
                 f'"magic_link","","{member.email}","{ip_addr}","{user_agent}",""'
             )
-            return
+            return Response(status_code=status.HTTP_400_BAD_REQUEST)
 
         fido_devices: list[models.MemberFido] = []
         for item in services.aws.query_dynamodb(
@@ -365,18 +361,17 @@ async def magic_link(
             if data := services.aws.get_dynamodb(
                 table_name=services.aws.Tables.MEMBER_FIDO,
                 item_key={"record_id": item["record_id"]},
-            ):
-                fido = models.MemberFido(**data)
+            ):  # type: ignore
+                fido = models.MemberFido(**data)  # type: ignore
                 if fido.device_id:
                     fido_devices.append(fido)
-                    continue
 
         if fido_devices:
             try:
                 authentication_options = internals.fido.authenticate(
                     [
                         PublicKeyCredentialDescriptor(
-                            id=base64url_to_bytes(device.device_id)
+                            id=base64url_to_bytes(device.device_id)  # type: ignore
                         )
                         for device in fido_devices
                     ]
@@ -418,9 +413,8 @@ async def magic_link(
             return f"/login/{link.magic_token}"
 
     except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
-        return
+        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     response.status_code = status.HTTP_424_FAILED_DEPENDENCY
 
@@ -477,27 +471,24 @@ async def login(
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         member = models.MemberProfileRedacted(email=link.email)
         if not member.load():
-            response.status_code = status.HTTP_400_BAD_REQUEST
             internals.logger.info(
                 f'"login","","{link.email}","{ip_addr}","{user_agent}",""'
             )
-            return
+            return Response(status_code=status.HTTP_400_BAD_REQUEST)
         internals.logger.info(
             f'"login","{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
         )
         account = models.MemberAccount(name=member.account_name)  # type: ignore pylint: disable=no-member
         if not account.load() or not account.load_billing():
-            response.status_code = status.HTTP_400_BAD_REQUEST
             internals.logger.info(
                 f'"login","","{link.email}","{ip_addr}","{user_agent}",""'
             )
-            return
+            return Response(status_code=status.HTTP_400_BAD_REQUEST)
         internals.logger.info(
             f'"login","{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
         )
         if not user_agent:
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-            return
+            return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         ua = ua_parser(user_agent)
         session_token = hashlib.sha224(
             bytes(
@@ -524,13 +515,11 @@ async def login(
             session.lat = geo_ip.lat
             session.lon = geo_ip.lng
         if not session.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         if member.confirmation_token == magic_token:
             member.confirmed = True
         if not member.save() or not link.delete():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         services.webhook.send(
             event_name=models.WebhookEvent.MEMBER_ACTIVITY,
@@ -629,11 +618,9 @@ async def update_email(
     Updates the login email address for the current logged in member.
     """
     if validators.email(data.email) is not True:  # type: ignore
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     if models.MemberProfile(email=data.email).exists():
-        response.status_code = status.HTTP_409_CONFLICT
-        return
+        return Response(status_code=status.HTTP_409_CONFLICT)
     try:
         token = hashlib.sha224(bytes(str(random()), "ascii")).hexdigest()
         sendgrid = services.sendgrid.send_email(
@@ -652,8 +639,7 @@ async def update_email(
             )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
-                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-                return
+                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
 
         link = models.AcceptEdit(
             account=authz.account,  # type: ignore
@@ -688,7 +674,6 @@ async def update_email(
         internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
 
 
 @router.get(
@@ -739,31 +724,25 @@ async def accept_token(
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         _cls: models.DAL = getattr(models, link.change_model, None)  # type: ignore
         if not _cls:
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-            return
+            return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         model: models.DAL = _cls(**{link.model_key: link.model_value})  # type: ignore
         if not model:
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-            return
+            return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         if not hasattr(model, "load"):
-            response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-            return
+            return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         model.load()
         old_value = getattr(model, link.change_prop)  # type: ignore
         if link.old_value != old_value:
-            response.status_code = status.HTTP_208_ALREADY_REPORTED
-            return
+            return Response(status_code=status.HTTP_208_ALREADY_REPORTED)
         setattr(model, link.change_prop, link.new_value)  # type: ignore
         if not model.save():
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return
+            return Response(status_code=status.HTTP_400_BAD_REQUEST)
         if link.change_model == "MemberProfile" and link.model_key == "email":
             old_member = models.MemberProfile(email=link.old_value)
             if old_member.load():
                 old_account = models.MemberAccount(name=old_member.account_name)  # type: ignore pylint: disable=no-member
                 if not old_account.load():
-                    response.status_code = status.HTTP_400_BAD_REQUEST
-                    return
+                    return Response(status_code=status.HTTP_400_BAD_REQUEST)
                 old_member.delete()
                 services.webhook.send(
                     event_name=models.WebhookEvent.MEMBER_ACTIVITY,
@@ -816,12 +795,10 @@ async def send_member_invitation(
     Invites a member to join the organisation
     """
     if validators.email(data.email) is not True:  # type: ignore
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
         if models.MemberProfile(email=data.email).exists():
-            response.status_code = status.HTTP_409_CONFLICT
-            return
+            return Response(status_code=status.HTTP_409_CONFLICT)
         member = models.MemberProfile(
             account_name=authz.account.name,
             email=data.email,
@@ -832,8 +809,7 @@ async def send_member_invitation(
             timestamp=round(time() * 1000),  # JavaScript support
         )
         if not member.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         services.sendgrid.upsert_contact(
             recipient_email=member.email, list_name="members"
         )
@@ -855,8 +831,7 @@ async def send_member_invitation(
             )
             if isinstance(res, dict) and res.get("errors"):
                 internals.logger.error(res.get("errors"))
-                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-                return
+                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         link = models.MagicLink(
             email=member.email,
             magic_token=member.confirmation_token,
@@ -882,7 +857,6 @@ async def send_member_invitation(
         internals.logger.exception(err)
 
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
 
 
 @router.delete(
@@ -1010,8 +984,7 @@ async def webauthn_enroll(
         member_email=authz.member.email,
     )  # type: ignore
     if not mfa.load():
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
     registered_devices = set()
     for item in services.aws.query_dynamodb(
         table_name=services.aws.Tables.MEMBER_FIDO,
@@ -1038,8 +1011,7 @@ async def webauthn_enroll(
             if mfa.device_id in registered_devices:
                 return Response(status_code=status.HTTP_409_CONFLICT)
             if not mfa.save():
-                response.status_code = status.HTTP_412_PRECONDITION_FAILED
-                return
+                return Response(status_code=status.HTTP_412_PRECONDITION_FAILED)
             if authz.member.mfa is not True:
                 authz.member.mfa = True
                 authz.member.save()
@@ -1160,22 +1132,19 @@ async def webauthn_verify(
 
     member = models.MemberProfileRedacted(email=data.member_email)
     if not member.load():
-        response.status_code = status.HTTP_400_BAD_REQUEST
         internals.logger.info(
             f'"login","","{member.email}","{ip_addr}","{user_agent}",""'
         )
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     account = models.MemberAccount(name=member.account_name)  # type: ignore pylint: disable=no-member
     if not account.load() or not account.load_billing():
-        response.status_code = status.HTTP_400_BAD_REQUEST
         internals.logger.info(
             f'"login","","{member.email}","{ip_addr}","{user_agent}",""'
         )
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
 
     if not user_agent:
-        response.status_code = status.HTTP_424_FAILED_DEPENDENCY
-        return
+        return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
 
     match = False
     success = False
@@ -1227,21 +1196,18 @@ async def webauthn_verify(
         session.lat = geo_ip.lat
         session.lon = geo_ip.lng
     if not session.save():
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        return
+        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     if not match:
         internals.logger.info(
             f'"webauthn_verify","","{member.email}","{ip_addr}","{user_agent}",""'
         )
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
+        return Response(status_code=status.HTTP_403_FORBIDDEN)
     if not success:
         internals.logger.info(
             f'"webauthn_verify","","{member.email}","{ip_addr}","{user_agent}",""'
         )
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        return
+        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
 
     return models.LoginResponse(
         session=session,
