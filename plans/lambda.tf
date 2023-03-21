@@ -44,5 +44,4 @@ resource "aws_s3_object" "file_upload" {
   source        = "${abspath(path.module)}/${local.source_file}"
   content_type  = "application/octet-stream"
   etag          = filemd5("${abspath(path.module)}/${local.source_file}")
-  server_side_encryption = "aws:kms"
 }
