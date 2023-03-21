@@ -67,6 +67,7 @@
             "pydantic",
             "sendgrid",
             "starlette",
+            "tldextract",
             "trivialscan"
         ]
     },

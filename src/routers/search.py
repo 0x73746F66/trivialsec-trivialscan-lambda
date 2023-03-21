@@ -3,7 +3,7 @@ import socket
 from datetime import datetime
 
 import validators
-from fastapi import APIRouter, Response, Request, status, Depends
+from fastapi import APIRouter, Response, status, Depends
 from fastapi.responses import RedirectResponse
 from pydantic import IPvAnyAddress
 from tldextract.tldextract import TLDExtract
@@ -23,7 +23,6 @@ router = APIRouter()
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
-        204: {"description": "No search results matching this query"},
         401: {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
         },
@@ -38,11 +37,10 @@ router = APIRouter()
 )
 async def search_any(
     query: str,
-    request: Request,
-    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+    _: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
-    Search hostnam or ip addresse, returning exact matches and knowm (scanned, if any) subdomains
+    Search hostname or ip address, returning exact matches and known (scanned, if any) subdomains
     """
     if validators.ipv4(query) or validators.ipv6(query):  # type: ignore
         return RedirectResponse(

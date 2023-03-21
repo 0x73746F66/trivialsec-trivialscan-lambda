@@ -239,7 +239,6 @@ def retrieve_clients(
     tags=["Member Account", "Client"],
 )
 async def activate_client(
-    response: Response,
     client_name: str,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
@@ -290,7 +289,6 @@ async def activate_client(
     tags=["Member Account", "Client"],
 )
 async def deactivated_client(
-    response: Response,
     client_name: str,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
@@ -338,7 +336,6 @@ async def deactivated_client(
     tags=["Member Account", "Client"],
 )
 async def delete_client(
-    response: Response,
     client_name: str,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):

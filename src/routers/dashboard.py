@@ -1,6 +1,6 @@
 import contextlib
 import json
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 
 from fastapi import APIRouter, Response, status, Depends
 from cachier import cachier
@@ -197,22 +197,36 @@ def latest_findings(
     and ordered by last seen
     """
     try:
-        latest = [
-            models.Finding(
+        latest = []
+        for item in services.aws.query_dynamodb(
+            table_name=services.aws.Tables.FINDINGS,
+            IndexName="account_name-index",
+            KeyConditionExpression=Key("account_name").eq(authz.account.name),
+            Limit=limit,
+        ):
+            finding = models.Finding(
                 **services.aws.get_dynamodb(  # type: ignore
                     table_name=services.aws.Tables.FINDINGS,
                     item_key={"finding_id": item["finding_id"]},
                 )
             )
-            for item in services.aws.query_dynamodb(
-                table_name=services.aws.Tables.FINDINGS,
-                IndexName="account_name-index",
-                KeyConditionExpression=Key("account_name").eq(authz.account.name),
-                Limit=limit,
+            deferred = filter(
+                lambda occurrence: occurrence.status == models.FindingStatus.DEFERRED
+                and occurrence.deferred_to <= datetime.now(tz=timezone.utc),
+                finding.occurrences,
             )
-        ]
-        for item in latest:
-            item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
+            if list(deferred):
+                continue
+            closed = filter(
+                lambda occurrence: occurrence.status == models.FindingStatus.WONT_FIX,
+                finding.occurrences,
+            )
+            if list(closed):
+                continue
+            finding.description = config.get_rule_desc(
+                f"{finding.group_id}.{finding.rule_id}"
+            )
+            latest.append(finding)
 
         return list(reversed(sorted(latest, key=lambda x: x.observed_at)))
     except RuntimeError as err:

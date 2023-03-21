@@ -1609,6 +1609,33 @@ class FindingOccurrence(BaseModel):
     regressed_at: Optional[datetime] = Field(default=None)
     false_positive_reason: Optional[str] = Field(default="")
 
+    class Config:
+        validate_assignment = True
+
+    @validator("last_seen")
+    def set_last_seen(cls, last_seen: datetime):
+        return last_seen.replace(tzinfo=timezone.utc) if last_seen else None
+
+    @validator("triaged_at")
+    def set_triaged_at(cls, triaged_at: datetime):
+        return triaged_at.replace(tzinfo=timezone.utc) if triaged_at else None
+
+    @validator("deferred_to")
+    def set_deferred_to(cls, deferred_to: datetime):
+        return deferred_to.replace(tzinfo=timezone.utc) if deferred_to else None
+
+    @validator("closed_at")
+    def set_closed_at(cls, closed_at: datetime):
+        return closed_at.replace(tzinfo=timezone.utc) if closed_at else None
+
+    @validator("remediated_at")
+    def set_remediated_at(cls, remediated_at: datetime):
+        return remediated_at.replace(tzinfo=timezone.utc) if remediated_at else None
+
+    @validator("regressed_at")
+    def set_regressed_at(cls, regressed_at: datetime):
+        return regressed_at.replace(tzinfo=timezone.utc) if regressed_at else None
+
 
 class Finding(BaseModel, DAL):
     finding_id: UUID
