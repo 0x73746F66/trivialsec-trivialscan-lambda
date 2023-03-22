@@ -186,6 +186,7 @@ def load_descriptions(
                 gsd = cve.upper().replace("CVE", "GSD")
                 item.references.append(models.ReferenceItem(name=gsd, url=f"https://gsd.id/{gsd}"))  # type: ignore
                 item.references.append(models.ReferenceItem(name=gsd, type=models.ReferenceType.JSON, url=f"https://api.gsd.id/{gsd}"))  # type: ignore
+                item.references.append(models.ReferenceItem(name="EPSS", type=models.ReferenceType.JSON, url=f"https://api.first.org/data/v1/epss?cve={cve}"))  # type: ignore
 
         item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
         item.recommendation = config.get_rule_recommendation(
