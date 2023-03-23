@@ -179,10 +179,10 @@ def certificate_issues(
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Scan Reports"],
+    tags=["Scan Reports", "Findings"],
 )
 @cachier(
-    stale_after=timedelta(minutes=5),
+    stale_after=timedelta(seconds=5),
     cache_dir=internals.CACHE_DIR,
     hash_params=lambda _, kw: kw["authz"].account.name + str(kw.get("limit")),
 )
@@ -232,3 +232,49 @@ def latest_findings(
     except RuntimeError as err:
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@router.post(
+    "/finding/status",
+    response_model=bool,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Findings"],
+)
+async def update_finding_status(
+    request: models.FindingStatusRequest,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    updates a finding occurrence status
+    """
+    updated = False
+    if data := services.aws.get_dynamodb(
+        table_name=services.aws.Tables.FINDINGS,
+        item_key={"finding_id": request.finding_id},
+    ):
+        finding = models.Finding(**data)
+        if finding.account_name != authz.account.name:
+            return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
+        for occurrence in finding.occurrences:
+            if occurrence.status == request.status:
+                continue
+            if occurrence.hostname == request.hostname:
+                occurrence.status = request.status
+                updated = True
+                break
+    if not updated:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return services.aws.put_dynamodb(
+        table_name=services.aws.Tables.FINDINGS, item=finding.dict()
+    )

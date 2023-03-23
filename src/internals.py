@@ -151602,6 +151602,7 @@ class AuthorizationRoute(str, Enum):
     DASHBOARD_COMPLIANCE = "/dashboard/compliance"
     DASHBOARD_CERTIFICATE_ISSUES = "/findings/certificate"
     DASHBOARD_LATEST_ISSUES = "/findings/latest"
+    UPDATE_FINDINGS = "/finding/status"
     DASHBOARD_QUOTAS = "/dashboard/quotas"
     SEARCH_HOST = "/search/host/"
     SEARCH_IP = "/search/ip/"
@@ -151663,6 +151664,7 @@ class Authorization:
         AuthorizationRoute.DASHBOARD_QUOTAS,
         AuthorizationRoute.DASHBOARD_CERTIFICATE_ISSUES,
         AuthorizationRoute.DASHBOARD_LATEST_ISSUES,
+        AuthorizationRoute.UPDATE_FINDINGS,
         AuthorizationRoute.SEARCH_HOST,
         AuthorizationRoute.SEARCH_IP,
         AuthorizationRoute.SEARCH_ANY,

@@ -1764,3 +1764,9 @@ class LoginResponse(BaseModel):
     member: MemberProfileRedacted
     account: MemberAccountRedacted
     fido_options: Union[dict, None]
+
+
+class FindingStatusRequest(BaseModel):
+    hostname: str
+    finding_id: str
+    status: FindingStatus
