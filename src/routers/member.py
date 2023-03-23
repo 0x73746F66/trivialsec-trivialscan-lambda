@@ -469,7 +469,7 @@ async def login(
         if not link:
             internals.logger.info(f'"login","","","{ip_addr}","{user_agent}",""')
             return Response(status_code=status.HTTP_204_NO_CONTENT)
-        member = models.MemberProfileRedacted(email=link.email)
+        member = models.MemberProfile(email=link.email)
         if not member.load():
             internals.logger.info(
                 f'"login","","{link.email}","{ip_addr}","{user_agent}",""'
@@ -577,8 +577,8 @@ async def login(
             session=models.MemberSessionRedacted(**session.dict())
             if fido_devices
             else session,
-            member=member,
-            account=account,
+            member=models.MemberProfileRedacted(**member.dict()),
+            account=models.MemberAccountRedacted(**account.dict()),
             fido_options=fido_options,
         )
 
