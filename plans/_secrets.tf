@@ -23,3 +23,8 @@ variable "pusher_secret" {
   type        = string
   sensitive   = true
 }
+variable "dynatrace_token" {
+  description = "DYNATRACE_TOKEN"
+  type        = string
+  sensitive   = true
+}
