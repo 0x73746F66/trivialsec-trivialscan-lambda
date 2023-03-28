@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import json
 from time import time
@@ -6,6 +7,7 @@ from random import random
 from typing import Union
 from secrets import token_urlsafe
 from uuid import uuid4
+from ipaddress import ip_address
 
 import validators
 import geocoder
@@ -322,14 +324,18 @@ async def magic_link(
     Creates an email with the magic link for login
     """
     event = request.scope.get("aws.event", {})
-    ip_addr = (
-        event.get("requestContext", {})
-        .get("http", {})
-        .get(
-            "sourceIp",
-            request.headers.get("X-Forwarded-For", request.headers.get("X-Real-IP")),
+    ip_addr = None
+    with contextlib.suppress(ValueError):
+        ip_addr = ip_address(
+            event.get("requestContext", {})
+            .get("http", {})
+            .get(
+                "sourceIp",
+                request.headers.get(
+                    "X-Forwarded-For", request.headers.get("X-Real-IP")
+                ),
+            )
         )
-    )
     user_agent = (
         event.get("requestContext", {})
         .get("http", {})
@@ -439,7 +445,6 @@ async def magic_link(
 )
 async def login(
     request: Request,
-    response: Response,
     magic_token: str,
 ):
     """
@@ -459,8 +464,8 @@ async def login(
         .get("http", {})
         .get("userAgent", request.headers.get("User-Agent"))
     )
+    object_key = f"{internals.APP_ENV}/magic-links/{magic_token}.json"
     try:
-        object_key = f"{internals.APP_ENV}/magic-links/{magic_token}.json"
         ret = services.aws.get_s3(path_key=object_key)
         if not ret:
             internals.logger.info(f'"login","","","{ip_addr}","{user_agent}",""')
@@ -484,15 +489,23 @@ async def login(
                 f'"login","","{link.email}","{ip_addr}","{user_agent}",""'
             )
             return Response(status_code=status.HTTP_400_BAD_REQUEST)
-        internals.logger.info(
-            f'"login","{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
-        )
-        if not user_agent:
-            return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
-        ua = ua_parser(user_agent)
+
+    except RuntimeError as err:
+        internals.logger.exception(err)
+        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    internals.logger.info(
+        f'"login","{member.account_name}","{link.email}","{ip_addr}","{user_agent}",""'  # pylint: disable=no-member
+    )
+    if not user_agent:
+        return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
+
+    confirmed_registration = False
+    try:
+        parsed_ua = ua_parser(user_agent)
         session_token = hashlib.sha224(
             bytes(
-                f"{member.email}{ua.get_browser()}{ua.get_os()}{ua.get_device()}",
+                f"{member.email}{parsed_ua.get_browser()}{parsed_ua.get_os()}{parsed_ua.get_device()}",
                 "ascii",
             )
         ).hexdigest()
@@ -504,11 +517,11 @@ async def login(
             user_agent=user_agent,
             timestamp=round(time() * 1000),
         )  # type: ignore
-        session.browser = ua.get_browser()
+        session.browser = parsed_ua.get_browser()
         session.platform = (
             "Postman"
             if session.browser.startswith("PostmanRuntime")
-            else f"{ua.get_os()} {ua.get_device()}"
+            else f"{parsed_ua.get_os()} {parsed_ua.get_device()}"
         )
         if ip_addr:
             geo_ip: Location = geocoder.ip(str(ip_addr))
@@ -518,25 +531,32 @@ async def login(
             return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         if member.confirmation_token == magic_token:
             member.confirmed = True
+            confirmed_registration = True
         if not member.save() or not link.delete():
             return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        services.webhook.send(
-            event_name=models.WebhookEvent.MEMBER_ACTIVITY,
-            account=account,
-            data={
-                "type": "login",
-                "timestamp": round(time() * 1000),
-                "account": account.name,
-                "member": member.email,
-                "session_token": session_token,
-                "ip_addr": ip_addr,
-                "user_agent": user_agent,
-                "browser": session.browser,
-                "platform": session.platform,
-            },
-        )
-        fido_devices: list[models.MemberFido] = []
+    except RuntimeError as err:
+        internals.logger.exception(err)
+        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    services.webhook.send(
+        event_name=models.WebhookEvent.MEMBER_ACTIVITY,
+        account=account,
+        data={
+            "type": "login",
+            "timestamp": round(time() * 1000),
+            "account": account.name,
+            "member": member.email,
+            "session_token": session_token,
+            "ip_addr": ip_addr,
+            "user_agent": user_agent,
+            "browser": session.browser,
+            "platform": session.platform,
+        },
+    )
+    fido_options = None
+    fido_devices: list[models.MemberFido] = []
+    if not confirmed_registration:
         for item in services.aws.query_dynamodb(
             table_name=services.aws.Tables.MEMBER_FIDO,
             IndexName="member_email-index",
@@ -553,38 +573,32 @@ async def login(
                 if fido.created_at < datetime.now(tz=timezone.utc) - timedelta(minutes=5):  # type: ignore
                     fido.delete()
 
-        fido_options = None
+    try:
         if fido_devices:
-            try:
-                authentication_options = internals.fido.authenticate(
-                    [
-                        PublicKeyCredentialDescriptor(
-                            id=base64url_to_bytes(device.device_id)
-                        )
-                        for device in fido_devices
-                    ]
-                )
-                for device in fido_devices:
-                    device.challenge = bytes_to_base64url(
-                        authentication_options.challenge
+            authentication_options = internals.fido.authenticate(
+                [
+                    PublicKeyCredentialDescriptor(
+                        id=base64url_to_bytes(device.device_id)
                     )
-                    device.save()
-                fido_options = json.loads(options_to_json(authentication_options))
-            except InvalidAuthenticationResponse as err:
-                internals.logger.exception(err)
-
-        return models.LoginResponse(
-            session=models.MemberSessionRedacted(**session.dict())
-            if fido_devices
-            else session,
-            member=models.MemberProfileRedacted(**member.dict()),
-            account=models.MemberAccountRedacted(**account.dict()),
-            fido_options=fido_options,
-        )
-
-    except RuntimeError as err:
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+                    for device in fido_devices
+                    if device.device_id
+                ]
+            )
+            for device in fido_devices:
+                device.challenge = bytes_to_base64url(authentication_options.challenge)
+                device.save()
+            fido_options = json.loads(options_to_json(authentication_options))
+    except InvalidAuthenticationResponse as err:
         internals.logger.exception(err)
+
+    return models.LoginResponse(
+        session=models.MemberSessionRedacted(**session.dict())
+        if fido_devices
+        else session,
+        member=models.MemberProfileRedacted(**member.dict()),
+        account=models.MemberAccountRedacted(**account.dict()),
+        fido_options=fido_options,
+    )
 
 
 @router.post(
@@ -1109,9 +1123,7 @@ async def delete_fido_device(
     },
     tags=["Member Profile"],
 )
-async def webauthn_verify(
-    request: Request, response: Response, data: models.WebauthnLogin
-):
+async def webauthn_verify(request: Request, data: models.WebauthnLogin):
     """
     Webauthn FIDO verification
     """
@@ -1130,7 +1142,7 @@ async def webauthn_verify(
         .get("userAgent", request.headers.get("User-Agent"))
     )
 
-    member = models.MemberProfileRedacted(email=data.member_email)
+    member = models.MemberProfileRedacted(email=data.member_email)  # type: ignore
     if not member.load():
         internals.logger.info(
             f'"login","","{member.email}","{ip_addr}","{user_agent}",""'
@@ -1158,7 +1170,7 @@ async def webauthn_verify(
             item_key={"record_id": item["record_id"]},
         ):
             fido = models.MemberFido(**_data)
-            if fido.device_id == data.id:
+            if fido.device_id == data.id and fido.challenge and fido.public_key:
                 match = True
                 try:
                     if success := internals.fido.authenticate_verify(
@@ -1170,10 +1182,10 @@ async def webauthn_verify(
                 except InvalidAuthenticationResponse as ex:
                     internals.logger.warning(ex, exc_info=True)
 
-    ua = ua_parser(user_agent)
+    parsed_ua = ua_parser(user_agent)
     session_token = hashlib.sha224(
         bytes(
-            f"{member.email}{ua.get_browser()}{ua.get_os()}{ua.get_device()}",
+            f"{member.email}{parsed_ua.get_browser()}{parsed_ua.get_os()}{parsed_ua.get_device()}",
             "ascii",
         )
     ).hexdigest()
@@ -1185,11 +1197,11 @@ async def webauthn_verify(
         user_agent=user_agent,
         timestamp=round(time() * 1000),
     )  # type: ignore
-    session.browser = ua.get_browser()
+    session.browser = parsed_ua.get_browser()
     session.platform = (
         "Postman"
         if session.browser.startswith("PostmanRuntime")
-        else f"{ua.get_os()} {ua.get_device()}"
+        else f"{parsed_ua.get_os()} {parsed_ua.get_device()}"
     )
     if ip_addr:
         geo_ip: Location = geocoder.ip(str(ip_addr))
@@ -1213,4 +1225,4 @@ async def webauthn_verify(
         session=session,
         member=member,
         account=account,
-    )
+    )  # type: ignore

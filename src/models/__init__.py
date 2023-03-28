@@ -652,7 +652,7 @@ class Client(BaseModel, DAL):
 class MagicLink(BaseModel, DAL):
     email: str
     magic_token: str
-    ip_addr: Optional[IPvAnyAddress]
+    ip_addr: Optional[Union[IPv4Address, IPv6Address]]
     user_agent: Optional[str]
     timestamp: Optional[int]
     sendgrid_message_id: Optional[str]
@@ -1764,7 +1764,7 @@ class LoginResponse(BaseModel):
     session: MemberSession
     member: MemberProfileRedacted
     account: MemberAccountRedacted
-    fido_options: Union[dict, None]
+    fido_options: Optional[dict]
 
 
 class FindingStatusRequest(BaseModel):
