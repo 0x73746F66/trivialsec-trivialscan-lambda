@@ -18,3 +18,13 @@ variable "stripe_secret_key" {
   type        = string
   sensitive   = true
 }
+variable "pusher_secret" {
+  description = "PUSHER_SECRET"
+  type        = string
+  sensitive   = true
+}
+variable "dynatrace_token" {
+  description = "DYNATRACE_TOKEN"
+  type        = string
+  sensitive   = true
+}

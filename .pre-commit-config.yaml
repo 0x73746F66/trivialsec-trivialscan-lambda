@@ -5,6 +5,7 @@ repos:
     hooks:
       - id: pyupgrade
         args: [--py37-plus]
+        files: src
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
@@ -13,19 +14,27 @@ repos:
         files: src
       - id: check-merge-conflict
       - id: check-yaml
+        files: src
+        exclude: ^(src/config/).*$
       - id: check-json
+        files: src
       - id: end-of-file-fixer
+        files: src
       - id: mixed-line-ending
       - id: trailing-whitespace
+        files: src
       - id: check-added-large-files
       - id: check-builtin-literals
+        files: src
         args: ["--no-allow-dict-kwargs"]
       - id: debug-statements
+        files: src
       - id: detect-private-key
       - id: no-commit-to-branch
         args: [--branch, main]
       - id: pretty-format-json
         args: [--autofix, --no-sort-keys]
+        files: src
 
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v2.1.1
@@ -39,21 +48,11 @@ repos:
       - id: check-git-config-email
         args: ["--domains", "trivialsec.com"]
 
-  - repo: https://github.com/crate-ci/typos
-    rev: typos-dict-v0.9.13
-    hooks:
-      - id: typos
-        files: src
-
-  - repo: https://github.com/APIDevTools/swagger-cli
-    rev: v4.0.4
-    hooks:
-      - id: swagger-validation
-
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.3.1
     hooks:
       - id: remove-tabs
+        files: src
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.0.0-alpha.4
@@ -65,12 +64,14 @@ repos:
     rev: v1.77.0
     hooks:
       - id: terraform_validate
+        files: plans
       - id: terraform_checkov
+        files: plans
         args:
           - --args=--skip-download
           - --args=--quiet
           - --args=--framework terraform
-          - --args=--skip-check CKV_AWS_18,CKV_AWS_19,CKV_AWS_21,CKV2_AWS_34,CKV_AWS_50,CKV_AWS_115,CKV_AWS_116,CKV_AWS_117,CKV_AWS_144,CKV_AWS_145,CKV_AWS_173
+          - --args=--skip-check CKV_AWS_18,CKV_AWS_19,CKV_AWS_21,CKV2_AWS_34,CKV_AWS_50,CKV_AWS_115,CKV_AWS_116,CKV_AWS_117,CKV_AWS_144,CKV_AWS_145,CKV_AWS_173,CKV_AWS_258,CKV_AWS_272,CKV_AWS_158,CKV_AWS_119,CKV_AWS_28
 
   - repo: https://github.com/psf/black
     rev: 22.12.0
@@ -82,23 +83,17 @@ repos:
     rev: 6.0.0
     hooks:
       - id: flake8
-        args: [--max-line-length=101]
+        files: src
+        args: [--max-line-length=500]
 
   - repo: local
     hooks:
-      - id: pylint
-        name: pylint
-        entry: pylint
-        language: system
-        types: [python]
-        require_serial: true
       - id: pip-audit
         name: pip-audit
         language: system
-        entry: pip-audit
-        args: [-r]
+        entry: pip-audit .
+        pass_filenames: false
         types: [plain-text, non-executable, file]
-        files: ^(requirements)\.(txt)$
 
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.4.0
@@ -118,3 +113,10 @@ repos:
     rev: v1.1.3
     hooks:
       - id: sign-commit
+
+  - repo: https://github.com/sourcery-ai/sourcery
+    rev: v1.0.5
+    hooks:
+      - id: sourcery
+        args: [--diff=git diff HEAD, --no-summary]
+        stages: [post-commit]

@@ -5,8 +5,7 @@ from datetime import timedelta
 from secrets import token_urlsafe
 from typing import Union
 
-from fastapi import Header, APIRouter, Response, status
-from starlette.requests import Request
+from fastapi import Header, APIRouter, Response, status, Depends
 import validators
 from cachier import cachier
 
@@ -16,6 +15,7 @@ import services.sendgrid
 import services.stripe
 import services.aws
 import services.helpers
+import services.webhook
 
 router = APIRouter()
 
@@ -39,58 +39,53 @@ router = APIRouter()
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Client Server"],
+    tags=["Client", "CLI"],
 )
 async def claim_client(
-    request: Request,
     response: Response,
     client_name: str,
     client_info: models.ClientInfo,
-    authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
     x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Generates an access token for provided *NEW* client name.
     Client names must be unique, if the corresponding registration token was lost a new client and token must be created.
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
+    # api_key Auth
     if validators.email(client_name) is True:  # type: ignore
         internals.logger.warning(f"Email {client_name} can not be used for client name")
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
-    event = request.scope.get("aws.event", {})
-    # api_key Auth
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-        account_name=x_trivialscan_account,
-    )
-    if not authz.is_valid:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        internals.logger.error(internals.ERR_INVALID_AUTHORIZATION)
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
-        if models.Client(account=authz.account, name=client_name).exists():  # type: ignore
-            response.status_code = status.HTTP_409_CONFLICT
-            return
+        if models.Client(account_name=authz.account.name, name=client_name).exists():  # type: ignore
+            return Response(status_code=status.HTTP_409_CONFLICT)
 
         client = models.Client(
-            account=authz.account,
+            account_name=authz.account.name,
             client_info=client_info,
             name=client_name,
             cli_version=x_trivialscan_version,
-            access_token=token_urlsafe(nbytes=32),
+            access_token=token_urlsafe(nbytes=23),
             ip_addr=authz.ip_addr,
-            user_agent=authz.user_agent,
+            user_agent=authz.user_agent.ua_string,
             timestamp=round(time() * 1000),  # JavaScript support
-        )
+        )  # type: ignore
         if client.save():
+            services.webhook.send(
+                event_name=models.WebhookEvent.CLIENT_ACTIVITY,
+                account=authz.account,
+                data={
+                    "type": "client_token",
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "member": authz.member.email
+                    if hasattr(authz.member, "email")
+                    else None,
+                    "client": client,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent.ua_string,
+                },
+            )
             return client
     except RuntimeError as err:
         internals.logger.exception(err)
@@ -116,47 +111,40 @@ async def claim_client(
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Client Server"],
+    tags=["Client", "CLI"],
 )
 async def auth_client(
-    request: Request,
     response: Response,
     client_name: str,
     client_info: models.ClientInfo,
-    authorization: Union[str, None] = Header(default=None),
-    x_trivialscan_account: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
     x_trivialscan_version: Union[str, None] = Header(default=None),
 ):
     """
     Authenticates the generated access token and client
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
     if validators.email(client_name) is True:  # type: ignore
-        print(f"Email {client_name} can not be used for client name")
         internals.logger.warning(f"Email {client_name} can not be used for client name")
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-        account_name=x_trivialscan_account,
-    )
-    if not authz.is_valid:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        internals.logger.error(internals.ERR_INVALID_AUTHORIZATION)
-        return
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
-        authz.client.client_info = client_info  # type: ignore
-        authz.client.cli_version = x_trivialscan_version  # type: ignore
-        authz.client.ip_addr = authz.ip_addr  # type: ignore
-        authz.client.user_agent = authz.user_agent  # type: ignore
-        if authz.client.save():  # type: ignore
+        authz.client.client_info = client_info
+        authz.client.cli_version = x_trivialscan_version
+        authz.client.ip_addr = authz.ip_addr
+        authz.client.user_agent = authz.user_agent.ua_string
+        if authz.client.save():
+            services.webhook.send(
+                event_name=models.WebhookEvent.CLIENT_ACTIVITY,
+                account=authz.account,
+                data={
+                    "type": "client_auth",
+                    "timestamp": round(time() * 1000),
+                    "account": authz.account.name,
+                    "authorisation_valid": authz.is_valid,
+                    "client": authz.client,
+                    "ip_addr": authz.ip_addr,
+                    "user_agent": authz.user_agent.ua_string,
+                },
+            )
             return {
                 "client": authz.client,
                 "authorisation_valid": authz.is_valid,
@@ -164,12 +152,10 @@ async def auth_client(
     except RuntimeError as err:
         internals.logger.exception(err)
 
-    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-
 
 @router.get(
     "/clients",
-    response_model=list[models.ClientRedacted],
+    response_model=list[models.Client],
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -185,48 +171,32 @@ async def auth_client(
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Client Server"],
+    tags=["Member Account", "Client"],
 )
 @cachier(
     stale_after=timedelta(seconds=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"],
+    hash_params=lambda _, kw: kw["authz"].account.name,
 )
 def retrieve_clients(
-    request: Request,
     response: Response,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a collection of your clients
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
     object_keys = []
     data = []
     try:
-        prefix_key = path.join(internals.APP_ENV, "accounts", authz.account.name, "client-tokens")  # type: ignore
+        prefix_key = path.join(
+            internals.APP_ENV, "accounts", authz.account.name, "client-tokens"
+        )
         object_keys = services.aws.list_s3(prefix_key=prefix_key)
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
-        return []
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     if not object_keys:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -250,7 +220,7 @@ def retrieve_clients(
 
 @router.get(
     "/activate/{client_name}",
-    response_model=models.ClientRedacted,
+    response_model=models.Client,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -266,46 +236,41 @@ def retrieve_clients(
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Client Server"],
+    tags=["Member Account", "Client"],
 )
 async def activate_client(
-    request: Request,
-    response: Response,
     client_name: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
-    Activate a activated client
+    Activate a client
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-    client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
-    if not client:
+    client = models.Client(account_name=authz.account.name, name=client_name)  # type: ignore
+    if not client.load():
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     if client.active is not True:
         client.active = True
         if not client.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    services.webhook.send(
+        event_name=models.WebhookEvent.CLIENT_STATUS,
+        account=authz.account,
+        data={
+            "type": "activated",
+            "timestamp": round(time() * 1000),
+            "account": authz.account.name,
+            "member": authz.member.email,
+            "ip_addr": authz.ip_addr,
+            "user_agent": authz.user_agent.ua_string,
+        },
+    )
 
     return client
 
 
 @router.get(
     "/deactivated/{client_name}",
-    response_model=models.ClientRedacted,
+    response_model=models.Client,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -321,39 +286,34 @@ async def activate_client(
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Client Server"],
+    tags=["Member Account", "Client"],
 )
 async def deactivated_client(
-    request: Request,
-    response: Response,
     client_name: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Deactivate a client
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-    client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
-    if not client:
+    client = models.Client(account_name=authz.account.name, name=client_name)  # type: ignore
+    if not client.load():
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     if client.active is not False:
         client.active = False
         if not client.save():
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return
+            return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    services.webhook.send(
+        event_name=models.WebhookEvent.CLIENT_STATUS,
+        account=authz.account,
+        data={
+            "type": "deactivated",
+            "timestamp": round(time() * 1000),
+            "account": authz.account.name,
+            "member": authz.member.email,
+            "ip_addr": authz.ip_addr,
+            "user_agent": authz.user_agent.ua_string,
+        },
+    )
 
     return client
 
@@ -373,39 +333,33 @@ async def deactivated_client(
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Client Server"],
+    tags=["Member Account", "Client"],
 )
 async def delete_client(
-    request: Request,
-    response: Response,
     client_name: str,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Deletes a specific MemberProfile within the same account as the authorized requester
     """
     if validators.email(client_name) is True:  # type: ignore
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-    client = models.Client(account=authz.account, name=client_name).load()  # type: ignore
-    if not client:
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
+    client = models.Client(account_name=authz.account.name, name=client_name)  # type: ignore
+    if not client.load():
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    if authz.account.name != client.account.name:  # type: ignore
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        return
+    if authz.account.name != client.account_name:  # pylint: disable=no-member
+        return Response(status_code=status.HTTP_401_UNAUTHORIZED)
+    services.webhook.send(
+        event_name=models.WebhookEvent.CLIENT_STATUS,
+        account=authz.account,
+        data={
+            "type": "deleted",
+            "timestamp": round(time() * 1000),
+            "account": authz.account.name,
+            "member": authz.member.email,
+            "ip_addr": authz.ip_addr,
+            "user_agent": authz.user_agent.ua_string,
+        },
+    )
 
     return client.delete()

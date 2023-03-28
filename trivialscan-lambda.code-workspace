@@ -61,13 +61,23 @@
         "sonarlint.disableTelemetry": true,
         "window.autoDetectColorScheme": true,
         "cSpell.words": [
+            "boto",
             "cachier",
+            "CCADB",
+            "DARKLIST",
             "fastapi",
+            "mkcert",
             "NOSONAR",
+            "ondemand",
             "pydantic",
+            "rustls",
             "sendgrid",
             "starlette",
-            "trivialscan"
+            "totp",
+            "trivialscan",
+            "trivialsec",
+            "webauthn",
+            "webpki"
         ]
     },
     "extensions": {

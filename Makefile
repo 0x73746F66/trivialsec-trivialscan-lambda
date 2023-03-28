@@ -73,7 +73,8 @@ tfinstall:
 	sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(shell lsb_release -cs) main"
 	sudo apt-get update
 	sudo apt-get install -y terraform
-	terraform -install-autocomplete || true
+	terraform -install-autocomplete || truefrom webauthn.helpers import parse_client_data_json
+	terraform -chdir=plans init -backend-config=${APP_ENV}-backend.conf -reconfigure -upgrade=true
 
 init: env ## Runs tf init tf
 	terraform -chdir=plans init -backend-config=${APP_ENV}-backend.conf -reconfigure -upgrade=true
@@ -101,7 +102,12 @@ unit-test: ## run unit tests with coverage
 	coverage report -m
 
 run-local: env ## A local server interfacing with Lambda URL
-	(cd src; uvicorn app:app --reload --port 8080 --host 0.0.0.0)
+	uvicorn app:app --reload --reload-dir src --port 8080 --host 0.0.0.0
+
+run-local-tls: env ## A local server interfacing with Lambda URL
+	uvicorn app:app --reload --reload-dir src --port 443 --host 0.0.0.0 --ssl-keyfile .development/jager.key --ssl-certfile .development/jager.crt
+# sudo tailscale cert --cert-file .development/jager.crt --key-file .development/jager.key jager.tail55052.ts.net
+# (as sudo) echo 'net.ipv4.ip_unprivileged_port_start=0' > /etc/sysctl.d/50-unprivileged-ports.conf && sysctl --system
 
 local-runner: ## local setup for a gitlab runner
 	@docker volume create --name=gitlab-cache 2>/dev/null || true

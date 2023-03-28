@@ -1,7 +1,6 @@
 {
-    "operating_system": "Linux",
-    "operating_system_release": "5.15.60-1-MANJARO",
-    "operating_system_version": "#1 SMP PREEMPT Thu Aug 11 13:14:05 UTC 2022",
-    "architecture": "x86_64"
- }
- 
+  "operating_system": "Linux",
+  "operating_system_release": "5.15.60-1-MANJARO",
+  "operating_system_version": "#1 SMP PREEMPT Thu Aug 11 13:14:05 UTC 2022",
+  "architecture": "x86_64"
+}

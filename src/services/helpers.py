@@ -1,5 +1,6 @@
-import re
-from typing import Union, Any
+import contextlib
+from typing import Union
+from datetime import datetime, timezone
 
 from dns import resolver, rdatatype
 from dns.exception import DNSException, Timeout as DNSTimeoutError
@@ -9,124 +10,95 @@ from pydantic import IPvAnyAddress
 import config
 import models
 import internals
+import models.stripe
+import services.stripe
+
+MONITORING_HOSTS_CE = 3
+ONDEMAND_HOSTS_CE = 1
 
 
 def get_quotas(
     account: models.MemberAccount,
     scanner_record: models.ScannerRecord,
 ) -> models.AccountQuotas:
-    active = 0
-    passive = 0
-    monitoring = 0
-    if len(scanner_record.monitored_targets or []) > 0:  # type: ignore
-        monitoring = sum(
-            1 if item.enabled else 0 for item in scanner_record.monitored_targets
-        )
-    if len(scanner_record.history or []) > 0:  # type: ignore
-        passive = sum(
-            1 if item.is_passive and item.type == models.ScanRecordType.ONDEMAND else 0
-            for item in scanner_record.history
-        )
-        active = sum(
-            1
-            if not item.is_passive and item.type == models.ScanRecordType.ONDEMAND
-            else 0
-            for item in scanner_record.history
-        )
+    seen_hosts = set()
+    monitoring_hosts = set()
+    if len(scanner_record.monitored_targets or []) > 0:
+        monitoring_hosts = {
+            item.hostname for item in scanner_record.monitored_targets if item.enabled
+        }
+    ondemand_hosts = set()
+    if len(scanner_record.history or []) > 0:
+        for report in scanner_record.history:
+            for host in report.targets:
+                seen_hosts.add(host.transport.hostname)
+            if not report.date or report.date < datetime.now(timezone.utc).replace(
+                day=1, minute=0, second=0, microsecond=0
+            ):
+                continue
+            if report.type == models.ScanRecordType.ONDEMAND:
+                for host in report.targets:
+                    ondemand_hosts.add(f"{host.transport.hostname}_{report.report_id}")
 
-    new_only = True
+    new_only = False
     unlimited_monitoring = False
     unlimited_scans = False
-    monitoring_total = 1
-    passive_total = 1
-    active_total = 0
-    if sub := models.SubscriptionAddon().load(account.name):  # type: ignore
-        unlimited_scans = True
-    if sub := models.SubscriptionBasics().load(account.name):  # type: ignore
-        monitoring_total = 1 if not sub.metadata else sub.metadata.get("monitoring", 1)
-        passive_total = (
-            1 if not sub.metadata else sub.metadata.get("managed_passive", 1)
-        )
-        active_total = 0 if not sub.metadata else sub.metadata.get("managed_active", 0)
-    elif sub := models.SubscriptionPro().load(account.name):  # type: ignore
-        monitoring_total = (
-            10 if not sub.metadata else sub.metadata.get("monitoring", 10)
-        )
-        passive_total = (
-            500 if not sub.metadata else sub.metadata.get("managed_passive", 500)
-        )
-        active_total = (
-            50 if not sub.metadata else sub.metadata.get("managed_active", 50)
-        )
-        new_only = False
-    elif sub := models.SubscriptionEnterprise().load(account.name):  # type: ignore
-        monitoring_total = (
-            50 if not sub.metadata else sub.metadata.get("monitoring", 50)
-        )
-        passive_total = (
-            1000 if not sub.metadata else sub.metadata.get("managed_passive", 1000)
-        )
-        active_total = (
-            100 if not sub.metadata else sub.metadata.get("managed_active", 100)
-        )
-        new_only = False
-    elif sub := models.SubscriptionUnlimited().load(account.name):  # type: ignore
-        unlimited_scans = True
-        unlimited_monitoring = True
+    monitoring_hosts_day = MONITORING_HOSTS_CE
+    ondemand_hosts_month = ONDEMAND_HOSTS_CE
 
-    if unlimited_monitoring:
-        monitoring_total = None
-    if unlimited_scans:
-        passive_total = None
-        active_total = None
-        new_only = False
+    product = None
+    if account.billing_client_id:
+        if customer := services.stripe.get_customer(account.billing_client_id):
+            if customer.get("subscriptions", {}).get("data"):
+                for subscription in customer.get("subscriptions", {}).get("data", []):
+                    metadata: dict = subscription["plan"]["metadata"]
+                    product = services.stripe.PRODUCT_MAP.get(
+                        subscription["plan"]["product"],
+                        services.stripe.Product.COMMUNITY_EDITION,
+                    )
+                    if product == services.stripe.Product.UNLIMITED_RESCANS:
+                        unlimited_scans = True
+                    elif product == services.stripe.Product.UNLIMITED:
+                        unlimited_scans = True
+                        unlimited_monitoring = True
+                    elif product in [
+                        services.stripe.Product.PROFESSIONAL,
+                        services.stripe.Product.ENTERPRISE,
+                    ]:
+                        monitoring_hosts_day = int(
+                            metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE)
+                        )
+                        ondemand_hosts_month = int(
+                            metadata.get("ondemand_hosts_month", ONDEMAND_HOSTS_CE)
+                        )
+
+    if not product:
+        product = services.stripe.Product.COMMUNITY_EDITION
+        new_only = True
+        if stripe_product := services.stripe.get_product(product):
+            metadata: dict = stripe_product["metadata"]
+            monitoring_hosts_day = int(
+                metadata.get("monitoring_hosts_day", MONITORING_HOSTS_CE)
+            )
 
     return models.AccountQuotas(
+        seen_hosts=list(seen_hosts),
+        monitoring_hosts=list(monitoring_hosts),
         unlimited_monitoring=unlimited_monitoring,
         unlimited_scans=unlimited_scans,
         monitoring={
             models.Quota.PERIOD: "Daily",
-            models.Quota.TOTAL: monitoring_total,
-            models.Quota.USED: monitoring,
+            models.Quota.TOTAL: monitoring_hosts_day,
+            models.Quota.USED: len(monitoring_hosts),
         },
-        passive={
-            models.Quota.PERIOD: "Only new hosts" if new_only else "Daily",
-            models.Quota.TOTAL: passive_total,
-            models.Quota.USED: passive,
-        },
-        active={
-            models.Quota.PERIOD: "Daily",
-            models.Quota.TOTAL: active_total,
-            models.Quota.USED: active,
+        ondemand={
+            models.Quota.PERIOD: "Once per host" if new_only else "Monthly",
+            models.Quota.TOTAL: max(monitoring_hosts_day, 1)
+            if new_only
+            else ondemand_hosts_month,
+            models.Quota.USED: len(ondemand_hosts),
         },
     )
-
-
-def parse_authorization_header(authorization_header: str) -> dict[str, str]:
-    auth_param_re = r'([a-zA-Z0-9_\-]+)=(([a-zA-Z0-9_\-]+)|("")|(".*[^\\]"))'
-    auth_param_re = re.compile(r"^\s*" + auth_param_re + r"\s*$")
-    unesc_quote_re = re.compile(r'(^")|([^\\]")')
-    scheme, pairs_str = authorization_header.split(None, 1)
-    parsed_header = {"scheme": scheme}
-    pairs = []
-    if pairs_str:
-        for pair in pairs_str.split(","):
-            if not pairs or auth_param_re.match(pairs[-1]):  # type: ignore
-                pairs.append(pair)
-            else:
-                pairs[-1] = pairs[-1] + "," + pair
-        if not auth_param_re.match(pairs[-1]):  # type: ignore
-            raise ValueError("Malformed auth parameters")
-    for pair in pairs:
-        (key, value) = pair.strip().split("=", 1)
-        # For quoted strings, remove quotes and backslash-escapes.
-        if value.startswith('"'):
-            value = value[1:-1]
-            if unesc_quote_re.search(value):
-                raise ValueError("Unescaped quote in quoted-string")
-            value = re.compile(r"\\.").sub(lambda m: m.group(0)[1], value)
-        parsed_header[key] = value
-    return parsed_header
 
 
 def dns_query(
@@ -164,47 +136,20 @@ def dns_query(
         return dns_query(
             tldext.registered_domain, try_apex=try_apex, resolve_type=resolve_type
         )
-    if not answer:
-        return None
-    return answer
+    return answer or None
 
 
 def retrieve_ip_for_host(hostname: str) -> list[IPvAnyAddress]:
     results = set()
-    domains_to_check = set()
-    domains_to_check.add(hostname)
+    domains_to_check = {hostname}
     if answer := dns_query(hostname, resolve_type=rdatatype.CNAME):
-        try:
+        with contextlib.suppress(Exception):
             domains_to_check.add(answer.rrset.to_rdataset().to_text().split(" ").pop()[:-1])  # type: ignore
-        except:
-            pass  # pylint: disable=bare-except
     for domain in domains_to_check:
         for resolve_type in [rdatatype.A, rdatatype.AAAA]:
             if answer := dns_query(domain, resolve_type=resolve_type):
                 results.update(ip.split(" ").pop() for ip in answer.rrset.to_rdataset().to_text().splitlines())  # type: ignore
     return list(results)
-
-
-def host_scanning_status(
-    hostname: str,
-    scanner_record: models.ScannerRecord,
-) -> Union[dict[str, Any], None]:
-    response = {
-        "monitoring": False,
-        "queued_timestamp": None,
-        "queue_status": None,
-    }
-    for target in scanner_record.monitored_targets:
-        if target.hostname == hostname:
-            response["monitoring"] = target.enabled
-    for target in scanner_record.queue_targets:
-        if target.hostname == hostname:
-            response["queued_timestamp"] = target.timestamp
-            response["queue_status"] = "Queued"
-            if target.scan_timestamp:
-                response["queue_status"] = "Processing"
-
-    return response
 
 
 def load_descriptions(
@@ -241,9 +186,12 @@ def load_descriptions(
                 gsd = cve.upper().replace("CVE", "GSD")
                 item.references.append(models.ReferenceItem(name=gsd, url=f"https://gsd.id/{gsd}"))  # type: ignore
                 item.references.append(models.ReferenceItem(name=gsd, type=models.ReferenceType.JSON, url=f"https://api.gsd.id/{gsd}"))  # type: ignore
-        if not item.description:
-            item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
+                item.references.append(models.ReferenceItem(name=f"EPSS for {cve}", type=models.ReferenceType.JSON, url=f"https://api.first.org/data/v1/epss?cve={cve}"))  # type: ignore
 
+        item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
+        item.recommendation = config.get_rule_recommendation(
+            f"{item.group_id}.{item.rule_id}"
+        )
         for group in item.compliance or []:
             if (
                 config.pcidss4
@@ -253,9 +201,9 @@ def load_descriptions(
                 pci4_items = []
                 for compliance in group.items or []:
                     compliance.description = (
-                        None
-                        if not compliance.requirement
-                        else config.pcidss4.requirements.get(compliance.requirement, "")
+                        config.pcidss4.requirements.get(compliance.requirement, "")
+                        if compliance.requirement
+                        else None
                     )
                     pci4_items.append(compliance)
                 group.items = pci4_items
@@ -267,9 +215,9 @@ def load_descriptions(
                 pci3_items = []
                 for compliance in group.items or []:
                     compliance.description = (
-                        None
-                        if not compliance.requirement
-                        else config.pcidss3.requirements.get(compliance.requirement, "")
+                        config.pcidss3.requirements.get(compliance.requirement, "")
+                        if compliance.requirement
+                        else None
                     )
                     pci3_items.append(compliance)
                 group.items = pci3_items

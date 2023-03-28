@@ -8,7 +8,7 @@
   issue: |-
     <p>Forward Anonymity, frequently and mistakenly described as Perfect Forward Secrecy (PFS), is where the TLS connection applies technical mechanisms intentionally that will not expose any unique client identifier that might be used by a server (TLS termination endpoint) for the purposes of user profiling and tracking.</p>
     <p>This is not the same as applying 'secrecy' or privacy to the contents of your TLS connection, the mechanism is designed only for identity protection a.k.a Anonymity - which is an entirely distinct concept from secrecy.</p>
-    <p>If the TLS connection does not use a cipher that offer the Forward Anonymity anonymity characteristic, the client identity can be tracked for any purpose the server (or Attacker in-the-middle) might choose, with no possibility of the client protecting themselves.</p>
+    <p>If the TLS connection does not use a cipher that offer the 'anonymity' characteristic, the client identity can be tracked for any purpose the server (or Attacker in-the-middle) might choose, with no possibility of the client protecting themselves.</p>
 "1.13":
   issue: |-
     <p>A cipher suite is a combination of authentication, encryption, and message authentication code (MAC) algorithms</p>
@@ -95,13 +95,14 @@
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "1.6":
   issue: |-
     <p>If the Certificate being used for client Authentication (M/TLS) was not matched to a subject sent by the server to indicate accepted client Certificates then most properly configured servers will drop the connection.</p>
     <p>If a connection is established and the TLS server was miss-configured the TLS connection should be distrusted as it may be compromised, ineffective at providing the intended security characteristics, or simply not meet the requirements for TLS which is designed to have a chain of trust that relies on Certificate issuers to follow the specification when issuing Certificates and also TLS servers configured per the specification.</p>
 "1.7":
   issue: |-
-    <p>A client Certificate was presented and Mutual Authentication (M/TLS) expected, if the presented client Certificate did not match the server sent subjects or the </p>
+    <p>A client Certificate was presented and Mutual Authentication (M/TLS) expected, if the presented client Certificate did not match the server sent subjects or the</p>
     <p>Certificate was not issued by a trusted Root Certificate Authority this connection attempt should not be considered secure.</p>
     <p>If a connection is established and the TLS server was miss-configured the TLS connection should be distrusted as it may be compromised, ineffetive at providing the intended security characteristics, or simply not meet the requirements for TLS which is designed to have a chain of trust that relies on Certificate issuers to follow the specification when issuing Certificates and also TLS servers configured per the specification.</p>
 "1.8":
@@ -192,26 +193,32 @@
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.25":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.26":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.27":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.28":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.29":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.3":
   issue: |-
     <p>When visiting a website that uses an expired Certificate it is likely the TLS connection is not secure.</p>
@@ -219,42 +226,52 @@
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.31":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.32":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.33":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.34":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.35":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.36":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.37":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.38":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.39":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.4":
   issue: |-
     <p>Whenever a DNS zone is signed with a SHA-1 DNSKEY algorithm it is vulnerable to chosen prefix collision attacks. This is a problem when a zone accepts updates from multiple parties, such as; TLDs, enterprises, hosting providers. It is also a problem when a key is re-used by multiple zones</p>
@@ -262,18 +279,45 @@
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
+    <p>Various servers will use different versions, i.e. an updated Debian-based server should include the latest Java JDK distributed by Debian which may not be either the same version considered to be the latest Java JDK distributed, nor the same on other operating systems.</p>
 "2.41":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
+    <p>The original source of these root certificates is the <a href="https://www.ccadb.org/">Common CA Database (CCADB)</a> (also the source for Google, Microsoft, Apple, and many more).</p>
+    <p>Then they are curated and prepared for bundling into Mozilla's Network Security Services (NSS), which is consumed by most Mozilla products and published publicly to also be consumed by countless 3rd party products.</p>
+    <p>The open source tool <a href="https://curl.se/docs/mk-ca-bundle.html">mk-ca-bundle</a> creates the bundle and <a href="https://github.com/curl/curl/blob/master/scripts/mk-ca-bundle.pl#L626">further curates</a> the certificates.</p>
+    <p>It doesn't appear <code>curl</code> apply bespoke filtering, and the resultant Root CA Trust Store is verifiable.</p>
 "2.42":
-  issue: |-
-    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
-    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+  issue: "<p>Certificates should be treated as suspicious when they do not have\
+    \ a trusted Root Certificate Authority, as it offers no security characteristics\
+    \ of TLS built on Trust Anchor system.</p>\n<p>When visiting a website that\
+    \ uses an suspicious Certificate it is likely the TLS connection is not secure.</p>\n\
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted\
+    \ stores then all website that have a leaf certificated issued by this CA\
+    \ will gain the ability to eaves-drop on all unencrypted information, inherently\
+    \ due to the nature they are providing the means for the encryption inherently\
+    \ and are present in the trusted CA Root store.</p>\n<p>We rely on a list\
+    \ generated from <a href=\"https://github.com/schors/gost-russian-ca/tree/master/certs\"\
+    >open source</a> collection of Russian CA MinTsifry Rossii (\u041C\u0438\u043D\
+    \u0446\u0438\u0444\u0440\u044B \u0420\u043E\u0441\u0441\u0438\u0438), Ministry\
+    \ of Telecom and Mass Communications of Russia (\u041C\u0438\u043D\u043A\u043E\
+    \u043C\u0441\u0432\u044F\u0437\u044C \u0420\u043E\u0441\u0441\u0438\u0438\
+    )</p>"
 "2.43":
   issue: |-
     <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
     <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
+    <p>The <code>rustls</code> crate contains <em>curated</em> root certificates for use with the <code>webpki</code> crate and anywhere <code>rustls</code> itself is used.</p>
+    <p>The original source of these root certificates is the <a href="https://www.ccadb.org/">Common CA Database (CCADB)</a> (also the source for Google, Microsoft, Apple, and many more).</p>
+    <p>Then they are curated and prepared for bundling into Mozilla's Network Security Services (NSS), which is consumed by most Mozilla products and published publicly to also be consumed by countless 3rd party products.</p>
+    <p>Before <code>rustls</code> get's the bundle the <a href="mkcert.org">mkcert.org</a> (commonly mistakenly referred to as the "Mozilla tooling", which it is not) further curates the certificates and serves them over a HTTP API which is insecure, as it is unverifiable what the code is doing (an open source repo is not the same as the running environment, merely a small portion is the code), but that is the method <code>rustls</code> implemented to initially get the root certificates.</p>
+    <p>Finally, <code>rustls</code> apply filtering on the subject and produce the resultant Root CA Trust Store.</p>
+    <p><strong>Critical Review</strong>;
+    A GitHub.com issue <a href="https://github.com/rustls/webpki-roots/issues/25">#25</a> outlines a lack of trust and we hope to have this addressed.</p>
 "2.44":
   issue: |-
     <p>This is frequently a miss-configuration, i.e. the website domain name was not included in your common name by mistake.</p>
@@ -364,19 +408,85 @@
   issue: |-
     <p>The server sent a response header to inform supporting browsers that the site should only be accessed using HTTPS, and that any future attempts to access it using HTTP should automatically be converted to HTTPS.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>Here is an example of what the <code>Strict-Transport-Security</code> header looks like: You can include the max age, subdomains, and preload.</p>
+    <p><code>Strict-Transport-Security: max-age=31536000; includeSubDomains; preload</code></p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload";</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>Header always set Strict-Transport-Security "max-age=63072000; includeSubdomains; preload"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Strict-Transport-Security" value="max-age=63072000; includeSubdomains; preload" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.12":
   issue: |-
-    <p>The server sent a response header to inform supporting browsers that the MIME types advertised in the Content-Type headers should be followed and not be changed. The header allows you to avoid MIME type sniffing by saying that the MIME types are deliberately configured.</p>
+    <p>The <code>X-Content-Type-Options</code> header prevents browsers from sniffing a response away from the declared Content-Type. This helps reduce the danger of drive-by downloads and helps treat the content the right way.</p>
+    <p>Essentially the server sends a response header to inform supporting browsers that the MIME types advertised in the Content-Type headers should be followed and not be changed. The header allows you to avoid MIME type sniffing by saying that the MIME types are deliberately configured.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>Here is an example of what the <code>Strict-Transport-Security</code> header looks like: You can include the max age, subdomains, and preload.</p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header X-Content-Type-Options "nosniff" always;</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>Header always set X-Content-Type-Options "nosniff"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="X-Content-Type-Options" value="nosniff" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.13":
   issue: |-
     <p>A web server can instruct web browsers to allow list on the features the site owner intends to utilise, blocking all unused features so that any malicious scripts cannot leverage the unused features or API.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>The <code>Feature-Policy</code> header grants the ability to allow or deny browser features, whether in its own frame or content within an inline frame element <code>&lt;iframe&gt;</code></p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Feature-Policy "clipboard-read 'none'" always;</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>Header always set Feature-Policy "clipboard-read 'none'"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Feature-Policy" value="clipboard-read 'none'" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.14":
   issue: |-
-    <p>The Referrer-Policy HTTP header controls how much referrer information (sent with the Referer header) should be included with requests.</p>
+    <p>The Referrer-Policy HTTP header controls how much referrer information (sent with the Referrer header) should be included with requests.</p>
     <p>This policy will leak potentially-private information from HTTPS resource URLs to insecure origins. Carefully consider the impact of this setting.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>The <code>Referrer-Policy</code> controls how much (if any) referrer information the browser should reveal to the web server.</p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Referrer-Policy "no-referrer" always;</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>Header always set Referrer-Policy "no-referrer"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Referrer-Policy" value="no-referrer" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.15":
   issue: |-
     <p>The server sent a response header <code>Content-Security-Policy</code> to inform 'supporting browsers; to ensure TLS is used even when miss-configured scripts attempt insecure connections.</p>
@@ -385,6 +495,27 @@
     Host: trivialsec.com
     Upgrade-Insecure-Requests: 1</code></p>
     <p><strong>Note</strong> this feature has no impact to malicious clients that control the client request and avoid producing the request header (indicating it will not support the feature). This is also not going to impact a scenario where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>There are many directives that you can use with <code>Content-Security-Policy</code>. This example below allows scripts from both the current domain (defined by 'self') as well as google-analytics.com.</p>
+    <p><code>Content-Security-Policy: block-all-mixed-content</code></p>
+    <p>Or web sites with large numbers of insecure legacy URLs that need to be rewritten:</p>
+    <p><code>Content-Security-Policy: upgrade-insecure-requests</code></p>
+    <p><strong>Note</strong>: The <code>upgrade-insecure-requests</code> directive is evaluated <em>before</em> <code>block-all-mixed-content</code></p>
+    <p>Alternatively the following granular examples will disallow only insecure HTTP images:</p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Content-Security-Policy: "img-src https:";</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>header set Content-Security-Policy "img-src https:;"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Content-Security-Policy" value="img-src https:" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.16":
   issue: |-
     <p>The server sent a response header to inform supporting browsers whether or not a browser should be allowed to render a page in a <code>&lt;frame&gt;</code>, <code>&lt;iframe&gt;</code>, <code>&lt;embed&gt;</code> or <code>&lt;object&gt;</code>.</p>
@@ -393,6 +524,23 @@
     <p><code>X-Frame-Options</code> works only by setting through the HTTP header.</p>
     <p><strong>Note:</strong> Setting X-Frame-Options inside the <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta"><code>&lt;meta&gt;</code></a> element is useless, <code>&lt;meta http-equiv="X-Frame-Options" content="deny"&gt;</code> has no effect.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>There are many directives that you can use with <code>Content-Security-Policy</code> HTTP response header, the following can help prevent clickjacking.
+    One major benefit to this directive is that it allows you to authorize multiple domains.</p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Content-Security-Policy: "frame-ancestors";</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>header set Content-Security-Policy "frame-ancestors;"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Content-Security-Policy" value="frame-ancestors" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.17":
   issue: |-
     <h3>Deprecated</h3>
@@ -413,28 +561,127 @@
     <p>Websites are not expected to read contents of the users' clipboard, which commonly contains private or sensitive information.</p>
     <p>A web server can instruct web browsers to block this feature so that any malicious scripts cannot leverage the API.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>Set the <code>Feature-Policy</code> HTTP response header to value <code>clipboard-read 'none'</code>.
+    For the time being, the soon to be deprecated <code>Permissions-Policy</code> HTTP response header can still help if set to value <code>clipboard-read=()</code></p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Feature-Policy "clipboard-read 'none'" always;</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>Header always set Feature-Policy "clipboard-read 'none'"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Feature-Policy" value="clipboard-read 'none'" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.5":
   issue: |-
     <p>Websites that are maintained should not be utilising deprecated features, that commonly exhibit insecure functionality or vulnerable to abuse.</p>
     <p>A web server can instruct web browsers to block these features so that any malicious scripts cannot leverage the API.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>Set the <code>Feature-Policy</code> HTTP response header to value <code>sync-script 'none'</code>, <code>sync-xhr 'none'</code>, and <code>document-domain 'none'</code>.
+    For the time being, the soon to be deprecated <code>Permissions-Policy</code> HTTP response header can still help if set to value <code>sync-script=()</code>, <code>sync-xhr=()</code>, and <code>document-domain=()</code>.</p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Feature-Policy "sync-script 'none'; sync-xhr 'none'; document-domain 'none'" always;</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>Header always set Feature-Policy "sync-script 'none'; sync-xhr 'none'; document-domain 'none'"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Feature-Policy" value="sync-script 'none'; sync-xhr 'none'; document-domain 'none'" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.6":
   issue: |-
     <p>The server sent a response header that prevents a document from loading any cross-origin resources that don't explicitly grant the document permission (using CORP or CORS).</p>
     <p>The default configuration when this is not sent allows the document to fetch cross-origin resources which leaves users' vulnerable to cross-site scripting (XSS) attacks.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>Set the <code>Cross-Origin-Embedder-Policy</code> HTTP response header to value <code>require-corp</code>.</p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Cross-Origin-Embedder-Policy: "require-corp";</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>header set Cross-Origin-Embedder-Policy "require-corp;"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Cross-Origin-Embedder-Policy" value="require-corp" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.7":
   issue: |-
     <p>The server sent a response header allows you to ensure a top-level document does not share a browsing context group with cross-origin documents.</p>
     <p>COOP will process-isolate your document and potential attackers can't access your global object if they were to open it in a popup, preventing a set of cross-origin attacks dubbed XS-Leaks.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>Set the <code>Cross-Origin-Opener-Policy</code> HTTP response header to value <code>same-origin</code>.</p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Cross-Origin-Opener-Policy: "same-origin";</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>header set Cross-Origin-Opener-Policy "same-origin;"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Cross-Origin-Opener-Policy" value="same-origin" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.8":
   issue: |-
     <p>The server sent a response header that prevents a document from loading any cross-origin resources that don't explicitly grant the document permission (CORS).</p>
     <p>The default configuration when this is not sent allows the document to fetch cross-origin resources which leaves users' vulnerable to cross-site scripting (XSS) attacks.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>Set the <code>Cross-Origin-Resource-Policy</code> HTTP response header to value <code>same-origin</code>.</p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Cross-Origin-Resource-Policy: "same-origin";</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>header set Cross-Origin-Resource-Policy "same-origin;"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Cross-Origin-Resource-Policy" value="same-origin" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>
 "4.9":
   issue: |-
     <p>The server sent a response header allows web site administrators to control resources the user agent is allowed to load for a given page. With a few exceptions, policies mostly involve specifying server origins and script endpoints.</p>
     <p>This helps guard against cross-site scripting attacks cross-site scripting (XSS), among many common browser attack vectors.</p>
     <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
+  recommendation: |-
+    <p>There are many directives that you can use with <code>Content-Security-Policy</code>. This example below allows scripts from both the current domain (defined by 'self') as well as google-analytics.com.</p>
+    <p><code>Content-Security-Policy: script-src 'self' https://www.google-analytics.com</code></p>
+    <p><strong>Enable in Nginx</strong></p>
+    <p><code>add_header Content-Security-Policy: "default-src 'none'; script-src 'self' https://www.google-analytics.com";</code></p>
+    <p><strong>Enable in Apache</strong></p>
+    <p><code>header set Content-Security-Policy "default-src 'none'; script-src 'self' https://www.google-analytics.com;"</code></p>
+    <p><strong>Enable on IIS</strong></p>
+    <p><code>&lt;system.webServer&gt;
+        ...
+        &lt;httpProtocol&gt;
+            &lt;customHeaders&gt;
+                &lt;add name="Content-Security-Policy" value="default-src 'none'; script-src 'self' https://www.google-analytics.com" /&gt;
+            &lt;/customHeaders&gt;
+        &lt;/httpProtocol&gt;
+        ...
+    &lt;/system.webServer&gt;</code></p>

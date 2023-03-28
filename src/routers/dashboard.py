@@ -1,10 +1,10 @@
+import contextlib
 import json
-from typing import Union
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 
-from fastapi import Header, APIRouter, Response, status
-from starlette.requests import Request
+from fastapi import APIRouter, Response, status, Depends
 from cachier import cachier
+from boto3.dynamodb.conditions import Key
 
 import internals
 import models
@@ -40,51 +40,29 @@ router = APIRouter()
 @cachier(
     stale_after=timedelta(minutes=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"],
+    hash_params=lambda _, kw: kw["authz"].account.name,
 )
 def dashboard_compliance(
-    request: Request,
     response: Response,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a collection of your clients
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
-    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-compliance.json"  # type: ignore
+    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-compliance.json"
     try:
         raw = services.aws.get_s3(path_key=object_key)
         if not raw:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
         data = json.loads(raw)
         for item in data:
-            try:
+            with contextlib.suppress(AttributeError):
                 item["label"] = getattr(models.GraphLabel, item["label"])
-            except AttributeError:
-                pass  # Label should already be the correct value
-
         return data
 
     except RuntimeError as err:
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
 
 
 @router.get(
@@ -94,6 +72,7 @@ def dashboard_compliance(
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
     responses={
+        204: {"description": "No scan data is present for this account"},
         401: {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
         },
@@ -109,35 +88,20 @@ def dashboard_compliance(
 @cachier(
     stale_after=timedelta(seconds=30),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"],
+    hash_params=lambda _, kw: kw["authz"].account.name,
 )
 def dashboard_quotas(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a collection of your clients
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-    scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
-    if scanner_record:
-        return services.helpers.get_quotas(account=authz.account, scanner_record=scanner_record)  # type: ignore
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
+    if scanner_record.load(load_history=True):
+        return services.helpers.get_quotas(
+            account=authz.account, scanner_record=scanner_record
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
@@ -163,38 +127,19 @@ def dashboard_quotas(
 @cachier(
     stale_after=timedelta(minutes=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"]
-    + str(kw.get("limit")),
+    hash_params=lambda _, kw: kw["authz"].account.name + str(kw.get("limit")),
 )
 def certificate_issues(
-    request: Request,
     response: Response,
     limit: int = 20,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a collection of your own Trivial Scanner reports, providing
     a list of certificate issues filtered to include only the highest risk
     and ordered by last seen
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
-    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-certificates.json"  # type: ignore
+    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-certificates.json"
     try:
         raw = services.aws.get_s3(path_key=object_key)
         if not raw:
@@ -209,10 +154,7 @@ def certificate_issues(
                     f"{item.group_id}.{item.rule_id}"
                 )
             enriched_data.append(item)
-        sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))  # type: ignore
-
-        return sorted_data
-
+        return list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))
     except RuntimeError as err:
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -221,7 +163,7 @@ def certificate_issues(
 
 @router.get(
     "/findings/latest",
-    response_model=list[models.EvaluationItem],
+    response_model=list[models.Finding],
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -237,135 +179,66 @@ def certificate_issues(
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Scan Reports"],
+    tags=["Scan Reports", "Findings"],
 )
 @cachier(
-    stale_after=timedelta(minutes=5),
+    stale_after=timedelta(seconds=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"]
-    + str(kw.get("limit")),
+    hash_params=lambda _, kw: kw["authz"].account.name + str(kw.get("limit")),
 )
 def latest_findings(
-    request: Request,
     response: Response,
-    limit: int = 20,
-    authorization: Union[str, None] = Header(default=None),
+    limit: int = 50,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a collection of your own Trivial Scanner reports, providing
     a list of host findings filtered to include only the highest risk issues
     and ordered by last seen
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
-    object_key = f"{internals.APP_ENV}/accounts/{authz.account.name}/computed/dashboard-findings.json"  # type: ignore
     try:
-        raw = services.aws.get_s3(path_key=object_key)
-        if not raw:
-            return Response(status_code=status.HTTP_204_NO_CONTENT)
-        data = json.loads(raw)
-        latest_data: list[dict] = data[:limit]
-        enriched_data = []
-        for _item in latest_data:
-            item = models.EvaluationItem(**_item)
-            if not item.description:
-                item.description = config.get_rule_desc(
-                    f"{item.group_id}.{item.rule_id}"
+        latest = []
+        for item in services.aws.query_dynamodb(
+            table_name=services.aws.Tables.FINDINGS,
+            IndexName="account_name-index",
+            KeyConditionExpression=Key("account_name").eq(authz.account.name),
+            Limit=limit,
+        ):
+            finding = models.Finding(
+                **services.aws.get_dynamodb(  # type: ignore
+                    table_name=services.aws.Tables.FINDINGS,
+                    item_key={"finding_id": item["finding_id"]},
                 )
+            )
+            deferred = filter(
+                lambda occurrence: occurrence.status == models.FindingStatus.DEFERRED
+                and occurrence.deferred_to <= datetime.now(tz=timezone.utc),
+                finding.occurrences,
+            )
+            if list(deferred):
+                continue
+            closed = filter(
+                lambda occurrence: occurrence.status == models.FindingStatus.WONT_FIX,
+                finding.occurrences,
+            )
+            if list(closed):
+                continue
+            finding.description = config.get_rule_desc(
+                f"{finding.group_id}.{finding.rule_id}"
+            )
+            latest.append(finding)
 
-            for group in item.compliance or []:
-                if (
-                    config.pcidss4
-                    and group.compliance == models.ComplianceName.PCI_DSS
-                    and group.version == "4.0"
-                ):
-                    pci4_items = []
-                    for compliance in group.items or []:
-                        compliance.description = (
-                            None
-                            if not compliance.requirement
-                            else config.pcidss4.requirements.get(
-                                compliance.requirement, ""
-                            )
-                        )
-                        pci4_items.append(compliance)
-                    group.items = pci4_items
-                if (
-                    config.pcidss3
-                    and group.compliance == models.ComplianceName.PCI_DSS
-                    and group.version == "3.2.1"
-                ):
-                    pci3_items = []
-                    for compliance in group.items or []:
-                        compliance.description = (
-                            None
-                            if not compliance.requirement
-                            else config.pcidss3.requirements.get(
-                                compliance.requirement, ""
-                            )
-                        )
-                        pci3_items.append(compliance)
-                    group.items = pci3_items
-                if group.compliance in [
-                    models.ComplianceName.NIST_SP800_131A,
-                    models.ComplianceName.FIPS_140_2,
-                ]:
-                    group.items = None
-
-            if config.mitre_attack:
-                for threat in item.threats or []:
-                    for tactic in config.mitre_attack.tactics:
-                        if tactic.id == threat.tactic_id:
-                            threat.tactic_description = tactic.description
-                    for data_source in config.mitre_attack.data_sources:
-                        if data_source.id == threat.data_source_id:
-                            threat.data_source_description = data_source.description
-                    for mitigation in config.mitre_attack.mitigations:
-                        if mitigation.id == threat.mitigation_id:
-                            threat.mitigation_description = mitigation.description
-                    for technique in config.mitre_attack.techniques:
-                        if technique.id == threat.technique_id:
-                            threat.technique_description = technique.description
-                        for sub_technique in technique.sub_techniques or []:
-                            if sub_technique.id == threat.sub_technique_id:
-                                threat.sub_technique_description = (
-                                    sub_technique.description
-                                )
-
-            enriched_data.append(item)
-        sorted_data = list(reversed(sorted(enriched_data, key=lambda x: x.observed_at)))  # type: ignore
-
-        return sorted_data
-
+        return list(reversed(sorted(latest, key=lambda x: x.observed_at)))
     except RuntimeError as err:
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    return
 
 
-@router.get(
-    "/reports",
-    response_model=list[models.ReportSummary],
-    response_model_exclude_unset=True,
-    response_model_exclude_none=True,
-    status_code=status.HTTP_200_OK,
+@router.post(
+    "/finding/status",
+    response_model=bool,
+    status_code=status.HTTP_202_ACCEPTED,
     responses={
-        204: {"description": "No scan data is present for this account"},
         401: {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
         },
@@ -376,39 +249,32 @@ def latest_findings(
             "description": "An unhandled error occurred during an AWS request for data access"
         },
     },
-    tags=["Scan Reports"],
+    tags=["Findings"],
 )
-@cachier(
-    stale_after=timedelta(seconds=30),
-    cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"],
-)
-def retrieve_reports(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
+async def update_finding_status(
+    request: models.FindingStatusRequest,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
-    Retrieves a collection of your own Trivial Scanner reports, providing a summary of each
+    updates a finding occurrence status
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+    updated = False
+    if data := services.aws.get_dynamodb(
+        table_name=services.aws.Tables.FINDINGS,
+        item_key={"finding_id": request.finding_id},
+    ):
+        finding = models.Finding(**data)
+        if finding.account_name != authz.account.name:
+            return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
+        for occurrence in finding.occurrences:
+            if occurrence.status == request.status:
+                continue
+            if occurrence.hostname == request.hostname:
+                occurrence.status = request.status
+                updated = True
+                break
+    if not updated:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return services.aws.put_dynamodb(
+        table_name=services.aws.Tables.FINDINGS, item=finding.dict()
     )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
-    if scanner_record := models.ScannerRecord(account=authz.account).load():  # type: ignore
-        return scanner_record.history
-
-    return Response(status_code=status.HTTP_204_NO_CONTENT)

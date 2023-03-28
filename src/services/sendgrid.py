@@ -1,8 +1,9 @@
 import logging
 import json
-import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Union
+
+import requests
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.eventwebhook import EventWebhook
 
@@ -12,14 +13,17 @@ import internals
 logger = logging.getLogger()
 
 SENDGRID_TEMPLATES = {
+    "early_warning_service": "d-4d6ad6a796bb4021a326fb8ca7fb47d2",
     "invitations": "d-c4a471191062414ea3cefd67c98deed4",
     "magic_link": "d-48aa0ed2e9ff442ea6ee9b73ac984b96",
     "recovery_request": "d-1958843496444e7bb8e29f4277e74182",
     "registrations": "d-a0a115275e404b32bf96b540ecdffeda",
+    "scan_completed": "d-b3e18e04202449398bb631694f10753e",
     "subscriptions": "d-1d20f029d4eb46b5957c253c3ccd3262",
     "support": "d-821ef38856bb4d0581f26c4745ce00e7",
     "updated_email": "d-fef742bc0a754165a8778f4929df3dbb",
-    "scan_completed": "d-b3e18e04202449398bb631694f10753e",
+    "webhook_signing_secret": "d-98a39d14bb11487c94f27d9df88c5c82",
+    "findings_digest": "d-16239339314e475eac2ba9711666de8b",
 }
 SENDGRID_GROUPS = {
     "notifications": 18318,
@@ -41,7 +45,7 @@ try:
         requests.get(
             url="https://api.sendgrid.com/v3/user/webhooks/event/settings/signed",
             headers=SendGridAPIClient(SENDGRID_API_KEY).client.request_headers,
-            timeout=3,
+            timeout=(5, 15),
         )
         .json()
         .get("public_key")
@@ -62,12 +66,12 @@ def send_email(
     bcc: Union[str, None] = None,
 ):
     sendgrid = SendGridAPIClient(SENDGRID_API_KEY)
-    tmp_url = sendgrid.client.mail.send._build_url(
+    tmp_url = sendgrid.client.mail.send._build_url(  # pylint: disable=protected-access
         query_params={}
-    )  # pylint: disable=protected-access
+    )
     personalization = {
         "subject": subject,
-        "dynamic_template_data": {**data, **{"email": recipient}},
+        "dynamic_template_data": {**data, **{"email": recipient, "subject": subject}},
         "to": [{"email": recipient}],
     }
     mail_settings = {
@@ -92,7 +96,10 @@ def send_email(
         "personalizations": [personalization],
     }
     res = requests.post(
-        url=tmp_url, json=req_body, headers=sendgrid.client.request_headers, timeout=10
+        url=tmp_url,
+        json=req_body,
+        headers=sendgrid.client.request_headers,
+        timeout=(5, 15),
     )
     logger.info(res.__dict__)
     return res
@@ -107,7 +114,7 @@ def upsert_contact(recipient_email: str, list_name: str = "subscribers"):
             "contacts": [{"email": recipient_email}],
         },
         headers=sendgrid.client.request_headers,
-        timeout=10,
+        timeout=(5, 15),
     )
     logger.debug(res.__dict__)
     return res
@@ -142,7 +149,7 @@ def process_webhook(payload: str) -> bool:
         event_id = data.get("sg_event_id")
         internals.logger.info(f"Webhook [{event}] event_id {event_id}")
         email = data.get("email")
-        timestamp = data.get("timestamp", datetime.utcnow().timestamp())
+        timestamp = data.get("timestamp", datetime.now(timezone.utc).timestamp())
         created = datetime.fromtimestamp(timestamp).strftime("%Y%m%d")
         message_id = data.get("sg_message_id")
         object_key = (
@@ -165,7 +172,9 @@ def process_webhook(payload: str) -> bool:
                         "message": contact.get("contact", {})
                         .get("custom_fields", {})
                         .get("contact_us_message", ""),
-                        "json": json.dumps({**data, **contact}, indent=2, default=str, sort_keys=True),  # type: ignore
+                        "json": json.dumps(
+                            {**data, **contact}, indent=2, default=str, sort_keys=True
+                        ),
                     },
                 )
 

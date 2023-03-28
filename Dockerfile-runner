@@ -1,4 +1,4 @@
-FROM docker.io/gitlab/gitlab-runner
+FROM docker.io/gitlab/gitlab-runner:ubuntu
 
 ENV RUNNER_TOKEN=${RUNNER_TOKEN}
 ENV DEBIAN_FRONTEND=noninteractive

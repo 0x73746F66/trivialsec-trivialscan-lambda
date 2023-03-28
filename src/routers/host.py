@@ -3,9 +3,9 @@ from os import path
 from typing import Union
 from datetime import datetime, timedelta
 
-from fastapi import Header, Query, APIRouter, Response, status
-from starlette.requests import Request
+from fastapi import Query, APIRouter, Response, status, Depends
 from cachier import cachier
+from tldextract import TLDExtract
 
 import internals
 import models
@@ -36,39 +36,20 @@ router = APIRouter()
     tags=["Hostname"],
 )
 @cachier(
-    stale_after=timedelta(seconds=30),
+    stale_after=timedelta(seconds=5),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"],
+    hash_params=lambda _, kw: kw["authz"].account.name,
 )
 def retrieve_hosts(
-    request: Request,
-    response: Response,
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves a collection of your own Trivial Scanner reports, providing
     a distinct list of hosts and ports, optionally returning the latest host
     full record
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
-
-    scanner_record = models.ScannerRecord(account=authz.account).load()  # type: ignore
-    if not scanner_record:
+    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
+    if not scanner_record.load(load_history=True):
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     seen = set()
@@ -79,16 +60,12 @@ def retrieve_hosts(
             if target not in seen:
                 seen.add(target)
                 data.append(host)
-
-    if not data:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-    return data
+    return data or Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
     "/host/{hostname}",
-    response_model=models.Host,
+    response_model=models.HostResponse,
     response_model_exclude_unset=True,
     response_model_exclude_none=True,
     status_code=status.HTTP_200_OK,
@@ -107,16 +84,14 @@ def retrieve_hosts(
     tags=["Hostname"],
 )
 @cachier(
-    stale_after=timedelta(seconds=30),
+    stale_after=timedelta(seconds=1),
     cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: services.helpers.parse_authorization_header(
-        kw["authorization"]
-    )["id"]
+    hash_params=lambda _, kw: kw["authz"].account.name
+    + str(kw.get("hostname", ""))
     + str(kw.get("port", ""))
     + str(kw.get("last_updated", "")),
 )
 def retrieve_host(
-    request: Request,
     response: Response,
     hostname: str,
     port: Union[int, None] = Query(
@@ -127,33 +102,43 @@ def retrieve_host(
         default=None,
         description="Return the result for specific date rather than the latest (default) Host information. Represented in ISO 8601 format; 2008-09-15T15:53:00+05:00",
     ),
-    authorization: Union[str, None] = Header(default=None),
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
     """
     Retrieves TLS data on any hostname, providing an optional port number
     """
-    if not authorization:
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        response.status_code = status.HTTP_403_FORBIDDEN
-        return
-    event = request.scope.get("aws.event", {})
-    authz = internals.Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-    )
-    if not authz.is_valid:
-        response.status_code = status.HTTP_401_UNAUTHORIZED
-        response.headers["WWW-Authenticate"] = internals.AUTHZ_REALM
-        return
+    prefix_key = f"{internals.APP_ENV}/hosts/"
+    versions = ["latest"]
+    related_domains = set()
+    tld = TLDExtract(cache_dir=internals.CACHE_DIR)(f"http://{hostname}")
+    if tld.registered_domain != hostname:
+        related_domains.add(tld.registered_domain)
 
-    prefix_key = path.join(internals.APP_ENV, "hosts", hostname)
+    matches = services.aws.list_s3(prefix_key=prefix_key)
+    for match in matches:
+        if match.endswith("latest.json"):
+            if f".{tld.registered_domain}/" in match:
+                related = match.split("/")[2]
+                if related != hostname:
+                    related_domains.add(related)
+            continue
+        if f"/{hostname}/" not in match:
+            continue
+        try:
+            _port, _ip, date, *_ = (
+                match.replace(".json", "")
+                .replace(f"{prefix_key}{hostname}/", "")
+                .split("/")
+            )
+            versions.append(f"{_port}/{date}/{_ip}")
+        except ValueError:
+            internals.logger.error(f"retrieve_host: bad object path {match}")
+
     if last_updated:
         object_key = None
-        scan_date = last_updated.strftime("%Y%m%d")  # type: ignore
+        scan_date = last_updated.strftime("%Y%m%d")
         if port:
             prefix_key = path.join(prefix_key, str(port))
-        matches = services.aws.list_s3(prefix_key=prefix_key)
         for match in matches:
             if match.endswith("latest.json"):
                 continue
@@ -165,15 +150,66 @@ def retrieve_host(
     else:
         if not port:
             port = 443
-        object_key = path.join(prefix_key, str(port), "latest.json")
+        object_key = path.join(prefix_key, hostname, str(port), "latest.json")
+
     try:
         ret = services.aws.get_s3(object_key)
         if not ret:
             return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-        return json.loads(ret)
+        host = models.Host(**json.loads(ret))
+        reports = []
+        scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
+        if scanner_record.load(load_history=True):
+            for target in scanner_record.monitored_targets:
+                if target.hostname == hostname:
+                    host.monitoring_enabled = target.enabled
+            for record in scanner_record.history:
+                reports.extend(
+                    record
+                    for _host in record.targets
+                    if (
+                        _host.transport.hostname == hostname
+                        and _host.transport.port == port
+                    )
+                )
+        return models.HostResponse(
+            host=host,
+            versions=versions,
+            reports=sorted(reports, key=lambda x: x.date, reverse=True),  # type: ignore
+            external_refs={
+                "AlienVault OTX": f"https://otx.alienvault.com/indicator/domain/{hostname}",
+                "HypeStat": f"https://hypestat.com/info/{hostname}",
+                "VirusTotal": f"https://www.virustotal.com/gui/domain/{hostname}/detection.json",
+                "Threat Intelligence Platform": f"https://threatintelligenceplatform.com/report/{hostname}",
+                "ViewDNS": f"https://viewdns.info/reversewhois/?q={hostname}",
+                "TrustScam": f"https://trustscam.com/{hostname}",
+                "URLScan": f"https://urlscan.io/search/#page.domain%3A{hostname}",
+                "Layered Domains App": f"https://dmns.app/domains?q={hostname}",
+                "Whoisology": f"https://whoisology.com/{hostname}",
+                "archive.org": f"http://web.archive.org/web/*/{hostname}",
+                "Google Cache": f"https://webcache.googleusercontent.com/search?q=cache:{hostname}",
+                "Shodan": f"https://www.shodan.io/domain/{hostname}",
+                "DomainIQ": f"https://www.domainiq.com/snapshot_history?data={hostname}",
+                "Moonsearch": f"https://moonsearch.com/report/{hostname}.html",
+                "BuiltWith": f"https://builtwith.com/{hostname}",
+                "DNSlytics": f"https://dnslytics.com/domain/{hostname}",
+                "Webmaster Tips": f"https://www.wmtips.com/tools/info/{hostname}",
+                "Robtex": f"https://www.robtex.com/dns-lookup/{hostname}",
+                "Domain Codex": f"https://www.domaincodex.com/search.php?q={hostname}",
+                "Website Informer": f"https://website.informer.com/{hostname}",
+                "Similarweb": f"https://www.similarweb.com/website/{hostname}/",
+                "Moz": f"https://moz.com/domain-analysis?site={hostname}",
+                "SpyFu": f"https://www.spyfu.com/overview/domain?query={hostname}",
+                "Linkody Backlinks": f"http://bc.linkody.com/en/seo-tools/free-backlink-checker/{hostname}",
+                "Censys": f"https://search.censys.io/search?resource=hosts&sort=RELEVANCE&per_page=100&virtual_hosts=INCLUDE&q={hostname}",
+                "SecurityTrails": f"https://securitytrails.com/list/apex_domain/{hostname}",
+                "Blacklight": f"https://themarkup.org/blacklight?url={hostname}",
+                "LeakIX": f"https://leakix.net/domain/{hostname}",
+                "Intelligence X": f"https://intelx.io/?s={hostname}",
+            },
+            related_domains=list(related_domains),
+        )
 
     except RuntimeError as err:
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         internals.logger.exception(err)
-    return
