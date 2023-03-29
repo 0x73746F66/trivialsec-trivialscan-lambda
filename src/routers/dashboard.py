@@ -210,18 +210,21 @@ def latest_findings(
                     item_key={"finding_id": item["finding_id"]},
                 )
             )
-            deferred = filter(
+            future_deferred = filter(
                 lambda occurrence: occurrence.status == models.FindingStatus.DEFERRED
+                and occurrence.deferred_to
                 and occurrence.deferred_to <= datetime.now(tz=timezone.utc),
                 finding.occurrences,
             )
-            if list(deferred):
-                continue
+            finding.occurrences = [
+                x for x in finding.occurrences if x not in future_deferred
+            ]
             closed = filter(
                 lambda occurrence: occurrence.status == models.FindingStatus.WONT_FIX,
                 finding.occurrences,
             )
-            if list(closed):
+            finding.occurrences = [x for x in finding.occurrences if x not in closed]
+            if not finding.occurrences:
                 continue
             finding.description = config.get_rule_desc(
                 f"{finding.group_id}.{finding.rule_id}"
@@ -258,7 +261,6 @@ async def update_finding_status(
     """
     updates a finding occurrence status
     """
-    updated = False
     if data := services.aws.get_dynamodb(
         table_name=services.aws.Tables.FINDINGS,
         item_key={"finding_id": request.finding_id},
@@ -271,10 +273,9 @@ async def update_finding_status(
                 continue
             if occurrence.hostname == request.hostname:
                 occurrence.status = request.status
-                updated = True
                 break
-    if not updated:
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-    return services.aws.put_dynamodb(
-        table_name=services.aws.Tables.FINDINGS, item=finding.dict()
-    )
+        return services.aws.put_dynamodb(
+            table_name=services.aws.Tables.FINDINGS, item=finding.dict()
+        )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

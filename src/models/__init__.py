@@ -1597,6 +1597,7 @@ class FeedState(BaseModel):
 
 
 class FindingOccurrence(BaseModel):
+    occurrence_id: Optional[UUID]
     report_ids: Optional[list[str]] = Field(default=[])
     hostname: str
     port: int
@@ -1664,7 +1665,7 @@ class Finding(BaseModel, DAL):
         finding_id: Union[str, None] = None,
     ) -> bool:
         if finding_id:
-            self.finding_id = finding_id
+            self.finding_id = UUID(finding_id)
         response = services.aws.get_dynamodb(
             table_name=services.aws.Tables.FINDINGS,
             item_key={"finding_id": str(self.finding_id)},
