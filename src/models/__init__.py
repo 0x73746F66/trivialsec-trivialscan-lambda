@@ -895,17 +895,17 @@ class Flags(BaseModel):
 
 
 class HostTLSProtocol(BaseModel):
-    negotiated: str
-    preferred: str
-    offered: list[str]
+    negotiated: Optional[str]
+    preferred: Optional[str]
+    offered: Optional[list[str]] = Field(default=[])
 
 
 class HostTLSCipher(BaseModel):
     forward_anonymity: Optional[bool] = Field(default=False)
-    offered: list[str]
+    offered: Optional[list[str]] = Field(default=[])
     offered_rfc: Optional[list[str]]
-    negotiated: str
-    negotiated_bits: PositiveInt
+    negotiated: Optional[str]
+    negotiated_bits: Optional[PositiveInt]
     negotiated_rfc: Optional[str]
 
 
@@ -913,21 +913,21 @@ class HostTLSClient(BaseModel):
     certificate_mtls_expected: Optional[bool] = Field(default=False)
     certificate_trusted: Optional[bool] = Field(default=False)
     certificate_match: Optional[bool] = Field(default=False)
-    expected_client_subjects: list[str] = Field(default=[])
+    expected_client_subjects: Optional[list[str]] = Field(default=[])
 
 
 class HostTLSSessionResumption(BaseModel):
-    cache_mode: str
-    tickets: bool
-    ticket_hint: bool
+    cache_mode: Optional[str]
+    tickets: Optional[bool]
+    ticket_hint: Optional[bool]
 
 
 class HostTLS(BaseModel):
-    certificates: list[str] = Field(default=[])
-    client: HostTLSClient
-    cipher: HostTLSCipher
-    protocol: HostTLSProtocol
-    session_resumption: HostTLSSessionResumption
+    certificates: Optional[list[str]] = Field(default=[])
+    client: Optional[HostTLSClient]
+    cipher: Optional[HostTLSCipher]
+    protocol: Optional[HostTLSProtocol]
+    session_resumption: Optional[HostTLSSessionResumption]
 
 
 class HostHTTP(BaseModel):
