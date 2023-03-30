@@ -14,6 +14,7 @@ logger = logging.getLogger()
 
 SENDGRID_TEMPLATES = {
     "early_warning_service": "d-4d6ad6a796bb4021a326fb8ca7fb47d2",
+    "findings_digest": "d-6b5969c92bd54591bccc72919f5d56b9",
     "invitations": "d-c4a471191062414ea3cefd67c98deed4",
     "magic_link": "d-48aa0ed2e9ff442ea6ee9b73ac984b96",
     "recovery_request": "d-1958843496444e7bb8e29f4277e74182",
@@ -23,7 +24,6 @@ SENDGRID_TEMPLATES = {
     "support": "d-821ef38856bb4d0581f26c4745ce00e7",
     "updated_email": "d-fef742bc0a754165a8778f4929df3dbb",
     "webhook_signing_secret": "d-98a39d14bb11487c94f27d9df88c5c82",
-    "findings_digest": "d-16239339314e475eac2ba9711666de8b",
 }
 SENDGRID_GROUPS = {
     "notifications": 18318,
