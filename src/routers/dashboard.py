@@ -181,11 +181,11 @@ def certificate_issues(
     },
     tags=["Scan Reports", "Findings"],
 )
-@cachier(
-    stale_after=timedelta(seconds=5),
-    cache_dir=internals.CACHE_DIR,
-    hash_params=lambda _, kw: kw["authz"].account.name + str(kw.get("limit")),
-)
+# @cachier(
+#     stale_after=timedelta(seconds=15),
+#     cache_dir=internals.CACHE_DIR,
+#     hash_params=lambda _, kw: kw["authz"].account.name + str(kw.get("limit")),
+# )
 def latest_findings(
     response: Response,
     limit: int = 50,
@@ -202,7 +202,6 @@ def latest_findings(
             table_name=services.aws.Tables.FINDINGS,
             IndexName="account_name-index",
             KeyConditionExpression=Key("account_name").eq(authz.account.name),
-            Limit=limit,
         ):
             finding = models.Finding(
                 **services.aws.get_dynamodb(  # type: ignore
@@ -217,13 +216,22 @@ def latest_findings(
                 finding.occurrences,
             )
             finding.occurrences = [
-                x for x in finding.occurrences if x not in future_deferred
+                x for x in finding.occurrences.copy() if x not in future_deferred
             ]
             closed = filter(
                 lambda occurrence: occurrence.status == models.FindingStatus.WONT_FIX,
                 finding.occurrences,
             )
-            finding.occurrences = [x for x in finding.occurrences if x not in closed]
+            finding.occurrences = [
+                x for x in finding.occurrences.copy() if x not in closed
+            ]
+            remediated = filter(
+                lambda occurrence: occurrence.status == models.FindingStatus.REMEDIATED,
+                finding.occurrences,
+            )
+            finding.occurrences = [
+                x for x in finding.occurrences.copy() if x not in remediated
+            ]
             if not finding.occurrences:
                 continue
             finding.description = config.get_rule_desc(
@@ -231,7 +239,7 @@ def latest_findings(
             )
             latest.append(finding)
 
-        return list(reversed(sorted(latest, key=lambda x: x.observed_at)))
+        return list(reversed(sorted(latest[:limit], key=lambda x: x.observed_at)))
     except RuntimeError as err:
         internals.logger.exception(err)
     response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
