@@ -8,7 +8,7 @@ import hashlib
 import threading
 from base64 import b64encode, b64decode
 from time import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlparse, unquote
 from os import getenv
 from typing import Union
@@ -151602,7 +151602,8 @@ class AuthorizationRoute(str, Enum):
     DASHBOARD_COMPLIANCE = "/dashboard/compliance"
     DASHBOARD_CERTIFICATE_ISSUES = "/findings/certificate"
     DASHBOARD_LATEST_ISSUES = "/findings/latest"
-    UPDATE_FINDINGS = "/finding/status"
+    UPDATE_FINDING_STATUS = "/finding/status"
+    UPDATE_FINDING_DEFERRED_TO = "/finding/deferred"
     DASHBOARD_QUOTAS = "/dashboard/quotas"
     SEARCH_HOST = "/search/host/"
     SEARCH_IP = "/search/ip/"
@@ -151664,7 +151665,8 @@ class Authorization:
         AuthorizationRoute.DASHBOARD_QUOTAS,
         AuthorizationRoute.DASHBOARD_CERTIFICATE_ISSUES,
         AuthorizationRoute.DASHBOARD_LATEST_ISSUES,
-        AuthorizationRoute.UPDATE_FINDINGS,
+        AuthorizationRoute.UPDATE_FINDING_STATUS,
+        AuthorizationRoute.UPDATE_FINDING_DEFERRED_TO,
         AuthorizationRoute.SEARCH_HOST,
         AuthorizationRoute.SEARCH_IP,
         AuthorizationRoute.SEARCH_ANY,
@@ -151890,6 +151892,8 @@ class Authorization:
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, o):
+        if isinstance(o, date):
+            return o.isoformat()
         if isinstance(o, datetime):
             return o.replace(microsecond=0).isoformat()
         if isinstance(o, int) and o > 10 ^ 38 - 1:

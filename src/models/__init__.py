@@ -4,7 +4,7 @@ import hashlib
 from abc import ABCMeta, abstractmethod
 from enum import Enum
 from typing import Union, Any, Optional
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from uuid import UUID
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
@@ -1606,7 +1606,7 @@ class FindingOccurrence(BaseModel):
     certificate_subject: Optional[str]
     status: Optional[FindingStatus] = Field(default=FindingStatus.DISCOVERED)
     triaged_at: Optional[datetime] = Field(default=None)
-    deferred_to: Optional[datetime] = Field(default=None)
+    deferred_to: Optional[date] = Field(default=None)
     closed_at: Optional[datetime] = Field(default=None)
     remediated_at: Optional[datetime] = Field(default=None)
     regressed_at: Optional[datetime] = Field(default=None)
@@ -1623,10 +1623,6 @@ class FindingOccurrence(BaseModel):
     def set_triaged_at(cls, triaged_at: datetime):
         return triaged_at.replace(tzinfo=timezone.utc) if triaged_at else None
 
-    @validator("deferred_to")
-    def set_deferred_to(cls, deferred_to: datetime):
-        return deferred_to.replace(tzinfo=timezone.utc) if deferred_to else None
-
     @validator("closed_at")
     def set_closed_at(cls, closed_at: datetime):
         return closed_at.replace(tzinfo=timezone.utc) if closed_at else None
@@ -1642,18 +1638,18 @@ class FindingOccurrence(BaseModel):
 
 class Finding(BaseModel, DAL):
     finding_id: UUID
-    account_name: str
+    account_name: Optional[str]
     observed_at: Optional[datetime]
-    occurrences: list[FindingOccurrence] = Field(default=[])
-    rule_id: int
-    group_id: int
-    key: str
-    group: str
-    name: str
+    occurrences: Optional[list[FindingOccurrence]] = Field(default=[])
+    rule_id: Optional[int]
+    group_id: Optional[int]
+    key: Optional[str]
+    group: Optional[str]
+    name: Optional[str]
     description: Optional[str]
-    cvss2: Union[str, Any] = Field(default=None)
-    cvss3: Union[str, Any] = Field(default=None)
-    customer_cvss3: Optional[str] = Field(default=None)
+    cvss2: Optional[str]
+    cvss3: Optional[str]
+    customer_cvss3: Optional[str]
 
     def exists(
         self,
@@ -1770,6 +1766,12 @@ class LoginResponse(BaseModel):
 
 
 class FindingStatusRequest(BaseModel):
-    hostname: str
     finding_id: str
+    occurrence_id: str
     status: FindingStatus
+
+
+class FindingDeferredToRequest(BaseModel):
+    finding_id: str
+    occurrence_id: str
+    deferred_to: date

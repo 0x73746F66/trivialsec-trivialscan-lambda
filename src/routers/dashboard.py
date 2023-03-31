@@ -1,6 +1,6 @@
 import contextlib
 import json
-from datetime import timedelta, datetime, timezone
+from datetime import date, timedelta, datetime, timezone
 
 from fastapi import APIRouter, Response, status, Depends
 from cachier import cachier
@@ -181,11 +181,11 @@ def certificate_issues(
     },
     tags=["Scan Reports", "Findings"],
 )
-# @cachier(
-#     stale_after=timedelta(seconds=15),
-#     cache_dir=internals.CACHE_DIR,
-#     hash_params=lambda _, kw: kw["authz"].account.name + str(kw.get("limit")),
-# )
+@cachier(
+    stale_after=timedelta(seconds=5),
+    cache_dir=internals.CACHE_DIR,
+    hash_params=lambda _, kw: kw["authz"].account.name + str(kw.get("limit")),
+)
 def latest_findings(
     response: Response,
     limit: int = 50,
@@ -209,10 +209,13 @@ def latest_findings(
                     item_key={"finding_id": item["finding_id"]},
                 )
             )
+            if not finding.occurrences:
+                finding.delete()
+                continue
             future_deferred = filter(
                 lambda occurrence: occurrence.status == models.FindingStatus.DEFERRED
                 and occurrence.deferred_to
-                and occurrence.deferred_to <= datetime.now(tz=timezone.utc),
+                and occurrence.deferred_to > date.today(),
                 finding.occurrences,
             )
             finding.occurrences = [
@@ -269,21 +272,98 @@ async def update_finding_status(
     """
     updates a finding occurrence status
     """
-    if data := services.aws.get_dynamodb(
-        table_name=services.aws.Tables.FINDINGS,
-        item_key={"finding_id": request.finding_id},
-    ):
-        finding = models.Finding(**data)
-        if finding.account_name != authz.account.name:
-            return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
-        for occurrence in finding.occurrences:
-            if occurrence.status == request.status:
-                continue
-            if occurrence.hostname == request.hostname:
-                occurrence.status = request.status
-                break
-        return services.aws.put_dynamodb(
-            table_name=services.aws.Tables.FINDINGS, item=finding.dict()
-        )
+    internals.logger.info(request.dict())
+    finding = models.Finding(finding_id=request.finding_id)  # type: ignore
+    if not finding.load():
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    if finding.account_name != authz.account.name:
+        return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
+    if not finding.occurrences:
+        finding.delete()
+        return Response(status_code=status.HTTP_302_FOUND)
+
+    occurrences = []
+    update = False
+    for occurrence in finding.occurrences:
+        if occurrence.status == request.status:
+            occurrences.append(occurrence)
+            continue
+        if str(occurrence.occurrence_id) == request.occurrence_id:
+            occurrence.status = request.status
+            update = True
+            if (
+                occurrence.status == models.FindingStatus.DEFERRED
+                and not occurrence.deferred_to
+            ):
+                occurrence.deferred_to = datetime.now(tz=timezone.utc) + timedelta(
+                    days=7
+                )
+            if occurrence.status == models.FindingStatus.REMEDIATED:
+                occurrence.remediated_at = datetime.now(tz=timezone.utc)
+            if occurrence.status == models.FindingStatus.TRIAGED:
+                occurrence.triaged_at = datetime.now(tz=timezone.utc)
+            if occurrence.status == models.FindingStatus.WONT_FIX:
+                occurrence.closed_at = datetime.now(tz=timezone.utc)
+            occurrences.append(occurrence)
+            break
+        occurrences.append(occurrence)
+
+    if update:
+        finding.occurrences = occurrences
+        return finding.save()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/finding/deferred",
+    response_model=bool,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        401: {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+        },
+        403: {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+        },
+        500: {
+            "description": "An unhandled error occurred during an AWS request for data access"
+        },
+    },
+    tags=["Findings"],
+)
+async def update_finding_deferred_to(
+    request: models.FindingDeferredToRequest,
+    authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
+):
+    """
+    updates a finding occurrence deferred_to
+    """
+    internals.logger.info(request.dict())
+    finding = models.Finding(finding_id=request.finding_id)  # type: ignore
+    if not finding.load():
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    if finding.account_name != authz.account.name:
+        return Response(status_code=status.HTTP_406_NOT_ACCEPTABLE)
+    if not finding.occurrences:
+        finding.delete()
+        return Response(status_code=status.HTTP_302_FOUND)
+
+    occurrences = []
+    update = False
+    for occurrence in finding.occurrences:
+        if occurrence.deferred_to == request.deferred_to:
+            occurrences.append(occurrence)
+            continue
+        if str(occurrence.occurrence_id) == request.occurrence_id:
+            occurrence.deferred_to = request.deferred_to
+            update = True
+            occurrences.append(occurrence)
+            break
+        occurrences.append(occurrence)
+
+    if update:
+        finding.occurrences = occurrences
+        return finding.save()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
