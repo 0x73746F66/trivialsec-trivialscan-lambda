@@ -8,10 +8,10 @@ resource "aws_lambda_function" "trivialscan" {
   runtime       = local.python_version
   timeout       = local.timeout
   memory_size   = local.memory_size
-  layers        = var.app_env == "Prod" ? ["arn:aws:lambda:ap-southeast-2:725887861453:layer:Dynatrace_OneAgent_1_261_5_20230309-143152_python:1"] : []
+  layers        = local.enable_dynatrace ? ["arn:aws:lambda:ap-southeast-2:725887861453:layer:Dynatrace_OneAgent_1_261_5_20230309-143152_python:1"] : []
 
   environment {
-    variables = var.app_env == "Prod" ? {
+    variables = local.enable_dynatrace ? {
       JITTER_SECONDS = var.jitter_seconds
       APP_ENV = var.app_env
       APP_NAME = var.app_name
