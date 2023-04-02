@@ -53,7 +53,18 @@ def retrieve_reports(
     """
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
     if scanner_record.load(load_history=True):
-        return sorted(scanner_record.history, key=lambda x: x.date, reverse=True)  # type: ignore
+        summaries = []
+        for summary in scanner_record.history:
+            if models.FullReport(
+                account_name=authz.account.name, report_id=summary.report_id
+            ).exists():
+                summaries.append(summary)
+            else:
+                services.aws.delete_dynamodb(
+                    item_key={"report_id": summary.report_id},
+                    table_name=services.aws.Tables.REPORT_HISTORY,
+                )
+        return sorted(summaries, key=lambda x: x.date, reverse=True)  # type: ignore
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

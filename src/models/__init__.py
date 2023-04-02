@@ -1239,6 +1239,14 @@ class EvaluationItem(DefaultInfo):
 class FullReport(ReportSummary, DAL):
     evaluations: Optional[list[EvaluationItem]] = Field(default=[])
 
+    @property
+    def object_key(self):
+        if not self.account_name:
+            raise ValueError("account_name not set for FullReport")
+        if not self.report_id:
+            raise ValueError("report_id not set for FullReport")
+        return f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
+
     def exists(
         self, report_id: Union[str, None] = None, account_name: Union[str, None] = None
     ) -> bool:
@@ -1246,8 +1254,7 @@ class FullReport(ReportSummary, DAL):
             self.report_id = report_id
         if account_name:
             self.account_name = account_name
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
-        return services.aws.object_exists(object_key)
+        return services.aws.object_exists(self.object_key)
 
     def load(
         self, report_id: Union[str, None] = None, account_name: Union[str, None] = None
@@ -1257,25 +1264,22 @@ class FullReport(ReportSummary, DAL):
         if account_name:
             self.account_name = account_name
 
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
-        raw = services.aws.get_s3(path_key=object_key)
+        raw = services.aws.get_s3(path_key=self.object_key)
         if not raw:
-            internals.logger.warning(f"Missing FullReport {object_key}")
+            internals.logger.warning(f"Missing FullReport {self.object_key}")
             return False
         if data := json.loads(raw):
             super().__init__(**data)
         return True
 
     def save(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
         return services.aws.store_s3(
-            object_key,
+            self.object_key,
             json.dumps(self.dict(), default=str),
         )
 
     def delete(self) -> bool:
-        object_key = f"{internals.APP_ENV}/accounts/{self.account_name}/results/{self.report_id}/full-report.json"
-        return services.aws.delete_s3(object_key)
+        return services.aws.delete_s3(self.object_key)
 
 
 class AcceptEdit(BaseModel, DAL):
