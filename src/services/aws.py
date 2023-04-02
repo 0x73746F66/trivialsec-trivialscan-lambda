@@ -460,8 +460,7 @@ def store_sqs(
 def get_dynamodb(
     item_key: dict, table_name: Tables, default: Any = None
 ) -> Union[dict, None]:
-    internals.logger.info(f"get_dynamodb table: {table_name.value}")
-    internals.logger.debug(f"item_key: {item_key}")
+    internals.logger.info(f"get_dynamodb table: {table_name.value} {item_key}")
     try:
         table = dynamodb.Table(table_name.value)
         response = table.get_item(Key=item_key)
@@ -516,8 +515,7 @@ def put_dynamodb(item: dict, table_name: Tables) -> bool:
     backoff=1,
 )
 def delete_dynamodb(item_key: dict, table_name: Tables) -> bool:
-    internals.logger.info(f"get_dynamodb table: {table_name.value}")
-    internals.logger.debug(f"item_key: {item_key}")
+    internals.logger.info(f"get_dynamodb table: {table_name.value} {item_key}")
     try:
         table = dynamodb.Table(table_name.value)
         response = table.delete_item(Key=item_key)

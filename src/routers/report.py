@@ -8,6 +8,7 @@ from time import time
 from fastapi import Header, APIRouter, Response, File, UploadFile, status, Depends
 from cachier import cachier
 from pusher import Pusher
+from boto3.dynamodb.conditions import Key
 
 import internals
 import models
@@ -490,6 +491,32 @@ async def delete_report(
                 "user_agent": authz.user_agent.ua_string,
             },
         )
+        for item in services.aws.query_dynamodb(
+            table_name=services.aws.Tables.FINDINGS,
+            IndexName="account_name-index",
+            KeyConditionExpression=Key("account_name").eq(authz.account.name),
+        ):
+            finding = models.Finding(
+                **services.aws.get_dynamodb(  # type: ignore
+                    table_name=services.aws.Tables.FINDINGS,
+                    item_key={"finding_id": item["finding_id"]},
+                )
+            )
+            occurrences = []
+            updated = False
+            for occurrence in finding.occurrences.copy():
+                if occurrence.report_ids and report_id in occurrence.report_ids:
+                    updated = True
+                    occurrence.report_ids = [
+                        rid for rid in occurrence.report_ids.copy() if rid != report_id
+                    ]
+                if occurrence.report_ids:
+                    occurrences.append(occurrence)
+            if not occurrences:
+                finding.delete()
+            elif updated:
+                finding.occurrences = occurrences
+                finding.save()
 
 
 @router.get(
