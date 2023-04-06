@@ -16,8 +16,8 @@ resource "aws_lambda_function" "trivialscan" {
       APP_ENV = var.app_env
       APP_NAME = var.app_name
       LOG_LEVEL = var.log_level
-      STORE_BUCKET = data.terraform_remote_state.trivialscan_s3.outputs.trivialscan_store_bucket[0]
-      AWS_LAMBDA_EXEC_WRAPPER = "/opt/dynatrace" # Use the wrapper from the layer
+      STORE_BUCKET = data.terraform_remote_state.trivialscan_s3.outputs.trivialscan_store_bucket
+      AWS_LAMBDA_EXEC_WRAPPER = "/opt/dynatrace"
       DT_TENANT = "xuf85063"
       DT_CLUSTER_ID = "-1273248646"
       DT_CONNECTION_BASE_URL = "https://xuf85063.live.dynatrace.com"
@@ -28,7 +28,7 @@ resource "aws_lambda_function" "trivialscan" {
       APP_ENV = var.app_env
       APP_NAME = var.app_name
       LOG_LEVEL = var.log_level
-      STORE_BUCKET = data.terraform_remote_state.trivialscan_s3.outputs.trivialscan_store_bucket[0]
+      STORE_BUCKET = data.terraform_remote_state.trivialscan_s3.outputs.trivialscan_store_bucket
     }
   }
   lifecycle {
@@ -52,7 +52,7 @@ resource "aws_cloudwatch_log_group" "api_logs" {
 }
 
 resource "aws_s3_object" "file_upload" {
-  bucket        = data.terraform_remote_state.trivialscan_s3.outputs.trivialscan_store_bucket[0]
+  bucket        = data.terraform_remote_state.trivialscan_s3.outputs.trivialscan_store_bucket
   key           = "lambda-functions/${local.function_name}.zip"
   source        = "${abspath(path.module)}/${local.source_file}"
   content_type  = "application/octet-stream"
