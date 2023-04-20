@@ -1,7 +1,7 @@
 data "aws_iam_policy_document" "trivialscan_assume_role_policy" {
   statement {
-    sid = "${var.app_env}TrivialScanApiAssumeRole"
-    actions    = ["sts:AssumeRole"]
+    sid     = "${var.app_env}TrivialScanApiAssumeRole"
+    actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
       identifiers = ["lambda.amazonaws.com"]
@@ -11,7 +11,7 @@ data "aws_iam_policy_document" "trivialscan_assume_role_policy" {
 data "aws_iam_policy_document" "trivialscan_iam_policy" {
   statement {
     sid = "${var.app_env}TrivialScanApiLogging"
-    actions   = [
+    actions = [
       "logs:CreateLogGroup",
       "logs:CreateLogStream",
       "logs:PutLogEvents"
@@ -22,7 +22,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
   }
   statement {
     sid = "${var.app_env}TrivialScanApiObjList"
-    actions   = [
+    actions = [
       "s3:Head*",
       "s3:List*",
     ]
@@ -33,7 +33,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
   }
   statement {
     sid = "${var.app_env}TrivialScanApiObjAccess"
-    actions   = [
+    actions = [
       "s3:DeleteObject",
       "s3:GetObject",
       "s3:PutObject",
@@ -44,7 +44,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
   }
   statement {
     sid = "${var.app_env}TrivialScanSecrets"
-    actions   = [
+    actions = [
       "ssm:GetParameter",
     ]
     resources = [
@@ -53,7 +53,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
   }
   statement {
     sid = "${var.app_env}TrivialScanDynamoDB"
-    actions   = [
+    actions = [
       "dynamodb:PutItem",
       "dynamodb:GetItem",
       "dynamodb:DeleteItem"
@@ -69,7 +69,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
   }
   statement {
     sid = "${var.app_env}TrivialScanDynamoDBQuery"
-    actions   = [
+    actions = [
       "dynamodb:Query"
     ]
     resources = [
@@ -83,7 +83,7 @@ data "aws_iam_policy_document" "trivialscan_iam_policy" {
   }
   statement {
     sid = "${var.app_env}TrivialScannerLambdaSQS"
-    actions   = [
+    actions = [
       "sqs:SendMessage",
       "sqs:ChangeMessageVisibility",
       "sqs:Get*",
@@ -102,9 +102,9 @@ resource "aws_iam_role" "trivialscan_role" {
   }
 }
 resource "aws_iam_policy" "trivialscan_policy" {
-  name        = "${lower(var.app_env)}_trivialscan_api_lambda_policy"
-  path        = "/"
-  policy      = data.aws_iam_policy_document.trivialscan_iam_policy.json
+  name   = "${lower(var.app_env)}_trivialscan_api_lambda_policy"
+  path   = "/"
+  policy = data.aws_iam_policy_document.trivialscan_iam_policy.json
 }
 resource "aws_iam_role_policy_attachment" "policy_attach" {
   role       = aws_iam_role.trivialscan_role.name
