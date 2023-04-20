@@ -689,8 +689,8 @@ class MagicLink(BaseModel, DAL):
 
 
 class MemberSession(BaseModel, DAL):
-    member_email: str
     session_token: str
+    member_email: Optional[str]
     access_token: Optional[str]
     ip_addr: Optional[IPvAnyAddress]
     user_agent: Optional[str]
@@ -718,7 +718,7 @@ class MemberSession(BaseModel, DAL):
         if session_token:
             self.session_token = session_token
         # type: ignore
-        if not self.session_token or validators.email(self.member_email) is False:  # type: ignore
+        if not self.session_token or self.member_email and validators.email(self.member_email) is False:  # type: ignore
             return False
         response = services.aws.get_dynamodb(
             table_name=services.aws.Tables.LOGIN_SESSIONS,
@@ -1655,6 +1655,13 @@ class Finding(BaseModel, DAL):
     cvss3: Optional[str]
     customer_cvss3: Optional[str]
 
+    class Config:
+        validate_assignment = True
+
+    @validator("observed_at")
+    def set_observed_at(cls, observed_at: datetime):
+        return observed_at.replace(tzinfo=timezone.utc) if observed_at else None
+
     def exists(
         self,
         finding_id: Union[str, None] = None,
@@ -1767,6 +1774,7 @@ class LoginResponse(BaseModel):
     member: MemberProfileRedacted
     account: MemberAccountRedacted
     fido_options: Optional[dict]
+    bearer_token: Optional[str]
 
 
 class FindingStatusRequest(BaseModel):

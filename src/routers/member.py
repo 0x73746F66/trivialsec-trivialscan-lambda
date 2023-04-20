@@ -10,6 +10,7 @@ from uuid import uuid4
 from ipaddress import ip_address
 
 import validators
+import jwt
 import geocoder
 from geocoder.location import Location
 from user_agents import parse as ua_parser
@@ -444,6 +445,7 @@ async def magic_link(
     tags=["Member Profile"],
 )
 async def login(
+    response: Response,
     request: Request,
     magic_token: str,
 ):
@@ -591,13 +593,47 @@ async def login(
     except InvalidAuthenticationResponse as err:
         internals.logger.exception(err)
 
+    bearer_token = None
+    if not fido_devices:
+        # no MFA just log me in
+        bearer_token = jwt.encode(
+            payload={
+                "iat": datetime.now(tz=timezone.utc),
+                "nbf": datetime.now(tz=timezone.utc)
+                + timedelta(
+                    seconds=3
+                ),  # S3 is eventually consistent, give it a few seconds..
+                "exp": datetime.now(tz=timezone.utc) + timedelta(days=1),
+                "aud": ["urn:trivialsec:authz:api:jwt-bearer"],
+                "iss": internals.DASHBOARD_URL,
+                "sub": internals.NAMESPACE.hex,
+                "acc": account.name,  # this is the only custom claim needed
+            },
+            key=session.access_token,  # type: ignore
+            algorithm="HS256",
+            headers={"kid": session_token},
+        )
+        # SameSite cookie is useful for API only, i.e. Postman testing
+        cookie_name = (
+            f"__Host-{internals.ORIGIN_HOST}-jwt-bearer"
+            if internals.APP_ENV == "Prod"
+            else "jwt-bearer"
+        )
+        response.set_cookie(
+            key=cookie_name,
+            value=bearer_token,
+            expires=datetime.now(tz=timezone.utc) + timedelta(days=1),
+            secure=internals.APP_ENV == "Prod",
+            httponly=True,
+            samesite="strict",
+        )
+
     return models.LoginResponse(
-        session=models.MemberSessionRedacted(**session.dict())
-        if fido_devices
-        else session,
+        session=models.MemberSessionRedacted(**session.dict()),
         member=models.MemberProfileRedacted(**member.dict()),
         account=models.MemberAccountRedacted(**account.dict()),
         fido_options=fido_options,
+        bearer_token=bearer_token,
     )
 
 
@@ -1123,7 +1159,9 @@ async def delete_fido_device(
     },
     tags=["Member Profile"],
 )
-async def webauthn_verify(request: Request, data: models.WebauthnLogin):
+async def webauthn_verify(
+    response: Response, request: Request, data: models.WebauthnLogin
+):
     """
     Webauthn FIDO verification
     """
@@ -1221,8 +1259,40 @@ async def webauthn_verify(request: Request, data: models.WebauthnLogin):
         )
         return Response(status_code=status.HTTP_401_UNAUTHORIZED)
 
+    bearer_token = jwt.encode(
+        payload={
+            "iat": datetime.now(tz=timezone.utc),
+            "nbf": datetime.now(tz=timezone.utc)
+            + timedelta(
+                seconds=3
+            ),  # S3 is eventually consistent, give it a few seconds..
+            "exp": datetime.now(tz=timezone.utc) + timedelta(days=1),
+            "aud": ["urn:trivialsec:authz:api:jwt-bearer"],
+            "iss": internals.DASHBOARD_URL,
+            "sub": internals.NAMESPACE.hex,
+            "acc": account.name,  # this is the only custom claim needed
+        },
+        key=session.access_token,  # type: ignore
+        algorithm="HS256",
+        headers={"kid": session_token},
+    )
+    # SameSite cookie is useful for API only, i.e. Postman testing
+    cookie_name = (
+        f"__Host-{internals.ORIGIN_HOST}-jwt-bearer"
+        if internals.APP_ENV == "Prod"
+        else "jwt-bearer"
+    )
+    response.set_cookie(
+        key=cookie_name,
+        value=bearer_token,
+        expires=datetime.now(tz=timezone.utc) + timedelta(days=1),
+        secure=internals.APP_ENV == "Prod",
+        httponly=True,
+        samesite="strict",
+    )
     return models.LoginResponse(
-        session=session,
-        member=member,
-        account=account,
+        session=models.MemberSessionRedacted(**session.dict()),
+        member=models.MemberProfileRedacted(**member.dict()),
+        account=models.MemberAccountRedacted(**account.dict()),
+        bearer_token=bearer_token,
     )  # type: ignore

@@ -21,6 +21,7 @@ import services.stripe
 import services.aws
 import services.helpers
 import services.webhook
+from config.sets import EMAIL_PROVIDERS
 
 router = APIRouter()
 
@@ -130,7 +131,7 @@ async def account_register(
             sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
         )
         _, hostname = member.email.split("@")
-        if hostname not in internals.EMAIL_PROVIDERS:
+        if hostname not in EMAIL_PROVIDERS:
             with contextlib.suppress(Exception):
                 queue_name = f"{internals.APP_ENV.lower()}-reconnaissance"
                 queued_timestamp = round(time() * 1000)  # JavaScript support

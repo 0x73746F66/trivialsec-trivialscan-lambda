@@ -17,6 +17,7 @@ import services.aws
 import services.helpers
 import services.sendgrid
 import services.webhook
+from config.sets import ALERT_DETAIL
 
 router = APIRouter()
 
@@ -570,13 +571,13 @@ def early_warning_service_alerts(
     if scanner_record.load(load_ews=True):
         return [
             models.EarlyWarningAlert(
-                summary=internals.ALERT_DETAIL[threat_intel.source][
+                summary=ALERT_DETAIL[threat_intel.source][
                     threat_intel.feed_data.get("category")
                 ]["summary"],
-                description=internals.ALERT_DETAIL[threat_intel.source][
+                description=ALERT_DETAIL[threat_intel.source][
                     threat_intel.feed_data.get("category")
                 ]["description"],
-                abuse=internals.ALERT_DETAIL[threat_intel.source][
+                abuse=ALERT_DETAIL[threat_intel.source][
                     threat_intel.feed_data.get("category")
                 ]["abuse"],
                 reference_url=make_reference_url(threat_intel),  # type: ignore
