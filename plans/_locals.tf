@@ -10,6 +10,7 @@ locals {
         CostCenter = var.app_env != "Prod" ? "randd" : "opex"
         SecurityTags = "credentials customer-data public-data"
         AutomationTool = "Terraform"
+        LUMIGO_TAG = var.app_env == "Prod" ? "Production" : "Development"
     }
     hosted_zone           = "Z04169281YCJD2GS4F5ER"
     domain_name           = "${lower(var.app_env)}-api.trivialsec.com"
