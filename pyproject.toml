@@ -3,26 +3,28 @@ requires = ["setuptools>=46.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "trivialscan-lambda"
+name = "trivialscan-api"
 version = "1.0.0"
-description = "Just an API"
+description = "Just an OpenAPI"
 authors = [
     {name = "Christopher Langton", email = "chris@trivialsec.com"},
 ]
 requires-python = ">=3.9"
 classifiers = [
-    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
     "validators >= 0.18.2",
     "anyio >= 3.6.1",
-    "fastapi >= 0.79.0",
+    "fastapi >= 0.95.1",
     "idna >= 3.3",
     "pydantic >= 1.9.2",
     "sniffio >= 1.2.0",
     "starlette >= 0.19.1",
     "typing-extensions >= 4.3.0",
-    "mangum >= 0.15.1",
+    "mangum >= 0.17.0",
     "retry >= 0.9.2",
     "python-multipart >= 0.0.5",
     "dnspython >= 2.3.0",
@@ -31,11 +33,11 @@ dependencies = [
     "user-agents == 2.2.0",
     "geocoder >= 1.38.1",
     "stripe >= 4.2.0",
-    "cachier >= 1.5.4",
+    "cachier >= 2.1.1",
     "tldextract >= 3.4.0",
     "pyyaml >= 6.0",
-    "pusher >= 3.3.0",
-    "webauthn >= 1.7.2",
+    "pusher >= 3.3.2",
+    "webauthn >= 1.8.0",
     "pyjwt >= 2.6.0"
 ]
 

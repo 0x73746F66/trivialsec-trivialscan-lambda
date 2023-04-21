@@ -6,16 +6,16 @@ provider "aws" {
 }
 
 terraform {
-  required_version = ">= 1.1.7"
+  required_version = ">= 1.5.0"
 
   required_providers {
     local = {
       source  = "hashicorp/local"
-      version = ">= 2.2.2"
+      version = ">= 2.4.0"
     }
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 4.9.0"
+      version = ">= 4.64.0"
     }
   }
   backend "s3" {}

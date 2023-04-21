@@ -79,6 +79,9 @@ tfinstall:
 init: env ## Runs tf init tf
 	terraform -chdir=plans init -backend-config=${APP_ENV}-backend.conf -reconfigure -upgrade=true
 
+init-upgrade: env ## Runs tf init tf
+	terraform -chdir=plans init -upgrade -backend-config=${APP_ENV}-backend.conf -reconfigure -upgrade=true
+
 plan: ## Runs tf validate and tf plan
 	terraform -chdir=plans fmt
 	terraform -chdir=plans validate

@@ -28,4 +28,4 @@ export TF_VAR_app_name=${APP_NAME}
 git fetch
 git status
 echo -e "${PRIMARY}$(make --version)${NC}\n$(make help)"
-[ -f .venv3.9/bin/activate ] && source .venv3.9/bin/activate
+[ -f .venv3.10/bin/activate ] && source .venv3.10/bin/activate
