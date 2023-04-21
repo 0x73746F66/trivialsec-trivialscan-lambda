@@ -537,6 +537,7 @@ class Authorization:
                 return
             except jwt.ExpiredSignatureError:
                 logger.critical(f"DENY expired bearer token {jwt_kid}")
+                self.session.delete()
                 return
 
             self.member = models.MemberProfile(email=self.session.member_email)  # type: ignore

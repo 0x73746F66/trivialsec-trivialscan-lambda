@@ -49,6 +49,9 @@ router = APIRouter()
     response_model_exclude_none=True,
     status_code=status.HTTP_203_NON_AUTHORITATIVE_INFORMATION,
     responses={
+        203: {
+            "description": "Access Controls/Authorization was not checked, only the provided Access Token was checked to be valid according to the authorisation_valid property"
+        },
         403: {
             "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
         },
@@ -58,7 +61,7 @@ router = APIRouter()
 async def validate_authorization(
     request: Request,
     authorization: str = Header(
-        alias="Authorization", title="HMAC-SHA512 Signed Request"
+        alias="Authorization", title="HMAC-SHA512 Signed Request", default=""
     ),
     x_trivialscan_account: Union[str, None] = Header(
         default=None, alias="X-Trivialscan-Account", title="CLI Client Token hint"
@@ -88,7 +91,7 @@ async def validate_authorization(
             "timestamp": round(time() * 1000),
             "account": authz.account.name,
             "member": authz.member.email if hasattr(authz, "member") else None,
-            "client": authz.client.name if hasattr(authz.client, "name") else None,
+            "client": authz.client.name if hasattr(authz, "client") else None,
             "ip_addr": authz.ip_addr,
             "user_agent": authz.user_agent.ua_string,
         },
@@ -936,11 +939,10 @@ async def delete_member(
     Deletes a specific MemberProfile within the same account as the authorized requester
     """
     if validators.email(email) is not True:  # type: ignore
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return False
-    # specifying the account here enforces only deletion of account linked members
-    member = models.MemberProfile(email=email, account_name=authz.account.name)
-    # returns True if member doesn't exist
+        return Response(status_code=status.HTTP_400_BAD_REQUEST)
+    member = models.MemberProfile(email=email)
+    if not member.load() or member.account_name != authz.account.name:
+        return Response(status_code=status.HTTP_403_FORBIDDEN)
     if member.delete():
         services.webhook.send(
             event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
@@ -956,6 +958,8 @@ async def delete_member(
             },
         )
         return True
+
+    return Response(status_code=status.HTTP_412_PRECONDITION_FAILED)
 
 
 @router.get(
