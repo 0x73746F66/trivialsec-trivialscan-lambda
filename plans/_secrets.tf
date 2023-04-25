@@ -28,3 +28,8 @@ variable "dynatrace_token" {
   type        = string
   sensitive   = true
 }
+variable "lumigo_token" {
+  description = "LUMIGO_TOKEN"
+  type        = string
+  sensitive   = true
+}

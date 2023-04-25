@@ -9,6 +9,6 @@ ENV PYTHONPATH ${PYTHONPATH}
 WORKDIR ${LAMBDA_TASK_ROOT}
 COPY pyproject.toml .
 
-RUN echo "Installing from pyproyect.toml" \
+RUN echo "Installing from pyproject.toml" \
     && python -m pip install --progress-bar off -U --no-cache-dir .
 CMD [ "app.handler" ]

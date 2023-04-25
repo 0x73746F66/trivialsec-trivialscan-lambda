@@ -16,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
+    "lumigo-tracer >= 1.1.219",
     "validators >= 0.18.2",
     "anyio >= 3.6.1",
     "fastapi >= 0.95.1",

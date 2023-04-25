@@ -5,8 +5,10 @@ from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
+from lumigo_tracer import lumigo_tracer
 
 import internals
+import services.aws
 from routers import (
     account,
     member,
@@ -66,4 +68,14 @@ async def startup_event():
         internals.logger = logging.getLogger("uvicorn.default")
 
 
-handler = Mangum(app, lifespan="off")
+@lumigo_tracer(
+    token=services.aws.get_ssm(
+        f"/{internals.APP_ENV}/{internals.APP_NAME}/Lumigo/token", WithDecryption=True
+    ),
+    should_report=internals.APP_ENV == "Prod",
+    skip_collecting_http_body=True,
+    verbose=internals.APP_ENV != "Prod",
+)
+def handler(event, context):
+    asgi_handler = Mangum(app, lifespan="off")
+    return asgi_handler(event, context)
