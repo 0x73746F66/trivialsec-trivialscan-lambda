@@ -102,6 +102,7 @@ def send_email(
         timeout=(5, 15),
     )
     logger.info(res.__dict__)
+    internals.trace_tag({f"sendgrid://{recipient}": res.headers.get("X-Message-Id")})
     return res
 
 

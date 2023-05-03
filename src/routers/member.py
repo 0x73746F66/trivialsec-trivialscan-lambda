@@ -31,6 +31,7 @@ from webauthn.helpers.structs import (
     PublicKeyCredentialCreationOptions,
     PublicKeyCredentialDescriptor,
 )
+
 import internals
 import models
 import services.aws

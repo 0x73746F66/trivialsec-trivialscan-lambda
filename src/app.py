@@ -24,7 +24,7 @@ from routers import (
 )
 
 app = FastAPI(
-    title="Trivial Scanner Dashboard API",
+    title="Trivial Scanner Dashboard OpenAPI",
 )
 if getenv("AWS_EXECUTION_ENV"):
     from fastapi.middleware.httpsredirect import (
@@ -74,7 +74,7 @@ async def startup_event():
     ),
     should_report=internals.APP_ENV == "Prod",
     skip_collecting_http_body=True,
-    verbose=internals.APP_ENV != "Prod",
+    verbose=getenv("AWS_EXECUTION_ENV") is None,
 )
 def handler(event, context):
     asgi_handler = Mangum(app, lifespan="off")

@@ -16,6 +16,8 @@ from enum import Enum
 from ipaddress import (
     IPv4Address,
     IPv6Address,
+    IPv4Network,
+    IPv6Network,
 )
 from uuid import UUID
 from webauthn import (
@@ -36,6 +38,7 @@ from webauthn.helpers.structs import (
     ResidentKeyRequirement,
     PublicKeyCredentialRequestOptions,
 )
+from lumigo_tracer import add_execution_tag
 
 import boto3
 import validators
@@ -45,6 +48,7 @@ from user_agents.parsers import UserAgent, parse as ua_parser
 from starlette.requests import Request
 from fastapi import Header, HTTPException, status
 from pydantic import (
+    HttpUrl,
     AnyHttpUrl,
     PositiveInt,
     PositiveFloat,
@@ -634,9 +638,12 @@ class JSONEncoder(json.JSONEncoder):
         if isinstance(
             o,
             (
+                HttpUrl,
                 AnyHttpUrl,
                 IPv4Address,
                 IPv6Address,
+                IPv4Network,
+                IPv6Network,
                 UUID,
             ),
         ):
@@ -706,7 +713,7 @@ async def auth_required(
     return authz
 
 
-def _request_task(url, body, headers):
+def _request_task(url: str, body: dict, headers: dict):
     with contextlib.suppress(requests.exceptions.ConnectionError):
         requests.post(
             url,
@@ -725,6 +732,26 @@ def post_beacon(url: AnyHttpUrl, body: dict, headers: dict = None):  # type: ign
     if headers is None:
         headers = {"Content-Type": "application/json"}
     threading.Thread(target=_request_task, args=(url, body, headers)).start()
+
+
+def trace_tag(data: dict[str, str]):
+    if not isinstance(data, dict) or not all(
+        isinstance(key, str) and isinstance(value, str) for key, value in data.items()
+    ):
+        raise ValueError
+    for key, value in data.items():
+        if len(key) > 50:
+            logger.warning(
+                f"Trace key must be less than 50 for: {value} See: https://docs.lumigo.io/docs/execution-tags#execution-tags-naming-limits-and-requirements"
+            )
+        if len(value) > 70:
+            logger.warning(
+                f"Trace value must be less than 70 for: {value} See: https://docs.lumigo.io/docs/execution-tags#execution-tags-naming-limits-and-requirements"
+            )
+    if getenv("AWS_EXECUTION_ENV") is None or APP_ENV != "Prod":
+        return
+    for key, value in data.items():
+        add_execution_tag(key[:50], value=value[:70])
 
 
 class fido:
