@@ -62,7 +62,7 @@ router = APIRouter()
 async def validate_authorization(
     request: Request,
     authorization: str = Header(
-        alias="Authorization", title="HMAC-SHA512 Signed Request", default=""
+        alias="Authorization", title="Contained JWT", default=""
     ),
     x_trivialscan_account: Union[str, None] = Header(
         default=None, alias="X-Trivialscan-Account", title="CLI Client Token hint"
