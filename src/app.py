@@ -77,13 +77,20 @@ async def startup_event():
     verbose=getenv("AWS_EXECUTION_ENV") is None,
 )
 def handler(event, context):
-    internals.trace_tag(
-        {
-            "rawPath": event.get("rawPath"),
-            "method": event.get("http", {}).get("method"),
-            "protocol": event.get("http", {}).get("protocol"),
-            "sourceIp": event.get("http", {}).get("sourceIp"),
-        }
-    )
+    execution_tags = {}
+    if event.get("path"):
+        execution_tags["path"] = event["rawPath"]
+    elif event.get("rawPath"):
+        execution_tags["path"] = event["rawPath"]
+    if event.get("http", {}).get("method"):
+        execution_tags["method"] = event["http"]["method"]
+    elif event.get("httpMethod"):
+        execution_tags["httpMethod"] = event["httpMethod"]
+    if event.get("http", {}).get("protocol"):
+        execution_tags["protocol"] = event["http"]["protocol"]
+    if event.get("http", {}).get("sourceIp"):
+        execution_tags["sourceIp"] = event["http"]["sourceIp"]
+    if execution_tags:
+        internals.trace_tag(execution_tags)
     asgi_handler = Mangum(app, lifespan="off")
     return asgi_handler(event, context)
