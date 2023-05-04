@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.2",
   "info": {
-    "title": "Trivial Scanner Dashboard API",
+    "title": "Trivial Scanner Dashboard OpenAPI",
     "version": "0.1.0"
   },
   "paths": {
@@ -72,10 +72,11 @@
         "operationId": "support_request_support_post",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -146,10 +147,11 @@
         "operationId": "update_billing_email_billing_email_post",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -223,10 +225,11 @@
         "operationId": "update_primary_email_account_email_post",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -300,10 +303,11 @@
         "operationId": "update_account_display_name_account_display_post",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -380,10 +384,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -450,10 +455,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -501,6 +507,193 @@
         }
       }
     },
+    "/webhook/{event_name}/{event_id}": {
+      "get": {
+        "tags": [
+          "Member Account"
+        ],
+        "summary": "Webhook Event Download",
+        "description": "Download webhook event",
+        "operationId": "webhook_event_download_webhook__event_name___event_id__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "Event Id",
+              "type": "string",
+              "format": "uuid"
+            },
+            "name": "event_id",
+            "in": "path"
+          },
+          {
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WebhookEvent"
+            },
+            "name": "event_name",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhook/events": {
+      "get": {
+        "tags": [
+          "Member Account"
+        ],
+        "summary": "Webhook Event Logs",
+        "description": "webhook event logs",
+        "operationId": "webhook_event_logs_webhook_events_get",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/mfa/{setting}": {
+      "get": {
+        "tags": [
+          "Member Account"
+        ],
+        "summary": "Account Mfa Setting",
+        "description": "Change account MFA setting",
+        "operationId": "account_mfa_setting_account_mfa__setting__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MfaSetting"
+            },
+            "name": "setting",
+            "in": "path"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/webhook/enable": {
       "post": {
         "tags": [
@@ -511,10 +704,11 @@
         "operationId": "enable_webhook_webhook_enable_post",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -594,10 +788,11 @@
             "in": "query"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -646,29 +841,21 @@
         }
       }
     },
-    "/validate": {
-      "get": {
+    "/account": {
+      "delete": {
         "tags": [
-          "CLI"
+          "Member Account"
         ],
-        "summary": "Validate Authorization",
-        "description": "Checks registration status of the provided account name, client name, and access token (or API key)",
-        "operationId": "validate_authorization_validate_get",
+        "summary": "Delete Account",
+        "description": "DANGER!!!\nDeletes an account, cannot be undone",
+        "operationId": "delete_account_account_delete",
         "parameters": [
           {
             "required": false,
             "schema": {
-              "title": "X-Trivialscan-Version",
-              "type": "string"
-            },
-            "name": "x-trivialscan-version",
-            "in": "header"
-          },
-          {
-            "required": true,
-            "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -684,8 +871,80 @@
           }
         ],
         "responses": {
-          "203": {
+          "202": {
             "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Delete Account Account Delete",
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/validate": {
+      "get": {
+        "tags": [
+          "CLI"
+        ],
+        "summary": "Validate Authorization",
+        "description": "Checks registration status of the provided account name, client name, and access token (or API key)",
+        "operationId": "validate_authorization_validate_get",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "X-Trivialscan-Version",
+              "type": "string"
+            },
+            "name": "x-trivialscan-version",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "203": {
+            "description": "Access Controls/Authorization was not checked, only the provided Access Token was checked to be valid according to the authorisation_valid property",
             "content": {
               "application/json": {
                 "schema": {
@@ -720,10 +979,11 @@
         "operationId": "member_profile_me_get",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -781,10 +1041,11 @@
         "operationId": "member_sessions_sessions_get",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -805,11 +1066,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Member Sessions Sessions Get",
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/MemberSessionForList"
-                  }
+                  "$ref": "#/components/schemas/MemberSecurity"
                 }
               }
             }
@@ -849,10 +1106,11 @@
         "operationId": "list_members_members_get",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -926,10 +1184,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1098,10 +1357,11 @@
         "operationId": "update_email_member_email_post",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1234,10 +1494,11 @@
         "operationId": "send_member_invitation_member_invite_post",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1323,10 +1584,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1378,6 +1640,281 @@
         }
       }
     },
+    "/webauthn/register": {
+      "get": {
+        "tags": [
+          "Member Profile"
+        ],
+        "summary": "Webauthn Register",
+        "description": "Webauthn FIDO registration.",
+        "operationId": "webauthn_register_webauthn_register_get",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicKeyCredentialCreationOptions"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "The email address is not valid"
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webauthn/enroll/{device_name}": {
+      "post": {
+        "tags": [
+          "Member Profile"
+        ],
+        "summary": "Webauthn Enroll",
+        "description": "Complete Webauthn FIDO enrollment",
+        "operationId": "webauthn_enroll_webauthn_enroll__device_name__post",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "Device Name",
+              "type": "string"
+            },
+            "name": "device_name",
+            "in": "path"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebauthnEnroll"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberFidoPublic"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "409": {
+            "description": "The device is already registered"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webauthn/delete/{record_id}": {
+      "delete": {
+        "tags": [
+          "Member Profile"
+        ],
+        "summary": "Delete Fido Device",
+        "description": "Delete a FIDO device",
+        "operationId": "delete_fido_device_webauthn_delete__record_id__delete",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            },
+            "name": "record_id",
+            "in": "path"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "204": {
+            "description": "No matching FIDO device, was it already deleted?"
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "424": {
+            "description": "Everything appeared to be correct until actually attempting to delete the device record, probably a race condition with simultaneous delete attempts"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webauthn/login": {
+      "post": {
+        "tags": [
+          "Member Profile"
+        ],
+        "summary": "Webauthn Verify",
+        "description": "Webauthn FIDO verification",
+        "operationId": "webauthn_verify_webauthn_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebauthnLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/reports": {
       "get": {
         "tags": [
@@ -1388,10 +1925,11 @@
         "operationId": "retrieve_reports_reports_get",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1465,10 +2003,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1538,10 +2077,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1609,10 +2149,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1686,10 +2227,11 @@
             "in": "header"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1751,6 +2293,75 @@
         }
       }
     },
+    "/early-warning-service/alerts": {
+      "get": {
+        "tags": [
+          "Early Warning Service"
+        ],
+        "summary": "Early Warning Service Alerts",
+        "description": "Retrieves early warning service alert",
+        "operationId": "early_warning_service_alerts_early_warning_service_alerts_get",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Early Warning Service Alerts Early Warning Service Alerts Get",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EarlyWarningAlert"
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No alert data is present for this account"
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/hosts": {
       "get": {
         "tags": [
@@ -1761,10 +2372,11 @@
         "operationId": "retrieve_hosts_hosts_get",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1861,10 +2473,11 @@
             "in": "query"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -1944,10 +2557,11 @@
             "in": "query"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2008,10 +2622,11 @@
         "operationId": "dashboard_compliance_dashboard_compliance_get",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2076,10 +2691,11 @@
         "operationId": "dashboard_quotas_dashboard_quotas_get",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2150,10 +2766,11 @@
             "in": "query"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2211,7 +2828,8 @@
     "/findings/latest": {
       "get": {
         "tags": [
-          "Scan Reports"
+          "Scan Reports",
+          "Findings"
         ],
         "summary": "Latest Findings",
         "description": "Retrieves a collection of your own Trivial Scanner reports, providing\na list of host findings filtered to include only the highest risk issues\nand ordered by last seen",
@@ -2222,16 +2840,17 @@
             "schema": {
               "title": "Limit",
               "type": "integer",
-              "default": 20
+              "default": 50
             },
             "name": "limit",
             "in": "query"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2255,7 +2874,7 @@
                   "title": "Response Latest Findings Findings Latest Get",
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/EvaluationItem"
+                    "$ref": "#/components/schemas/Finding"
                   }
                 }
               }
@@ -2263,6 +2882,152 @@
           },
           "204": {
             "description": "No scan data is present for this account"
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/finding/status": {
+      "post": {
+        "tags": [
+          "Findings"
+        ],
+        "summary": "Update Finding Status",
+        "description": "updates a finding occurrence status",
+        "operationId": "update_finding_status_finding_status_post",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindingStatusRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Update Finding Status Finding Status Post",
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/finding/deferred": {
+      "post": {
+        "tags": [
+          "Findings"
+        ],
+        "summary": "Update Finding Deferred To",
+        "description": "updates a finding occurrence deferred_to",
+        "operationId": "update_finding_deferred_to_finding_deferred_post",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindingDeferredToRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Update Finding Deferred To Finding Deferred Post",
+                  "type": "boolean"
+                }
+              }
+            }
           },
           "401": {
             "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
@@ -2296,10 +3061,11 @@
         "operationId": "scanner_config_scanner_config_get",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2362,10 +3128,11 @@
         "operationId": "update_config_scanner_config_post",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2449,10 +3216,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2525,10 +3293,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2598,10 +3367,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2672,10 +3442,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2727,6 +3498,81 @@
         }
       }
     },
+    "/search/any/{query}": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Search Any",
+        "description": "Search hostname or ip address, returning exact matches and known (scanned, if any) subdomains",
+        "operationId": "search_any_search_any__query__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "title": "Query",
+              "type": "string"
+            },
+            "name": "query",
+            "in": "path"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
+            },
+            "name": "Authorization",
+            "in": "header"
+          },
+          {
+            "required": false,
+            "schema": {
+              "title": "CLI Client Token hint",
+              "type": "string"
+            },
+            "name": "X-Trivialscan-Account",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Search Any Search Any  Query  Get",
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SearchResult"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization Header was sent but something was not valid (check the logs), likely signed the wrong HTTP method or forgot to sign the base64 encoded POST data"
+          },
+          "403": {
+            "description": "Authorization Header was not sent, or dropped at a proxy (requesters issue) or the CDN (that one is our server misconfiguration)"
+          },
+          "500": {
+            "description": "An unhandled error occurred during an AWS request for data access"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/search/host/{hostname}": {
       "get": {
         "tags": [
@@ -2746,10 +3592,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2824,10 +3671,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -2911,10 +3759,11 @@
             "in": "header"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -3007,10 +3856,11 @@
             "in": "header"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -3082,10 +3932,11 @@
         "operationId": "retrieve_clients_clients_get",
         "parameters": [
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -3160,10 +4011,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -3234,10 +4086,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -3308,10 +4161,11 @@
             "in": "path"
           },
           {
-            "required": true,
+            "required": false,
             "schema": {
-              "title": "HMAC-SHA512 Signed Request",
-              "type": "string"
+              "title": "Contained JWT",
+              "type": "string",
+              "default": ""
             },
             "name": "Authorization",
             "in": "header"
@@ -3454,16 +4308,6 @@
             "title": "New Findings Domains",
             "type": "boolean",
             "default": false
-          },
-          "include_warning": {
-            "title": "Include Warning",
-            "type": "boolean",
-            "default": false
-          },
-          "include_info": {
-            "title": "Include Info",
-            "type": "boolean",
-            "default": false
           }
         }
       },
@@ -3532,6 +4376,65 @@
           }
         }
       },
+      "AttestationConveyancePreference": {
+        "title": "AttestationConveyancePreference",
+        "enum": [
+          "none",
+          "indirect",
+          "direct",
+          "enterprise"
+        ],
+        "type": "string",
+        "description": "The Relying Party's interest in receiving an attestation statement.\n\nMembers:\n    `NONE`: The Relying Party isn't interested in receiving an attestation statement\n    `INDIRECT`: The Relying Party is interested in an attestation statement, but the client is free to generate it as it sees fit\n    `DIRECT`: The Relying Party is interested in an attestation statement generated directly by the authenticator\n    `ENTERPRISE`: The Relying Party is interested in a statement with identifying information. Typically used within organizations\n\nhttps://www.w3.org/TR/webauthn-2/#enum-attestation-convey"
+      },
+      "AuthenticatorAttachment": {
+        "title": "AuthenticatorAttachment",
+        "enum": [
+          "platform",
+          "cross-platform"
+        ],
+        "type": "string",
+        "description": "How an authenticator is connected to the client/browser.\n\nMembers:\n    `PLATFORM`: A non-removable authenticator, like TouchID or Windows Hello\n    `CROSS_PLATFORM`: A \"roaming\" authenticator, like a YubiKey\n\nhttps://www.w3.org/TR/webauthn-2/#enumdef-authenticatorattachment"
+      },
+      "AuthenticatorSelectionCriteria": {
+        "title": "AuthenticatorSelectionCriteria",
+        "type": "object",
+        "properties": {
+          "authenticatorAttachment": {
+            "$ref": "#/components/schemas/AuthenticatorAttachment"
+          },
+          "residentKey": {
+            "$ref": "#/components/schemas/ResidentKeyRequirement"
+          },
+          "requireResidentKey": {
+            "title": "Requireresidentkey",
+            "type": "boolean",
+            "default": false
+          },
+          "userVerification": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserVerificationRequirement"
+              }
+            ],
+            "default": "preferred"
+          }
+        },
+        "description": "A Relying Party's requirements for the types of authenticators that may interact with the client/browser.\n\nAttributes:\n    (optional) `authenticator_attachment`: How the authenticator can be connected to the client/browser\n    (optional) `resident_key`: Whether the authenticator should be able to store a credential on itself\n    (optional) `require_resident_key`: DEPRECATED, set a value for `resident_key` instead\n    (optional) `user_verification`: How the authenticator should be capable of determining user identity\n\nhttps://www.w3.org/TR/webauthn-2/#dictdef-authenticatorselectioncriteria"
+      },
+      "AuthenticatorTransport": {
+        "title": "AuthenticatorTransport",
+        "enum": [
+          "usb",
+          "nfc",
+          "ble",
+          "internal",
+          "cable",
+          "hybrid"
+        ],
+        "type": "string",
+        "description": "How an authenticator communicates to the client/browser.\n\nMembers:\n    `USB`: USB wired connection\n    `NFC`: Near Field Communication\n    `BLE`: Bluetooth Low Energy\n    `INTERNAL`: Direct connection (read: a platform authenticator)\n    `CABLE`: Cloud Assisted Bluetooth Low Energy\n    `HYBRID`: A combination of (often separate) data-transport and proximity mechanisms\n\nhttps://www.w3.org/TR/webauthn-2/#enum-transport"
+      },
       "Billing": {
         "title": "Billing",
         "required": [
@@ -3588,6 +4491,66 @@
             }
           }
         }
+      },
+      "CLIConfig": {
+        "title": "CLIConfig",
+        "required": [
+          "defaults",
+          "outputs",
+          "targets"
+        ],
+        "type": "object",
+        "properties": {
+          "account_name": {
+            "title": "Account Name",
+            "type": "string",
+            "description": "Trivial Security account name"
+          },
+          "client_name": {
+            "title": "Client Name",
+            "type": "string",
+            "description": "Machine name where trivialscan CLI execcutes"
+          },
+          "project_name": {
+            "title": "Project Name",
+            "type": "string",
+            "description": "Trivial Scanner project assignment for the report"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/ConfigDefaults"
+          },
+          "outputs": {
+            "title": "Outputs",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigOutput"
+            }
+          },
+          "targets": {
+            "title": "Targets",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigTarget"
+            }
+          }
+        }
+      },
+      "COSEAlgorithmIdentifier": {
+        "title": "COSEAlgorithmIdentifier",
+        "enum": [
+          -7,
+          -8,
+          -36,
+          -37,
+          -38,
+          -39,
+          -257,
+          -258,
+          -259,
+          -65535
+        ],
+        "type": "integer",
+        "description": "Various registered values indicating cryptographic algorithms that may be used in credential responses\n\nMembers:\n    `ECDSA_SHA_256`\n    `EDDSA`\n    `ECDSA_SHA_512`\n    `RSASSA_PSS_SHA_256`\n    `RSASSA_PSS_SHA_384`\n    `RSASSA_PSS_SHA_512`\n    `RSASSA_PKCS1_v1_5_SHA_256`\n    `RSASSA_PKCS1_v1_5_SHA_384`\n    `RSASSA_PKCS1_v1_5_SHA_512`\n    `RSASSA_PKCS1_v1_5_SHA_1`\n\nhttps://www.w3.org/TR/webauthn-2/#sctn-alg-identifier\nhttps://www.iana.org/assignments/cose/cose.xhtml#algorithms"
       },
       "Certificate": {
         "title": "Certificate",
@@ -3951,49 +4914,6 @@
         "type": "string",
         "description": "An enumeration."
       },
-      "Config": {
-        "title": "Config",
-        "required": [
-          "defaults",
-          "outputs",
-          "targets"
-        ],
-        "type": "object",
-        "properties": {
-          "account_name": {
-            "title": "Account Name",
-            "type": "string",
-            "description": "Trivial Security account name"
-          },
-          "client_name": {
-            "title": "Client Name",
-            "type": "string",
-            "description": "Machine name where trivialscan CLI execcutes"
-          },
-          "project_name": {
-            "title": "Project Name",
-            "type": "string",
-            "description": "Trivial Scanner project assignment for the report"
-          },
-          "defaults": {
-            "$ref": "#/components/schemas/ConfigDefaults"
-          },
-          "outputs": {
-            "title": "Outputs",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConfigOutput"
-            }
-          },
-          "targets": {
-            "title": "Targets",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ConfigTarget"
-            }
-          }
-        }
-      },
       "ConfigDefaults": {
         "title": "ConfigDefaults",
         "required": [
@@ -4145,6 +5065,66 @@
                 "$ref": "#/components/schemas/ComplianceChartItem"
               }
             }
+          }
+        }
+      },
+      "EarlyWarningAlert": {
+        "title": "EarlyWarningAlert",
+        "required": [
+          "id",
+          "account_name",
+          "source",
+          "feed_date",
+          "summary",
+          "description",
+          "abuse"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string",
+            "format": "uuid"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ThreatIntelSource"
+          },
+          "feed_identifier": {
+            "title": "Feed Identifier"
+          },
+          "feed_date": {
+            "title": "Feed Date",
+            "type": "string",
+            "format": "date-time"
+          },
+          "feed_data": {
+            "title": "Feed Data"
+          },
+          "matching_data": {
+            "title": "Matching Data"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "abuse": {
+            "title": "Abuse",
+            "type": "string"
+          },
+          "reference_url": {
+            "title": "Reference Url",
+            "maxLength": 2083,
+            "minLength": 1,
+            "type": "string",
+            "format": "uri"
           }
         }
       },
@@ -4323,6 +5303,214 @@
           }
         }
       },
+      "Finding": {
+        "title": "Finding",
+        "required": [
+          "finding_id"
+        ],
+        "type": "object",
+        "properties": {
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string",
+            "format": "uuid"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string",
+            "format": "date-time"
+          },
+          "occurrences": {
+            "title": "Occurrences",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FindingOccurrence"
+            },
+            "default": []
+          },
+          "rule_id": {
+            "title": "Rule Id",
+            "type": "integer"
+          },
+          "group_id": {
+            "title": "Group Id",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "cvss2": {
+            "title": "Cvss2",
+            "type": "string"
+          },
+          "cvss3": {
+            "title": "Cvss3",
+            "type": "string"
+          },
+          "customer_cvss3": {
+            "title": "Customer Cvss3",
+            "type": "string"
+          }
+        }
+      },
+      "FindingDeferredToRequest": {
+        "title": "FindingDeferredToRequest",
+        "required": [
+          "finding_id",
+          "occurrence_id",
+          "deferred_to"
+        ],
+        "type": "object",
+        "properties": {
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "occurrence_id": {
+            "title": "Occurrence Id",
+            "type": "string"
+          },
+          "deferred_to": {
+            "title": "Deferred To",
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "FindingOccurrence": {
+        "title": "FindingOccurrence",
+        "required": [
+          "hostname",
+          "port"
+        ],
+        "type": "object",
+        "properties": {
+          "occurrence_id": {
+            "title": "Occurrence Id",
+            "type": "string",
+            "format": "uuid"
+          },
+          "report_ids": {
+            "title": "Report Ids",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "hostname": {
+            "title": "Hostname",
+            "type": "string"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "last_seen": {
+            "title": "Last Seen",
+            "type": "string",
+            "format": "date-time"
+          },
+          "certificate_sha1": {
+            "title": "Certificate Sha1",
+            "type": "string"
+          },
+          "certificate_subject": {
+            "title": "Certificate Subject",
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FindingStatus"
+              }
+            ],
+            "default": "discovered"
+          },
+          "triaged_at": {
+            "title": "Triaged At",
+            "type": "string",
+            "format": "date-time"
+          },
+          "deferred_to": {
+            "title": "Deferred To",
+            "type": "string",
+            "format": "date"
+          },
+          "closed_at": {
+            "title": "Closed At",
+            "type": "string",
+            "format": "date-time"
+          },
+          "remediated_at": {
+            "title": "Remediated At",
+            "type": "string",
+            "format": "date-time"
+          },
+          "regressed_at": {
+            "title": "Regressed At",
+            "type": "string",
+            "format": "date-time"
+          },
+          "false_positive_reason": {
+            "title": "False Positive Reason",
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "FindingStatus": {
+        "title": "FindingStatus",
+        "enum": [
+          "discovered",
+          "triaged",
+          "wont_fix",
+          "deferred",
+          "remediated",
+          "regression"
+        ],
+        "type": "string",
+        "description": "An enumeration."
+      },
+      "FindingStatusRequest": {
+        "title": "FindingStatusRequest",
+        "required": [
+          "finding_id",
+          "occurrence_id",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "occurrence_id": {
+            "title": "Occurrence Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FindingStatus"
+          }
+        }
+      },
       "Flags": {
         "title": "Flags",
         "type": "object",
@@ -4434,7 +5622,7 @@
             "$ref": "#/components/schemas/Flags"
           },
           "config": {
-            "$ref": "#/components/schemas/Config"
+            "$ref": "#/components/schemas/CLIConfig"
           },
           "client": {
             "$ref": "#/components/schemas/ClientInfo"
@@ -4572,7 +5760,8 @@
           "host",
           "reports",
           "versions",
-          "external_refs"
+          "external_refs",
+          "related_domains"
         ],
         "type": "object",
         "properties": {
@@ -4609,17 +5798,18 @@
                 }
               ]
             }
+          },
+          "related_domains": {
+            "title": "Related Domains",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
       "HostTLS": {
         "title": "HostTLS",
-        "required": [
-          "client",
-          "cipher",
-          "protocol",
-          "session_resumption"
-        ],
         "type": "object",
         "properties": {
           "certificates": {
@@ -4646,11 +5836,6 @@
       },
       "HostTLSCipher": {
         "title": "HostTLSCipher",
-        "required": [
-          "offered",
-          "negotiated",
-          "negotiated_bits"
-        ],
         "type": "object",
         "properties": {
           "forward_anonymity": {
@@ -4663,7 +5848,8 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "default": []
           },
           "offered_rfc": {
             "title": "Offered Rfc",
@@ -4718,11 +5904,6 @@
       },
       "HostTLSProtocol": {
         "title": "HostTLSProtocol",
-        "required": [
-          "negotiated",
-          "preferred",
-          "offered"
-        ],
         "type": "object",
         "properties": {
           "negotiated": {
@@ -4738,17 +5919,13 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "default": []
           }
         }
       },
       "HostTLSSessionResumption": {
         "title": "HostTLSSessionResumption",
-        "required": [
-          "cache_mode",
-          "tickets",
-          "ticket_hint"
-        ],
         "type": "object",
         "properties": {
           "cache_mode": {
@@ -4829,6 +6006,14 @@
           },
           "account": {
             "$ref": "#/components/schemas/MemberAccountRedacted"
+          },
+          "fido_options": {
+            "title": "Fido Options",
+            "type": "object"
+          },
+          "bearer_token": {
+            "title": "Bearer Token",
+            "type": "string"
           }
         }
       },
@@ -4889,6 +6074,14 @@
             "title": "Timestamp",
             "type": "integer"
           },
+          "mfa": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MfaSetting"
+              }
+            ],
+            "default": "enroll"
+          },
           "billing": {
             "$ref": "#/components/schemas/Billing"
           },
@@ -4905,9 +6098,7 @@
               "self_hosted_uploads": false,
               "early_warning": false,
               "new_findings_certificates": false,
-              "new_findings_domains": false,
-              "include_warning": false,
-              "include_info": false
+              "new_findings_domains": false
             }
           },
           "webhooks": {
@@ -4917,6 +6108,38 @@
               "$ref": "#/components/schemas/Webhooks"
             },
             "default": []
+          }
+        }
+      },
+      "MemberFidoPublic": {
+        "title": "MemberFidoPublic",
+        "required": [
+          "record_id",
+          "created_at"
+        ],
+        "type": "object",
+        "properties": {
+          "record_id": {
+            "title": "Record Id",
+            "type": "string",
+            "format": "uuid"
+          },
+          "device_name": {
+            "title": "Device Name",
+            "type": "string"
+          },
+          "device_id": {
+            "title": "Device Id",
+            "type": "string"
+          },
+          "public_key": {
+            "title": "Public Key",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -4961,6 +6184,11 @@
             "title": "Confirmation Token",
             "type": "string"
           },
+          "mfa": {
+            "title": "Mfa",
+            "type": "boolean",
+            "default": false
+          },
           "timestamp": {
             "title": "Timestamp",
             "type": "integer"
@@ -4994,6 +6222,11 @@
           "confirmation_token": {
             "title": "Confirmation Token",
             "type": "string"
+          },
+          "mfa": {
+            "title": "Mfa",
+            "type": "boolean",
+            "default": false
           },
           "timestamp": {
             "title": "Timestamp",
@@ -5034,26 +6267,54 @@
             "title": "Confirmation Token",
             "type": "string"
           },
+          "mfa": {
+            "title": "Mfa",
+            "type": "boolean",
+            "default": false
+          },
           "timestamp": {
             "title": "Timestamp",
             "type": "integer"
           }
         }
       },
+      "MemberSecurity": {
+        "title": "MemberSecurity",
+        "required": [
+          "sessions",
+          "fido_devices"
+        ],
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "title": "Sessions",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberSessionForList"
+            }
+          },
+          "fido_devices": {
+            "title": "Fido Devices",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberFidoPublic"
+            }
+          }
+        }
+      },
       "MemberSession": {
         "title": "MemberSession",
         "required": [
-          "member_email",
           "session_token"
         ],
         "type": "object",
         "properties": {
-          "member_email": {
-            "title": "Member Email",
-            "type": "string"
-          },
           "session_token": {
             "title": "Session Token",
+            "type": "string"
+          },
+          "member_email": {
+            "title": "Member Email",
             "type": "string"
           },
           "access_token": {
@@ -5098,17 +6359,16 @@
       "MemberSessionForList": {
         "title": "MemberSessionForList",
         "required": [
-          "member_email",
           "session_token"
         ],
         "type": "object",
         "properties": {
-          "member_email": {
-            "title": "Member Email",
-            "type": "string"
-          },
           "session_token": {
             "title": "Session Token",
+            "type": "string"
+          },
+          "member_email": {
+            "title": "Member Email",
             "type": "string"
           },
           "access_token": {
@@ -5158,17 +6418,16 @@
       "MemberSessionRedacted": {
         "title": "MemberSessionRedacted",
         "required": [
-          "member_email",
           "session_token"
         ],
         "type": "object",
         "properties": {
-          "member_email": {
-            "title": "Member Email",
-            "type": "string"
-          },
           "session_token": {
             "title": "Session Token",
+            "type": "string"
+          },
+          "member_email": {
+            "title": "Member Email",
             "type": "string"
           },
           "access_token": {
@@ -5209,6 +6468,15 @@
             "type": "string"
           }
         }
+      },
+      "MfaSetting": {
+        "title": "MfaSetting",
+        "enum": [
+          "enroll",
+          "opt_out"
+        ],
+        "type": "string",
+        "description": "An enumeration."
       },
       "MonitorHostname": {
         "title": "MonitorHostname",
@@ -5286,6 +6554,69 @@
           }
         }
       },
+      "ObservedIdentifier": {
+        "title": "ObservedIdentifier",
+        "required": [
+          "id",
+          "account_name",
+          "source",
+          "address",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string",
+            "format": "uuid"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ObservedSource"
+          },
+          "source_data": {
+            "title": "Source Data"
+          },
+          "address": {
+            "title": "Address",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "ipv4"
+              },
+              {
+                "type": "string",
+                "format": "ipv6"
+              },
+              {
+                "type": "string",
+                "format": "ipv4network"
+              },
+              {
+                "type": "string",
+                "format": "ipv6network"
+              }
+            ]
+          },
+          "date": {
+            "title": "Date",
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ObservedSource": {
+        "title": "ObservedSource",
+        "enum": [
+          "Trivial Scanner",
+          "Open Source Intelligence"
+        ],
+        "type": "string",
+        "description": "An enumeration."
+      },
       "OutputType": {
         "title": "OutputType",
         "enum": [
@@ -5304,6 +6635,152 @@
         ],
         "type": "string",
         "description": "An enumeration."
+      },
+      "PublicKeyCredentialCreationOptions": {
+        "title": "PublicKeyCredentialCreationOptions",
+        "required": [
+          "rp",
+          "user",
+          "challenge",
+          "pubKeyCredParams"
+        ],
+        "type": "object",
+        "properties": {
+          "rp": {
+            "$ref": "#/components/schemas/PublicKeyCredentialRpEntity"
+          },
+          "user": {
+            "$ref": "#/components/schemas/PublicKeyCredentialUserEntity"
+          },
+          "challenge": {
+            "title": "Challenge",
+            "type": "string",
+            "format": "binary"
+          },
+          "pubKeyCredParams": {
+            "title": "Pubkeycredparams",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicKeyCredentialParameters"
+            }
+          },
+          "timeout": {
+            "title": "Timeout",
+            "type": "integer"
+          },
+          "excludeCredentials": {
+            "title": "Excludecredentials",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicKeyCredentialDescriptor"
+            }
+          },
+          "authenticatorSelection": {
+            "$ref": "#/components/schemas/AuthenticatorSelectionCriteria"
+          },
+          "attestation": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AttestationConveyancePreference"
+              }
+            ],
+            "default": "none"
+          }
+        },
+        "description": "Registration Options.\n\nAttributes:\n    `rp`: Information about the Relying Party\n    `user`: Information about the user\n    `challenge`: A unique byte sequence to be returned by the authenticator. Helps prevent replay attacks\n    `pub_key_cred_params`: Cryptographic algorithms supported by the Relying Party when verifying signatures\n    (optional) `timeout`: How long the client/browser should give the user to interact with an authenticator\n    (optional) `exclude_credentials`: A list of credentials associated with the user to prevent them from re-enrolling one of them\n    (optional) `authenticator_selection`: Additional qualities about the authenticators the user can use to complete registration\n    (optional) `attestation`: The Relying Party's desire for a declaration of an authenticator's provenance via attestation statement\n\nhttps://www.w3.org/TR/webauthn-2/#dictdef-publickeycredentialcreationoptions"
+      },
+      "PublicKeyCredentialDescriptor": {
+        "title": "PublicKeyCredentialDescriptor",
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string",
+            "format": "binary"
+          },
+          "type": {
+            "title": "Type",
+            "enum": [
+              "public-key"
+            ],
+            "type": "string",
+            "default": "public-key"
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthenticatorTransport"
+            }
+          }
+        },
+        "description": "Information about a generated credential.\n\nAttributes:\n    `type`: The literal string `\"public-key\"`\n    `id`: The sequence of bytes representing the credential's ID\n    (optional) `transports`: The types of connections to the client/browser the authenticator supports\n\nhttps://www.w3.org/TR/webauthn-2/#dictdef-publickeycredentialdescriptor"
+      },
+      "PublicKeyCredentialParameters": {
+        "title": "PublicKeyCredentialParameters",
+        "required": [
+          "type",
+          "alg"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "title": "Type",
+            "enum": [
+              "public-key"
+            ],
+            "type": "string"
+          },
+          "alg": {
+            "$ref": "#/components/schemas/COSEAlgorithmIdentifier"
+          }
+        },
+        "description": "Information about a cryptographic algorithm that may be used when creating a credential.\n\nAttributes:\n    `type`: The literal string `\"public-key\"`\n    `alg`: A numeric indicator of a particular algorithm\n\nhttps://www.w3.org/TR/webauthn-2/#dictdef-publickeycredentialparameters"
+      },
+      "PublicKeyCredentialRpEntity": {
+        "title": "PublicKeyCredentialRpEntity",
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "description": "Information about the Relying Party.\n\nAttributes:\n    `name`: A user-readable name for the Relying Party\n    (optional) `id`: A unique, constant value assigned to the Relying Party. Authenticators use this value to associate a credential with a particular Relying Party user\n\nhttps://www.w3.org/TR/webauthn-2/#dictdef-publickeycredentialrpentity"
+      },
+      "PublicKeyCredentialUserEntity": {
+        "title": "PublicKeyCredentialUserEntity",
+        "required": [
+          "id",
+          "name",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string",
+            "format": "binary"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "displayName": {
+            "title": "Displayname",
+            "type": "string"
+          }
+        },
+        "description": "Information about a user of a Relying Party.\n\nAttributes:\n    `id`: An \"opaque byte sequence\" that uniquely identifies a user. Typically something like a UUID, but never user-identifying like an email address. Cannot exceed 64 bytes.\n    `name`: A value which a user can see to determine which account this credential is associated with. A username or email address is fine here.\n    `display_name`: A user-friendly representation of a user, like a full name.\n\nhttps://www.w3.org/TR/webauthn-2/#dictdef-publickeycredentialuserentity"
       },
       "PublicKeyType": {
         "title": "PublicKeyType",
@@ -5435,7 +6912,7 @@
             "$ref": "#/components/schemas/Flags"
           },
           "config": {
-            "$ref": "#/components/schemas/Config"
+            "$ref": "#/components/schemas/CLIConfig"
           },
           "client": {
             "$ref": "#/components/schemas/ClientInfo"
@@ -5464,6 +6941,16 @@
         "type": "string",
         "description": "An enumeration."
       },
+      "ResidentKeyRequirement": {
+        "title": "ResidentKeyRequirement",
+        "enum": [
+          "discouraged",
+          "preferred",
+          "required"
+        ],
+        "type": "string",
+        "description": "The Relying Party's preference for the authenticator to create a dedicated \"client-side\" credential for it. Requiring an authenticator to store a dedicated credential should not be done lightly due to the limited storage capacity of some types of authenticators.\n\nMembers:\n    `DISCOURAGED`: The authenticator should not create a dedicated credential\n    `PREFERRED`: The authenticator can create and store a dedicated credential, but if it doesn't that's alright too\n    `REQUIRED`: The authenticator MUST create a dedicated credential. If it cannot, the RP is prepared for an error to occur.\n\nhttps://www.w3.org/TR/webauthn-2/#enum-residentKeyRequirement"
+      },
       "ScanRecordCategory": {
         "title": "ScanRecordCategory",
         "enum": [
@@ -5478,9 +6965,12 @@
       "ScanRecordType": {
         "title": "ScanRecordType",
         "enum": [
+          "Internal",
           "Managed Monitoring",
           "Managed On-demand",
-          "Customer-managed"
+          "Managed",
+          "Customer-managed",
+          "Subdomains"
         ],
         "type": "string",
         "description": "An enumeration."
@@ -5488,12 +6978,13 @@
       "ScannerRecord": {
         "title": "ScannerRecord",
         "required": [
-          "account"
+          "account_name"
         ],
         "type": "object",
         "properties": {
-          "account": {
-            "$ref": "#/components/schemas/MemberAccountRedacted"
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
           },
           "monitored_targets": {
             "title": "Monitored Targets",
@@ -5508,6 +6999,22 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ReportSummary"
+            },
+            "default": []
+          },
+          "ews": {
+            "title": "Ews",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ThreatIntel"
+            },
+            "default": []
+          },
+          "observed_identifiers": {
+            "title": "Observed Identifiers",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservedIdentifier"
             },
             "default": []
           }
@@ -5638,11 +7145,22 @@
       "ThreatIntel": {
         "title": "ThreatIntel",
         "required": [
+          "id",
+          "account_name",
           "source",
           "feed_date"
         ],
         "type": "object",
         "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string",
+            "format": "uuid"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
           "source": {
             "$ref": "#/components/schemas/ThreatIntelSource"
           },
@@ -5653,6 +7171,12 @@
             "title": "Feed Date",
             "type": "string",
             "format": "date-time"
+          },
+          "feed_data": {
+            "title": "Feed Data"
+          },
+          "matching_data": {
+            "title": "Matching Data"
           }
         }
       },
@@ -5662,7 +7186,8 @@
           "CharlesHaley",
           "DataPlane",
           "TalosIntelligence",
-          "Darklist"
+          "Darklist",
+          "ProofPoint"
         ],
         "type": "string",
         "description": "An enumeration."
@@ -5780,6 +7305,16 @@
           }
         }
       },
+      "UserVerificationRequirement": {
+        "title": "UserVerificationRequirement",
+        "enum": [
+          "required",
+          "preferred",
+          "discouraged"
+        ],
+        "type": "string",
+        "description": "The degree to which the Relying Party wishes to verify a user's identity.\n\nMembers:\n    `REQUIRED`: User verification must occur\n    `PREFERRED`: User verification would be great, but if not that's okay too\n    `DISCOURAGED`: User verification should not occur, but it's okay if it does\n\nhttps://www.w3.org/TR/webauthn-2/#enumdef-userverificationrequirement"
+      },
       "ValidationError": {
         "title": "ValidationError",
         "required": [
@@ -5823,6 +7358,128 @@
         "type": "string",
         "description": "An enumeration."
       },
+      "WebauthnClientResponse": {
+        "title": "WebauthnClientResponse",
+        "required": [
+          "clientDataJSON"
+        ],
+        "type": "object",
+        "properties": {
+          "clientDataJSON": {
+            "title": "Clientdatajson",
+            "type": "string"
+          },
+          "attestationObject": {
+            "title": "Attestationobject",
+            "type": "string"
+          },
+          "authenticatorData": {
+            "title": "Authenticatordata",
+            "type": "string"
+          },
+          "signature": {
+            "title": "Signature",
+            "type": "string"
+          },
+          "userHandle": {
+            "title": "Userhandle",
+            "type": "string"
+          }
+        }
+      },
+      "WebauthnEnroll": {
+        "title": "WebauthnEnroll",
+        "required": [
+          "id",
+          "rawId",
+          "type",
+          "response",
+          "record_id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "rawId": {
+            "title": "Rawid",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/WebauthnEnrollType"
+          },
+          "response": {
+            "$ref": "#/components/schemas/WebauthnClientResponse"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "WebauthnEnrollType": {
+        "title": "WebauthnEnrollType",
+        "enum": [
+          "public-key"
+        ],
+        "type": "string",
+        "description": "An enumeration."
+      },
+      "WebauthnLogin": {
+        "title": "WebauthnLogin",
+        "required": [
+          "member_email",
+          "id",
+          "rawId",
+          "type",
+          "response"
+        ],
+        "type": "object",
+        "properties": {
+          "member_email": {
+            "title": "Member Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "rawId": {
+            "title": "Rawid",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/WebauthnEnrollType"
+          },
+          "response": {
+            "$ref": "#/components/schemas/WebauthnClientResponse"
+          }
+        }
+      },
+      "WebhookEvent": {
+        "title": "WebhookEvent",
+        "enum": [
+          "hosted_monitoring",
+          "hosted_scanner",
+          "self_hosted_uploads",
+          "early_warning_email",
+          "early_warning_domain",
+          "early_warning_ip",
+          "new_findings_certificates",
+          "new_findings_domains",
+          "client_status",
+          "client_activity",
+          "scanner_configurations",
+          "report_created",
+          "report_deleted",
+          "account_activity",
+          "member_activity"
+        ],
+        "type": "string",
+        "description": "An enumeration."
+      },
       "Webhooks": {
         "title": "Webhooks",
         "type": "object",
@@ -5856,37 +7513,27 @@
           "early_warning_email": {
             "title": "Early Warning Email",
             "type": "boolean",
-            "default": false
+            "default": true
           },
           "early_warning_domain": {
             "title": "Early Warning Domain",
             "type": "boolean",
-            "default": false
+            "default": true
           },
           "early_warning_ip": {
             "title": "Early Warning Ip",
             "type": "boolean",
-            "default": false
+            "default": true
           },
           "new_findings_certificates": {
             "title": "New Findings Certificates",
             "type": "boolean",
-            "default": false
+            "default": true
           },
           "new_findings_domains": {
             "title": "New Findings Domains",
             "type": "boolean",
-            "default": false
-          },
-          "include_warning": {
-            "title": "Include Warning",
-            "type": "boolean",
-            "default": false
-          },
-          "include_info": {
-            "title": "Include Info",
-            "type": "boolean",
-            "default": false
+            "default": true
           },
           "client_status": {
             "title": "Client Status",
