@@ -44,6 +44,7 @@ import boto3
 import validators
 import requests
 import jwt
+import lumigo_tracer
 from user_agents.parsers import UserAgent, parse as ua_parser
 from starlette.requests import Request
 from fastapi import Header, HTTPException, status
@@ -425,10 +426,10 @@ class Authorization:
                 "IP Address not determined, potential risk if not deliberate or is running locally"
             )
         if not self.user_agent:
-            logger.critical("Missing User-Agent")
+            lumigo_tracer.report_error("Missing User-Agent")
             return
         if self.user_agent.is_bot:
-            logger.critical("DENY Bot User-Agent")
+            lumigo_tracer.report_error("DENY Bot User-Agent")
             return
         if (
             not any(
@@ -441,7 +442,9 @@ class Authorization:
             and not postman_token
             and not is_trivial_scanner
         ):
-            logger.critical(f"DENY unrecognisable User-Agent {self.user_agent}")
+            lumigo_tracer.report_error(
+                f"DENY unrecognisable User-Agent {self.user_agent}"
+            )
             return
 
         authorization_header = request.headers.get("Authorization", "")
@@ -462,11 +465,15 @@ class Authorization:
                 )
                 self.member = models.MemberProfile(email=self.hmac.id)
                 if not self.member.load():
-                    logger.critical(f"DENY missing MemberProfile {self.hmac.id}")
+                    lumigo_tracer.report_error(
+                        f"DENY missing MemberProfile {self.hmac.id}"
+                    )
                     return
                 self.account = models.MemberAccount(name=self.member.account_name)  # type: ignore
                 if not self.account.load():
-                    logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
+                    lumigo_tracer.report_error(
+                        f"DENY missing MemberAccount {self.hmac.id}"
+                    )
                     return
                 logger.info(
                     f"Session inputs; {self.member.email} | {self.user_agent.get_browser()} | {self.user_agent.get_os()} | {self.user_agent.get_device()}"
@@ -483,7 +490,9 @@ class Authorization:
                 )
                 self.session = models.MemberSession(member_email=self.member.email, session_token=session_token)  # type: ignore
                 if not self.session.load():
-                    logger.critical(f"DENY missing MemberSession {self.hmac.id}")
+                    lumigo_tracer.report_error(
+                        f"DENY missing MemberSession {self.hmac.id}"
+                    )
                     return
                 self.is_valid = self.hmac.validate(self.session.access_token)  # type: ignore
                 self.token_type = TokenTypes.SIGNED_SESSION
@@ -494,14 +503,18 @@ class Authorization:
                 )
                 self.account = models.MemberAccount(name=account_name)  # type: ignore
                 if not self.account.load():
-                    logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
+                    lumigo_tracer.report_error(
+                        f"DENY missing MemberAccount {self.hmac.id}"
+                    )
                     return
                 self.client = models.Client(account_name=self.account.name, name=self.hmac.id)  # type: ignore
                 if not self.client.load():
-                    logger.critical(f"DENY missing Client {self.hmac.id}")
+                    lumigo_tracer.report_error(f"DENY missing Client {self.hmac.id}")
                     return
                 if not isinstance(self.account, models.MemberAccount):
-                    logger.critical(f"DENY missing MemberAccount {self.hmac.id}")
+                    lumigo_tracer.report_error(
+                        f"DENY missing MemberAccount {self.hmac.id}"
+                    )
                 if self.client.active:
                     self.is_valid = self.hmac.validate(self.client.access_token)  # type: ignore
                     self.token_type = TokenTypes.CLIENT_TOKEN
@@ -524,7 +537,7 @@ class Authorization:
             logger.info(f"JWT validation for kid {jwt_kid}")
             self.session = models.MemberSession(session_token=jwt_kid)  # type: ignore
             if not self.session.load():
-                logger.critical(f"DENY missing MemberSession {jwt_kid}")
+                lumigo_tracer.report_error(f"DENY missing MemberSession {jwt_kid}")
                 return
             try:
                 decoded = jwt.decode(
@@ -537,16 +550,16 @@ class Authorization:
                     algorithms=["HS256"],
                 )
             except jwt.InvalidSignatureError:
-                logger.critical(f"DENY bearer token {jwt_kid}")
+                lumigo_tracer.report_error(f"DENY bearer token {jwt_kid}")
                 return
             except jwt.ExpiredSignatureError:
-                logger.critical(f"DENY expired bearer token {jwt_kid}")
+                lumigo_tracer.report_error(f"DENY expired bearer token {jwt_kid}")
                 self.session.delete()
                 return
 
             self.member = models.MemberProfile(email=self.session.member_email)  # type: ignore
             if not self.member.load():
-                logger.critical(
+                lumigo_tracer.report_error(
                     f"DENY missing MemberProfile {self.session.member_email}"
                 )
                 return
@@ -557,13 +570,13 @@ class Authorization:
                 )
             ).hexdigest()
             if self.session.session_token != expected_session_token:
-                logger.critical(
-                    f"AUTH_FLOW Expected Session Token: session_token {self.session.session_token} != {expected_session_token}"
+                lumigo_tracer.report_error(
+                    f"DENY Expected Session Token: session_token {self.session.session_token} != {expected_session_token}"
                 )
                 return
             self.account = models.MemberAccount(name=self.member.account_name)  # type: ignore
             if not self.account.load():
-                logger.critical(
+                lumigo_tracer.report_error(
                     f"DENY missing MemberAccount {self.member.account_name}"
                 )
                 return
@@ -573,7 +586,7 @@ class Authorization:
             self.token_type = TokenTypes.BEARER_TOKEN
 
         if not self.is_valid:
-            logger.critical("Unhandled validation")
+            lumigo_tracer.report_error("DENY Unhandled validation")
             return
         if isinstance(self.session, models.MemberSession):
             self.session.timestamp = round(time() * 1000)

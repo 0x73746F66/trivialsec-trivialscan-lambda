@@ -9,6 +9,7 @@ from uuid import UUID
 from ipaddress import IPv4Address, IPv6Address, IPv4Network, IPv6Network
 
 import validators
+import lumigo_tracer
 from pydantic import (
     BaseModel,
     Field,
@@ -532,8 +533,9 @@ class MemberProfile(BaseModel):
         )
         matches = [k for k in prefix_matches if k.endswith(suffix)]
         if len(matches) > 1:
-            internals.logger.critical(
-                "MemberProfile.load found too many matches, this is a data taint, likely manual data edits"
+            lumigo_tracer.error(
+                "MemberProfile.load found too many matches, this is a data taint, likely manual data edits",
+                extra={f"match{k+1}": v for k, v in enumerate(matches)},
             )
             internals.logger.info(matches)
         if not matches:
