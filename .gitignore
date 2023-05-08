@@ -98,4 +98,4 @@ cert_dot_sh/*.csv.part
 .development/*.log
 .development/*.crt
 .development/*.key
-
+cyclonedx.json
