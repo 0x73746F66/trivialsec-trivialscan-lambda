@@ -66,6 +66,7 @@ output: env init
 
 build: env ## makes the lambda zip archive
 	python .$(BUILD_ENV)/build_yaml_descriptions.py
+	pre-commit run prettier
 	./.$(BUILD_ENV)/bin/build-archive
 
 tfinstall:

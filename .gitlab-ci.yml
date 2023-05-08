@@ -1,12 +1,12 @@
 variables:
   BUILD_ENV: ci
   APP_ENV: Prod
-  SOURCE_FILE: prod-trivialscan-lambda.zip
-  IMAGE_NAME: trivialscan-lambda-ci
+  SOURCE_FILE: prod-trivialscan-api.zip
+  IMAGE_NAME: trivialscan-api-ci
   TF_VAR_jitter_seconds: 30
   TF_VAR_app_env: Prod
   TF_VAR_log_level: WARNING
-  TF_VAR_app_name: trivialscan-lambda
+  TF_VAR_app_name: trivialscan-api
   TF_LOG: WARN
 
 stages:

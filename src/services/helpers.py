@@ -189,9 +189,7 @@ def load_descriptions(
                 item.references.append(models.ReferenceItem(name=f"EPSS for {cve}", type=models.ReferenceType.JSON, url=f"https://api.first.org/data/v1/epss?cve={cve}"))  # type: ignore
 
         item.description = config.get_rule_desc(f"{item.group_id}.{item.rule_id}")
-        item.recommendation = config.get_rule_recommendation(
-            f"{item.group_id}.{item.rule_id}"
-        )
+        item.recommendation = f'See the <a href="https://docs.{internals.APEX_DOMAIN}/rules/issue_{item.group_id}.{item.rule_id}.html" target="_blank" class="font-xs-sb font-color-primary text-decoration-none hover-help">issue documentation page</a> for further details and remediation instructions.'
         for group in item.compliance or []:
             if (
                 config.pcidss4

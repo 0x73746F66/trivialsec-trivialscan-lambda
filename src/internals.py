@@ -6,8 +6,9 @@ import logging
 import hmac
 import hashlib
 import threading
+from inspect import getframeinfo, stack
 from base64 import b64encode, b64decode
-from time import time
+from time import sleep, time
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import urlparse, unquote
 from os import getenv
@@ -20,6 +21,11 @@ from ipaddress import (
     IPv6Network,
 )
 from uuid import UUID
+
+import boto3
+import validators
+import requests
+import jwt
 from webauthn import (
     generate_registration_options,
     verify_registration_response,
@@ -38,13 +44,7 @@ from webauthn.helpers.structs import (
     ResidentKeyRequirement,
     PublicKeyCredentialRequestOptions,
 )
-from lumigo_tracer import add_execution_tag
-
-import boto3
-import validators
-import requests
-import jwt
-import lumigo_tracer
+from lumigo_tracer import add_execution_tag, error as lumigo_error
 from user_agents.parsers import UserAgent, parse as ua_parser
 from starlette.requests import Request
 from fastapi import Header, HTTPException, status
@@ -56,15 +56,16 @@ from pydantic import (
 )
 
 
-CACHE_DIR = getenv("CACHE_DIR", "/tmp")
+CACHE_DIR = getenv("CACHE_DIR", default="/tmp")
 JITTER_SECONDS = int(getenv("JITTER_SECONDS", default="30"))
-APP_ENV = getenv("APP_ENV", "Dev")
-APP_NAME = getenv("APP_NAME", "trivialscan-api")
+APP_ENV = getenv("APP_ENV", default="Dev")
+APP_NAME = getenv("APP_NAME", default="trivialscan-api")
 DEFAULT_LOG_LEVEL = "WARNING"
 LOG_LEVEL = getenv("LOG_LEVEL", DEFAULT_LOG_LEVEL)
 NAMESPACE = UUID("bc6e2cd5-1f59-487f-b05b-49946bd078b2")
 GENERIC_SECURITY_MESSAGE = "Your malformed request has been logged for investigation"
-ORIGIN_HOST = "dev.trivialsec.com" if APP_ENV == "Dev" else "www.trivialsec.com"
+APEX_DOMAIN = "trivialsec.com"
+ORIGIN_HOST = f"dev.{APEX_DOMAIN}" if APP_ENV == "Dev" else f"www.{APEX_DOMAIN}"
 DASHBOARD_URL = f"https://{ORIGIN_HOST}"
 ALLOWED_ORIGINS = (
     [
@@ -84,6 +85,54 @@ ERR_MISSING_AUTHORIZATION = "Missing Bearer Token"
 logger = logging.getLogger()
 boto3.set_stream_logger("boto3", getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))  # type: ignore
 logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
+
+
+def always_log(message: Union[str, Exception]):
+    caller = getframeinfo(stack()[1][0])
+    alert_type = (
+        message.__class__.__name__
+        if hasattr(message, "__class__") and message is not str
+        else "UnhandledError"
+    )
+    filename = (
+        caller.filename.replace(getenv("LAMBDA_TASK_ROOT", ""), "")
+        if getenv("AWS_EXECUTION_ENV") is not None and getenv("LAMBDA_TASK_ROOT")
+        else caller.filename.split("/src/")[1]
+    )
+    lumigo_error(
+        f"{filename}:{caller.function}:{caller.lineno} - {message}",
+        alert_type,
+        extra={
+            "LOG_LEVEL": LOG_LEVEL,
+            "NAMESPACE": NAMESPACE.hex,
+        },
+    )
+
+
+class DenyAuthorisation(Exception):
+    """
+    Denied Authorisation Attempt
+    """
+
+
+class DelayRetryHandler(Exception):
+    """
+    Delay the retry handler and provide a useful message when retries are exceeded
+    """
+
+    def __init__(self, **kwargs):
+        sleep(kwargs.get("delay", 3) or 3)
+        Exception.__init__(self, kwargs.get("msg", "Max retries exceeded"))
+
+
+class UnspecifiedError(Exception):
+    """
+    The exception class for exceptions that weren't previously known.
+    """
+
+    def __init__(self, **kwargs):
+        always_log(kwargs.get("msg", "An unspecified error occurred"))
+        Exception.__init__(self, kwargs.get("msg", "An unspecified error occurred"))
 
 
 class HMAC:
@@ -409,11 +458,12 @@ class Authorization:
             user_agent or request.headers.get("User-Agent", "")
         )
         if postman_token := request.headers.get("Postman-Token"):
+            trace_tag({"postman_token": postman_token})  # type: ignore
             logger.info(f"Postman-Token: {postman_token}")
         if is_trivial_scanner := self.user_agent.ua_string.startswith(
             "Trivial Scanner"
         ):
-            logger.info(user_agent)
+            trace_tag({"is_trivial_scanner": str(is_trivial_scanner)})  # type: ignore
         _check_ip: Any = request.headers.get(
             "X-Forwarded-For", request.headers.get("X-Real-IP")
         )
@@ -422,15 +472,20 @@ class Authorization:
         if _check_ip and validators.ipv6(_check_ip) is True:
             self.ip_addr = IPv6Address(_check_ip)
         if not self.ip_addr:
-            logger.warning(
+            always_log(
                 "IP Address not determined, potential risk if not deliberate or is running locally"
             )
+        trace_tag({"ip_addr": str(self.ip_addr)})  # type: ignore
         if not self.user_agent:
-            lumigo_tracer.report_error("Missing User-Agent")
-            return
+            raise DenyAuthorisation("Missing User-Agent")
+
+        trace_tag({"is_bot": str(self.user_agent.is_bot)})  # type: ignore
         if self.user_agent.is_bot:
-            lumigo_tracer.report_error("DENY Bot User-Agent")
-            return
+            raise DenyAuthorisation("Bot User-Agent")
+
+        trace_tag({"is_mobile": str(self.user_agent.is_mobile)})  # type: ignore
+        trace_tag({"is_tablet": str(self.user_agent.is_tablet)})  # type: ignore
+        trace_tag({"is_pc": str(self.user_agent.is_pc)})  # type: ignore
         if (
             not any(
                 [
@@ -442,10 +497,7 @@ class Authorization:
             and not postman_token
             and not is_trivial_scanner
         ):
-            lumigo_tracer.report_error(
-                f"DENY unrecognisable User-Agent {self.user_agent}"
-            )
-            return
+            raise DenyAuthorisation(f"Unrecognisable User-Agent {self.user_agent}")
 
         authorization_header = request.headers.get("Authorization", "")
         if authorization_header.startswith("HMAC "):
@@ -460,25 +512,22 @@ class Authorization:
             )
             logger.info(f"Signature validation for id {self.hmac.id}")
             if validators.email(self.hmac.id) is True:  # type: ignore
-                logger.warning(
-                    f"Deprecated use of symmetric signed session {self.hmac.id}"
+                logger.critical(
+                    DeprecationWarning(
+                        f"Deprecated use of symmetric signed session {self.hmac.id}"
+                    )
                 )
                 self.member = models.MemberProfile(email=self.hmac.id)
                 if not self.member.load():
-                    lumigo_tracer.report_error(
-                        f"DENY missing MemberProfile {self.hmac.id}"
-                    )
-                    return
+                    raise DenyAuthorisation(f"Missing MemberProfile {self.hmac.id}")
+
                 self.account = models.MemberAccount(name=self.member.account_name)  # type: ignore
                 if not self.account.load():
-                    lumigo_tracer.report_error(
-                        f"DENY missing MemberAccount {self.hmac.id}"
-                    )
-                    return
+                    raise DenyAuthorisation(f"Missing MemberAccount {self.hmac.id}")
+
                 logger.info(
                     f"Session inputs; {self.member.email} | {self.user_agent.get_browser()} | {self.user_agent.get_os()} | {self.user_agent.get_device()}"
                 )
-
                 session_token = hashlib.sha224(
                     bytes(
                         f"{self.member.email}{self.user_agent.get_browser()}{self.user_agent.get_os()}{self.user_agent.get_device()}",
@@ -490,10 +539,8 @@ class Authorization:
                 )
                 self.session = models.MemberSession(member_email=self.member.email, session_token=session_token)  # type: ignore
                 if not self.session.load():
-                    lumigo_tracer.report_error(
-                        f"DENY missing MemberSession {self.hmac.id}"
-                    )
-                    return
+                    raise DenyAuthorisation(f"Missing MemberSession {self.hmac.id}")
+
                 self.is_valid = self.hmac.validate(self.session.access_token)  # type: ignore
                 self.token_type = TokenTypes.SIGNED_SESSION
 
@@ -503,18 +550,15 @@ class Authorization:
                 )
                 self.account = models.MemberAccount(name=account_name)  # type: ignore
                 if not self.account.load():
-                    lumigo_tracer.report_error(
-                        f"DENY missing MemberAccount {self.hmac.id}"
-                    )
-                    return
+                    raise DenyAuthorisation(f"Missing MemberAccount {self.hmac.id}")
+
                 self.client = models.Client(account_name=self.account.name, name=self.hmac.id)  # type: ignore
                 if not self.client.load():
-                    lumigo_tracer.report_error(f"DENY missing Client {self.hmac.id}")
-                    return
+                    raise DenyAuthorisation(f"Missing Client {self.hmac.id}")
+
                 if not isinstance(self.account, models.MemberAccount):
-                    lumigo_tracer.report_error(
-                        f"DENY missing MemberAccount {self.hmac.id}"
-                    )
+                    raise DenyAuthorisation(f"Missing MemberAccount {self.hmac.id}")
+
                 if self.client.active:
                     self.is_valid = self.hmac.validate(self.client.access_token)  # type: ignore
                     self.token_type = TokenTypes.CLIENT_TOKEN
@@ -537,8 +581,8 @@ class Authorization:
             logger.info(f"JWT validation for kid {jwt_kid}")
             self.session = models.MemberSession(session_token=jwt_kid)  # type: ignore
             if not self.session.load():
-                lumigo_tracer.report_error(f"DENY missing MemberSession {jwt_kid}")
-                return
+                raise DenyAuthorisation(f"Missing MemberSession {jwt_kid}")
+
             try:
                 decoded = jwt.decode(
                     jwt=bearer_token,
@@ -549,20 +593,19 @@ class Authorization:
                     issuer=DASHBOARD_URL,
                     algorithms=["HS256"],
                 )
-            except jwt.InvalidSignatureError:
-                lumigo_tracer.report_error(f"DENY bearer token {jwt_kid}")
-                return
-            except jwt.ExpiredSignatureError:
-                lumigo_tracer.report_error(f"DENY expired bearer token {jwt_kid}")
+            except jwt.InvalidSignatureError as err:
+                raise DenyAuthorisation(f"Bearer token {jwt_kid}") from err
+
+            except jwt.ExpiredSignatureError as err:
                 self.session.delete()
-                return
+                raise DenyAuthorisation(f"Bearer token {jwt_kid}") from err
 
             self.member = models.MemberProfile(email=self.session.member_email)  # type: ignore
             if not self.member.load():
-                lumigo_tracer.report_error(
-                    f"DENY missing MemberProfile {self.session.member_email}"
+                raise DenyAuthorisation(
+                    f"Missing MemberProfile {self.session.member_email}"
                 )
-                return
+
             expected_session_token = hashlib.sha224(
                 bytes(
                     f"{self.member.email}{self.user_agent.get_browser()}{self.user_agent.get_os()}{self.user_agent.get_device()}",
@@ -570,24 +613,38 @@ class Authorization:
                 )
             ).hexdigest()
             if self.session.session_token != expected_session_token:
-                lumigo_tracer.report_error(
-                    f"DENY Expected Session Token: session_token {self.session.session_token} != {expected_session_token}"
+                raise DenyAuthorisation(
+                    f"Expected Session Token: session_token {self.session.session_token} != {expected_session_token}"
                 )
-                return
+
             self.account = models.MemberAccount(name=self.member.account_name)  # type: ignore
             if not self.account.load():
-                lumigo_tracer.report_error(
-                    f"DENY missing MemberAccount {self.member.account_name}"
+                raise DenyAuthorisation(
+                    f"Missing MemberAccount {self.member.account_name}"
                 )
-                return
+
             self.is_valid = (
                 decoded.get("acc") == self.member.account_name
             )  # the only custom claim we signed
             self.token_type = TokenTypes.BEARER_TOKEN
 
+        trace_tags = {
+            "account_name": self.account.name,
+            "is_valid": str(self.is_valid),
+        }
+        if isinstance(self.token_type, TokenTypes):
+            trace_tags["token_type"] = self.token_type.value
+        if isinstance(self.member, models.MemberSession) and self.member.email:
+            trace_tags["member_email"] = self.member.email
+        if (
+            isinstance(self.session, models.MemberSession)
+            and self.session.session_token
+        ):
+            trace_tags["session_token"] = self.session.session_token
+        trace_tag(trace_tags)
         if not self.is_valid:
-            lumigo_tracer.report_error("DENY Unhandled validation")
-            return
+            raise DenyAuthorisation("Unhandled validation")
+
         if isinstance(self.session, models.MemberSession):
             self.session.timestamp = round(time() * 1000)
             if not self.session.save():
@@ -709,13 +766,22 @@ async def auth_required(
         )
     event = request.scope.get("aws.event", {})
     raw_body = await get_contents(request)
-    authz = Authorization(
-        request=request,
-        user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
-        ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
-        account_name=x_trivialscan_account,
-        raw_body=raw_body,
-    )
+    try:
+        authz = Authorization(
+            request=request,
+            user_agent=event.get("requestContext", {}).get("http", {}).get("userAgent"),
+            ip_addr=event.get("requestContext", {}).get("http", {}).get("sourceIp"),
+            account_name=x_trivialscan_account,
+            raw_body=raw_body,
+        )
+    except DenyAuthorisation as err:
+        always_log(err)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=ERR_INVALID_AUTHORIZATION,
+            headers={"WWW-Authenticate": AUTHZ_REALM},
+        ) from err
+
     if not authz.is_valid or not authz.authorized(request.url.path):
         logger.error(ERR_INVALID_AUTHORIZATION)
         raise HTTPException(
@@ -753,11 +819,11 @@ def trace_tag(data: dict[str, str]):
     ):
         raise ValueError
     for key, value in data.items():
-        if len(key) > 50:
+        if 1 > len(key) > 50:
             logger.warning(
-                f"Trace key must be less than 50 for: {value} See: https://docs.lumigo.io/docs/execution-tags#execution-tags-naming-limits-and-requirements"
+                f"Trace key must be less than 50 for: {key} See: https://docs.lumigo.io/docs/execution-tags#execution-tags-naming-limits-and-requirements"
             )
-        if len(value) > 70:
+        if 1 > len(value) > 70:
             logger.warning(
                 f"Trace value must be less than 70 for: {value} See: https://docs.lumigo.io/docs/execution-tags#execution-tags-naming-limits-and-requirements"
             )

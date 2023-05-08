@@ -63,7 +63,9 @@ def _sign_and_send(
         key=webhook.signing_secret.encode("utf8"),  # type: ignore
         algorithm="HS256",
     )
-    internals.trace_tag({f"{event_name.value}://{payload.event_id}": account_name})
+    internals.trace_tag(
+        {payload.event_id.hex: f"urn:trivialsec:webhook:{event_name.value}"}
+    )
     internals.post_beacon(
         url=webhook.endpoint,
         body=payload.dict(),

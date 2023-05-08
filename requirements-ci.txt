@@ -4,3 +4,4 @@ coverage
 pre-commit
 pip-audit
 markdown
+ruamel.yaml >= 0.2.7

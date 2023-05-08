@@ -1,7 +1,9 @@
 import logging
+from contextlib import asynccontextmanager
 from os import getenv
+from urllib.parse import urlparse, unquote
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
@@ -23,8 +25,33 @@ from routers import (
     sendgrid,
 )
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup
+    if getenv("AWS_EXECUTION_ENV") is None:
+        internals.logger = logging.getLogger("uvicorn.default")
+    yield  # serve requests
+    # shutdown below
+
+
+async def trace_tags(request: Request):
+    try:
+        parsed_url = urlparse(str(request.url))
+        internals.trace_tag(
+            {
+                "method": request.method.upper(),
+                "path": unquote(parsed_url.path),
+            }
+        )
+    except Exception as err:
+        internals.always_log(err)
+
+
 app = FastAPI(
     title="Trivial Scanner Dashboard OpenAPI",
+    lifespan=lifespan,
+    dependencies=[Depends(trace_tags)],
 )
 if getenv("AWS_EXECUTION_ENV"):
     from fastapi.middleware.httpsredirect import (
@@ -62,12 +89,6 @@ app.include_router(sendgrid.router, include_in_schema=False, prefix="/sendgrid")
 app.include_router(stripe.router, include_in_schema=False, prefix="/stripe")
 
 
-@app.on_event("startup")
-async def startup_event():
-    if getenv("AWS_EXECUTION_ENV") is None:
-        internals.logger = logging.getLogger("uvicorn.default")
-
-
 @lumigo_tracer(
     token=services.aws.get_ssm(
         f"/{internals.APP_ENV}/{internals.APP_NAME}/Lumigo/token", WithDecryption=True
@@ -77,20 +98,5 @@ async def startup_event():
     verbose=getenv("AWS_EXECUTION_ENV") is None,
 )
 def handler(event, context):
-    execution_tags = {}
-    if event.get("path"):
-        execution_tags["path"] = event["rawPath"]
-    elif event.get("rawPath"):
-        execution_tags["path"] = event["rawPath"]
-    if event.get("http", {}).get("method"):
-        execution_tags["method"] = event["http"]["method"]
-    elif event.get("httpMethod"):
-        execution_tags["httpMethod"] = event["httpMethod"]
-    if event.get("http", {}).get("protocol"):
-        execution_tags["protocol"] = event["http"]["protocol"]
-    if event.get("http", {}).get("sourceIp"):
-        execution_tags["sourceIp"] = event["http"]["sourceIp"]
-    if execution_tags:
-        internals.trace_tag(execution_tags)
     asgi_handler = Mangum(app, lifespan="off")
     return asgi_handler(event, context)

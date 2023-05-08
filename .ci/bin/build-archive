@@ -7,7 +7,7 @@ if [ -z "${APP_ENV}" ]; then
     exit 1
 fi
 readonly SOURCE_FILE=${SOURCE_FILE:-$(echo "$APP_ENV" | awk '{print tolower($0)}')-$(basename $CWD).zip}
-readonly IMAGE_NAME=${IMAGE_NAME:-trivialscan-lambda-ci}
+readonly IMAGE_NAME=${IMAGE_NAME:-trivialscan-api-ci}
 if [ -z "${SOURCE_FILE}" ]; then
     echo "SOURCE_FILE not set"
     exit 1

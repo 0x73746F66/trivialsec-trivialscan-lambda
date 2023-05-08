@@ -3,17 +3,13 @@ from glob import glob
 from pathlib import Path
 
 from markdown import markdown
-import yaml
+import ruamel.yaml
 
 
-def str_presenter(dumper, data):
-    if len(data) > 50:  # check for multiline string
-        return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
-    return dumper.represent_scalar('tag:yaml.org,2002:str', data)
-
-yaml.add_representer(str, str_presenter)
-yaml.representer.SafeRepresenter.add_representer(str, str_presenter)
-
+yaml = ruamel.yaml.YAML(typ="safe")
+yaml.indent(mapping=2, sequence=4, offset=2)
+yaml.allow_duplicate_keys = True
+yaml.default_flow_style = False
 
 PROJ_ROOT = str(Path(__file__).parent.parent)
 
@@ -31,7 +27,7 @@ for file_name in glob(f"{PROJ_ROOT}/src/config/rules/*.md"):
         rule_descriptions[rule_num]['issue'] = description
 
 with open(f'{PROJ_ROOT}/src/config/rule_desc.yaml', 'w', encoding='utf8') as handle:
-    yaml.safe_dump_all([rule_descriptions], stream=handle, indent=4, encoding='utf8', default_flow_style=False)
+    yaml.dump_all([rule_descriptions], handle)
 
 pci_dss = {
     'version': "3.2.1",
@@ -43,7 +39,7 @@ for file_name in glob(f"{PROJ_ROOT}/src/config/pci_dss/3.2.1/*.md"):
     pci_dss['requirements'][requirement] = description
 
 with open(f'{PROJ_ROOT}/src/config/pci_dss_3.2.1.yaml', 'w', encoding='utf8') as handle:
-    yaml.safe_dump_all([pci_dss], stream=handle, indent=4, encoding='utf8', default_flow_style=False)
+    yaml.dump_all([pci_dss], stream=handle)
 
 pci_dss = {
     'version': "4.0",
@@ -55,7 +51,7 @@ for file_name in glob(f"{PROJ_ROOT}/src/config/pci_dss/4.0/*.md"):
     pci_dss['requirements'][requirement] = description
 
 with open(f'{PROJ_ROOT}/src/config/pci_dss_4.0.yaml', 'w', encoding='utf8') as handle:
-    yaml.safe_dump_all([pci_dss], stream=handle, indent=4, encoding='utf8', default_flow_style=False)
+    yaml.dump_all([pci_dss], stream=handle)
 
 mitre_attack = {
     'version': "11.2",
@@ -112,4 +108,4 @@ for file_name in glob(f"{PROJ_ROOT}/src/config/mitre/attack_11.2/techniques/*/*.
     mitre_attack['techniques'].append(techniques)
 
 with open(f'{PROJ_ROOT}/src/config/mitre_attack_11.2.yaml', 'w', encoding='utf8') as handle:
-    yaml.safe_dump_all([mitre_attack], stream=handle, indent=4, encoding='utf8', default_flow_style=False)
+    yaml.dump_all([mitre_attack], stream=handle)

@@ -16,8 +16,8 @@ from botocore.exceptions import (
 
 import internals
 
-STORE_BUCKET = getenv("STORE_BUCKET", "trivialscan-dashboard-store")
-AWS_REGION = getenv("AWS_REGION", "ap-southeast-2")
+STORE_BUCKET = getenv("STORE_BUCKET", default="trivialscan-dashboard-store")
+AWS_REGION = getenv("AWS_REGION", default="ap-southeast-2")
 if getenv("AWS_EXECUTION_ENV") is None:
     boto3.setup_default_session(
         profile_name=getenv("AWS_PROFILE_NAME"),
@@ -73,6 +73,7 @@ class StorageClass(str, Enum):
     backoff=1,
 )
 def object_exists(file_path: str, bucket_name: str = STORE_BUCKET, **kwargs):
+    internals.logger.info(f"object_exists {file_path} from bucket {bucket_name}")
     try:
         content = s3_client.head_object(Bucket=bucket_name, Key=file_path, **kwargs)
         return content.get("ResponseMetadata", None) is not None
@@ -93,7 +94,7 @@ def object_exists(file_path: str, bucket_name: str = STORE_BUCKET, **kwargs):
     backoff=1,
 )
 def get_ssm(parameter: str, default: Any = None, **kwargs) -> Any:
-    internals.logger.info(f"requesting secret {parameter}")
+    internals.logger.info(f"get_ssm parameter {parameter}")
     try:
         response = ssm_client.get_parameter(Name=parameter, **kwargs)
         return (
@@ -125,7 +126,7 @@ def get_ssm(parameter: str, default: Any = None, **kwargs) -> Any:
     backoff=1,
 )
 def store_ssm(parameter: str, value: str, **kwargs) -> bool:
-    internals.logger.info(f"storing secret {parameter}")
+    internals.logger.info(f"store_ssm parameter {parameter}")
     try:
         response = ssm_client.put_parameter(Name=parameter, Value=value, **kwargs)
         return (
@@ -221,7 +222,7 @@ def list_s3_objects(prefix_key: str, bucket_name: str = STORE_BUCKET) -> list[st
     - bucket_name: s3 bucket with target contents
     - prefix_key: pattern to match in s3
     """
-    internals.logger.info(f"list_s3 key prefix {prefix_key}")
+    internals.logger.info(f"list_s3_objects key prefix {prefix_key}")
     items = []
     next_token = ""
     base_kwargs = {
@@ -414,7 +415,7 @@ def store_sqs(
     message_group_id: Union[str, None] = None,
     **kwargs,
 ) -> bool:
-    internals.logger.info(f"storing {queue_name}")
+    internals.logger.info(f"store_sqs {queue_name}")
     internals.logger.debug(f"message {message_body}")
     if queue_name.endswith(".fifo"):
         if deduplicate and not deduplication_id:

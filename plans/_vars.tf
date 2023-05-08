@@ -13,9 +13,9 @@ variable "app_env" {
   default     = "Dev"
 }
 variable "app_name" {
-  description = "default trivialscan-lambda"
+  description = "default trivialscan-api"
   type        = string
-  default     = "trivialscan-lambda"
+  default     = "trivialscan-api"
 }
 variable "build_env" {
   description = "BUILD_ENV"

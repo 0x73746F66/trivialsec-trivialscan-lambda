@@ -1,5 +1,5 @@
 # <img src=".repo/assets/icon-512x512.png"  width="52" height="52"> Trivial Scanner lambda
 
-[![pipeline status](https://gitlab.com/trivialsec/trivialscan-lambda/badges/main/pipeline.svg)](https://gitlab.com/trivialsec/trivialscan-lambda/commits/main)
+[![pipeline status](https://gitlab.com/trivialsec/trivialscan-api/badges/main/pipeline.svg)](https://gitlab.com/trivialsec/trivialscan-api/commits/main)
 
 #

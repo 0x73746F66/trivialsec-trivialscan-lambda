@@ -12,6 +12,7 @@ black
 pre-commit
 detect-secrets
 pip-audit
-uvicorn==0.18.2
+uvicorn == 0.18.2
 markdown
 checkov
+ruamel.yaml >= 0.2.7

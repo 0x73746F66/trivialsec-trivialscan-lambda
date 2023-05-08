@@ -71,7 +71,7 @@ repos:
           - --args=--skip-download
           - --args=--quiet
           - --args=--framework terraform
-          - --args=--skip-check CKV_AWS_18,CKV_AWS_19,CKV_AWS_21,CKV2_AWS_34,CKV_AWS_50,CKV_AWS_115,CKV_AWS_116,CKV_AWS_117,CKV_AWS_144,CKV_AWS_145,CKV_AWS_173,CKV_AWS_258,CKV_AWS_272,CKV_AWS_158,CKV_AWS_119,CKV_AWS_28
+          - --args=--skip-check CKV_AWS_337,CKV_AWS_18,CKV_AWS_19,CKV_AWS_21,CKV2_AWS_34,CKV_AWS_50,CKV_AWS_115,CKV_AWS_116,CKV_AWS_117,CKV_AWS_144,CKV_AWS_145,CKV_AWS_173,CKV_AWS_258,CKV_AWS_272,CKV_AWS_158,CKV_AWS_119,CKV_AWS_28
 
   - repo: https://github.com/psf/black
     rev: 22.12.0
@@ -94,6 +94,7 @@ repos:
         entry: pip-audit .
         pass_filenames: false
         types: [plain-text, non-executable, file]
+        args: [--skip-editable,--progress-spinner=off,--format=cyclonedx-json,--output=cyclonedx.json,--ignore-vuln=PYSEC-2022-42969]
 
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.4.0

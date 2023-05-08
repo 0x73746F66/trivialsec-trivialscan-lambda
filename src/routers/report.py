@@ -103,11 +103,15 @@ def retrieve_summary(
     """
     Retrieves a summary of a Trivial Scanner report for the provided report identifier
     """
-    scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load(load_history=True):
-        for summary in scanner_record.history:
-            if summary.report_id == report_id:
-                return summary
+    if report := models.ReportSummary(
+        **services.aws.get_dynamodb(  # type: ignore
+            table_name=services.aws.Tables.REPORT_HISTORY,
+            item_key={"report_id": report_id},
+        )
+    ):
+        if authz.account.name != report.account_name:
+            return Response(status_code=status.HTTP_401_UNAUTHORIZED)
+        return report
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -150,7 +154,7 @@ def retrieve_full_report(
 
     report.evaluations = services.helpers.load_descriptions(report)
     scanner_record = models.ScannerRecord(account_name=authz.account.name)  # type: ignore
-    if scanner_record.load(load_history=True):
+    if scanner_record.load():
         for host in report.targets:  # pylint: disable=not-an-iterable
             for target in scanner_record.monitored_targets:  # type: ignore
                 if target.hostname == host.transport.hostname:
