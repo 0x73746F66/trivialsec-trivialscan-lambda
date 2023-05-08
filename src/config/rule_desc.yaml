@@ -1,1343 +1,485 @@
 "1.1":
-  issue:
-    <p>Path length gives the maximum number of intermediate certificates that
-    may follow the root CA certificate typically (or certificate otherwise specifying
-    the constraint) in a valid certification path.</p>
+  issue: |-
+    <p>Path length gives the maximum number of intermediate certificates that may follow the root CA certificate typically (or certificate otherwise specifying the constraint) in a valid certification path.</p>
 "1.11":
-  issue:
-    <p>The TLS Signaling Cipher Suite Value (SCSV) protects against TLS/SSL downgrade
-    attacks. If enabled, the server makes sure that the strongest protocol that both
-    client and server understand is used. Attackers can make a client attempt weaker
-    TLS connections and exploit all the vulnerabilities associated with a given protocol</p>
+  issue: |-
+    <p>The TLS Signaling Cipher Suite Value (SCSV) protects against TLS/SSL downgrade attacks. If enabled, the server makes sure that the strongest protocol that both client and server understand is used. Attackers can make a client attempt weaker TLS connections and exploit all the vulnerabilities associated with a given protocol</p>
 "1.12":
-  issue:
-    "<p>Forward Anonymity, frequently and mistakenly described as Perfect Forward
-    Secrecy (PFS), is where the TLS connection applies technical mechanisms intentionally
-    that will not expose any unique client identifier that might be used by a server
-    (TLS termination endpoint) for the purposes of user profiling and tracking.</p>
-
-    <p>This is not the same as applying 'secrecy' or privacy to the contents of
-    your TLS connection, the mechanism is designed only for identity protection a.k.a
-    Anonymity - which is an entirely distinct concept from secrecy.</p>
-
-    <p>If the TLS connection does not use a cipher that offer the 'anonymity' characteristic,
-    the client identity can be tracked for any purpose the server (or Attacker in-the-middle)
-    might choose, with no possibility of the client protecting themselves.</p>"
+  issue: |-
+    <p>Forward Anonymity, frequently and mistakenly described as Perfect Forward Secrecy (PFS), is where the TLS connection applies technical mechanisms intentionally that will not expose any unique client identifier that might be used by a server (TLS termination endpoint) for the purposes of user profiling and tracking.</p>
+    <p>This is not the same as applying 'secrecy' or privacy to the contents of your TLS connection, the mechanism is designed only for identity protection a.k.a Anonymity - which is an entirely distinct concept from secrecy.</p>
+    <p>If the TLS connection does not use a cipher that offer the 'anonymity' characteristic, the client identity can be tracked for any purpose the server (or Attacker in-the-middle) might choose, with no possibility of the client protecting themselves.</p>
 "1.13":
-  issue:
-    "<p>A cipher suite is a combination of authentication, encryption, and message
-    authentication code (MAC) algorithms</p>
-
-    <p>They are used during the negotiation of security settings for a TLS/SSL connection
-    as well as for the transfer of data</p>
-
+  issue: |-
+    <p>A cipher suite is a combination of authentication, encryption, and message authentication code (MAC) algorithms</p>
+    <p>They are used during the negotiation of security settings for a TLS/SSL connection as well as for the transfer of data</p>
     <p>By default, most servers still support outdated and known vulnerable ciphers</p>
-
-    <p>This is known as an insecure default and could lead to trivial attacks against
-    default or miss-configured servers</p>"
+    <p>This is known as an insecure default and could lead to trivial attacks against default or miss-configured servers</p>
 "1.14":
-  issue:
-    "<p>A cipher suite is a combination of authentication, encryption, and message
-    authentication code (MAC) algorithms</p>
-
-    <p>They are used during the negotiation of security settings for a TLS/SSL connection
-    as well as for the transfer of data</p>
-
+  issue: |-
+    <p>A cipher suite is a combination of authentication, encryption, and message authentication code (MAC) algorithms</p>
+    <p>They are used during the negotiation of security settings for a TLS/SSL connection as well as for the transfer of data</p>
     <p>By default, most servers still support outdated and known vulnerable ciphers</p>
-
-    <p>This could lead to trivial attacks against default or miss-configured servers</p>"
+    <p>This could lead to trivial attacks against default or miss-configured servers</p>
 "1.15":
-  issue:
-    "<p>If the Client Hello messages longer than 255 bytes and the connection
-    fails, this is an indication of very old web servers or a web server with coding
-    errors/bugs.</p>
-
-    <p>Using all possible valid ciphers (sending approx 3458 bytes) the 'Client Hello'
-    will be sufficiently long to trigger this web server bug (if it exists).</p>
-
-    <p>This may be experienced during server to server communications over TLS, but
-    is uncommon scenario for web browsers (that affect end users).</p>"
+  issue: |-
+    <p>If the Client Hello messages longer than 255 bytes and the connection fails, this is an indication of very old web servers or a web server with coding errors/bugs.</p>
+    <p>Using all possible valid ciphers (sending approx 3458 bytes) the 'Client Hello' will be sufficiently long to trigger this web server bug (if it exists).</p>
+    <p>This may be experienced during server to server communications over TLS, but is uncommon scenario for web browsers (that affect end users).</p>
 "1.16":
-  issue:
-    "<p>Cipher negotiation can be manipulated by the client requester if an unwitting
-    server configuration has not been defined defensively.</p>
-
-    <p>Not having negotiated a strong cipher is an indication of server willingly
-    downgrading security when any anonymous requester simply asks it to.</p>
-
-    <p>By not providing any ciphers that are previously or theoretically suspected
-    to be weak, you future-proof software security to the best current standard.</p>"
+  issue: |-
+    <p>Cipher negotiation can be manipulated by the client requester if an unwitting server configuration has not been defined defensively.</p>
+    <p>Not having negotiated a strong cipher is an indication of server willingly downgrading security when any anonymous requester simply asks it to.</p>
+    <p>By not providing any ciphers that are previously or theoretically suspected to be weak, you future-proof software security to the best current standard.</p>
 "1.17":
-  issue:
-    <p>Timing attack causing padding errors using RSA with <code>PKCS#1</code>
-    v1.5 session keys allowing any attacker to passively record traffic and later
-    decrypt it</p>
+  issue: |-
+    <p>Timing attack causing padding errors using RSA with <code>PKCS#1</code> v1.5 session keys allowing any attacker to passively record traffic and later decrypt it</p>
 "1.18":
-  issue:
-    <p>Client initiated TLS renegotiation allows attackers to leverage known
-    exploits for lower protocols, prevention is possible when implementing Secure
-    Renegotiation described in RFC-5746 section 3.3 implemented using the renegotiation_info
-    extension or the spurious cipher <code>TLS_EMPTY_RENEGOTIATION_INFO_SCSV</code></p>
+  issue: |-
+    <p>Client initiated TLS renegotiation allows attackers to leverage known exploits for lower protocols, prevention is possible when implementing Secure Renegotiation described in RFC-5746 section 3.3 implemented using the renegotiation_info extension or the spurious cipher <code>TLS_EMPTY_RENEGOTIATION_INFO_SCSV</code></p>
 "1.19":
-  issue:
-    "<p>The TLS session cache fails to reliably prevent resumption of an unauthenticated
-    session, which allows remote attackers (such as malicious 802.1X supplicants)
-    to bypass authentication for various software depending on their implementation
-    configurations.</p>
-
-    <p>Other issues arise when TLS session resumption is enabled and a client certificate
-    is used, subsequent connection attempts to the same server get a previously authenticated
-    session 'resumed' without actually Authenticating with their own client Certificate.</p>"
+  issue: |-
+    <p>The TLS session cache fails to reliably prevent resumption of an unauthenticated session, which allows remote attackers (such as malicious 802.1X supplicants) to bypass authentication for various software depending on their implementation configurations.</p>
+    <p>Other issues arise when TLS session resumption is enabled and a client certificate is used, subsequent connection attempts to the same server get a previously authenticated session 'resumed' without actually Authenticating with their own client Certificate.</p>
 "1.2":
-  issue:
-    <p>Timing attack causing padding errors using RSA with <code>PKCS#1</code>
-    v1.5 session keys allowing any attacker to passively record traffic and later
-    decrypt it</p>
+  issue: |-
+    <p>Timing attack causing padding errors using RSA with <code>PKCS#1</code> v1.5 session keys allowing any attacker to passively record traffic and later decrypt it</p>
 "1.20":
-  issue:
-    "<p>Depending on your specific application, and how important the history
-    of your network interaction may be, you may want to forego TLS session resumption
-    altogether.</p>
-
-    <p>Long session gaps can give bad actors time to hack into a session and cause
-    trouble. This is why session IDs and session tickets both have security timeout
-    settings that are dictated by the server. When an ID or a ticket expires, the
-    server intentionally flushes cached session data and forces a complete new session
-    handshake when the client initiates the next contact.</p>
-
-    <p>Leaking any information for attackers to derive ways to weaken TLS results
-    in ineffective data protection or broken integrity of communications.</p>"
+  issue: |-
+    <p>Depending on your specific application, and how important the history of your network interaction may be, you may want to forego TLS session resumption altogether.</p>
+    <p>Long session gaps can give bad actors time to hack into a session and cause trouble. This is why session IDs and session tickets both have security timeout settings that are dictated by the server. When an ID or a ticket expires, the server intentionally flushes cached session data and forces a complete new session handshake when the client initiates the next contact.</p>
+    <p>Leaking any information for attackers to derive ways to weaken TLS results in ineffective data protection or broken integrity of communications.</p>
 "1.21":
   issue:
-    "<p>The session ticket mechanism is referred to as the stateless resumption
-    mechanism.</p>
-
-    <p>In 2018 security researchers from the University of Hamburg published a paper
-    describing a new method that websites could use to track browser users’ history.</p>"
+    "<p>The session ticket mechanism is referred to as the stateless resumption\
+    \ mechanism.</p>\n<p>In 2018 security researchers from the University of Hamburg\
+    \ published a paper describing a new method that websites could use to track\
+    \ browser users\u2019 history.</p>"
 "1.22":
-  issue:
-    "<p>Cipher negotiation can be manipulated by the client requester if an unwitting
-    server configuration has not been defined defensively.</p>
-
-    <p>Not having negotiated a strong cipher is an indication of server willingly
-    downgrading security when any anonymous requester simply asks it to.</p>
-
-    <p>This is not a mere exploit, it is simply showing the inherent weakness in the
-    server configuration.</p>"
+  issue: |-
+    <p>Cipher negotiation can be manipulated by the client requester if an unwitting server configuration has not been defined defensively.</p>
+    <p>Not having negotiated a strong cipher is an indication of server willingly downgrading security when any anonymous requester simply asks it to.</p>
+    <p>This is not a mere exploit, it is simply showing the inherent weakness in the server configuration.</p>
 "1.23":
-  issue:
-    "<p>Winshock vulnerability in 2014 was the first real example of issues arising
-    when the available ciphers were not sufficient to secure communications years
-    after the software was released.</p>
-
-    <p>While ciphers supported by software at the time of release may be sufficient
-    at the time of release, that software must be updated to support newer and stronger
-    ciphers as they become available and not wait for the ciphers supported to be
-    proven weak via an exploit.</p>"
+  issue: |-
+    <p>Winshock vulnerability in 2014 was the first real example of issues arising when the available ciphers were not sufficient to secure communications years after the software was released.</p>
+    <p>While ciphers supported by software at the time of release may be sufficient at the time of release, that software must be updated to support newer and stronger ciphers as they become available and not wait for the ciphers supported to be proven weak via an exploit.</p>
 "1.24":
-  issue:
-    <p>Timing attack causing padding errors using RSA with <code>PKCS#1</code>
-    v1.5 session keys allowing any attacker to passively record traffic and later
-    decrypt it</p>
+  issue: |-
+    <p>Timing attack causing padding errors using RSA with <code>PKCS#1</code> v1.5 session keys allowing any attacker to passively record traffic and later decrypt it</p>
 "1.25":
-  issue:
-    "<p>The chain terminates with a Root CA Certificate. The Root CA Certificate
-    is always signed by the CA itself. The signatures of all certificates in the chain
-    must be verified up to the Root CA Certificate.</p>
-
-    <p>Each certificate in the chain is checked to ensure it is not expired and the
-    chain path is complete.</p>
-
-    <p>When the root certificates are available in trust-store, this script will use
-    its public key to verify the root certificate, once it verifies it will verify
-    trust the intermediate certificate and eventually the server (leaf) certificate
-    to complete the chain.</p>
-
-    <p>Only one valid chain from trusted root to the leaf certificate is needed to
-    be compatible with web browsers, however the entire certificate chain should be
-    valid to be considered trustworthy as any compromised certificate in any chain
-    would allow malicious attackers to sign a leaf certificate which would be considered
-    valid in the parallel chain.</p>"
+  issue: |-
+    <p>The chain terminates with a Root CA Certificate. The Root CA Certificate is always signed by the CA itself. The signatures of all certificates in the chain must be verified up to the Root CA Certificate.</p>
+    <p>Each certificate in the chain is checked to ensure it is not expired and the chain path is complete.</p>
+    <p>When the root certificates are available in trust-store, this script will use its public key to verify the root certificate, once it verifies it will verify trust the intermediate certificate and eventually the server (leaf) certificate to complete the chain.</p>
+    <p>Only one valid chain from trusted root to the leaf certificate is needed to be compatible with web browsers, however the entire certificate chain should be valid to be considered trustworthy as any compromised certificate in any chain would allow malicious attackers to sign a leaf certificate which would be considered valid in the parallel chain.</p>
 "1.26":
-  issue:
-    "<p>When a web browser reports an error that describes Version Interference
-    (e.g. Chrome <code>ERR_SSL_VERSION_INTERFERENCE</code>), this indicates that the
-    we browser on the user's system has attempted to negotiate a TLS connection with
-    the web server using a TLS version which is not known by the web server.</p>
-
-    <p>This is typically seen when new TLS versions are in draft status, recently
-    released, or an attacker in-the-middle is present and altering the TLS negotiation.</p>
-
-    <p>This error is widely misunderstood to be an issue with the web browser, but
-    it is merely a symptom that appears in the web browser when the root cause of
-    this problem exists with the web server (or introduced by an attacker).</p>
-
-    <p>An outdated version (or miss-configured e.g. CORS header) of web server introduces
-    TLS Version Interference errors for which it may be possible to change web browsers
-    entirely (or upgrade/downgrade) to avoid the issues with the web server.</p>"
+  issue: |-
+    <p>When a web browser reports an error that describes Version Interference (e.g. Chrome <code>ERR_SSL_VERSION_INTERFERENCE</code>), this indicates that the we browser on the user's system has attempted to negotiate a TLS connection with the web server using a TLS version which is not known by the web server.</p>
+    <p>This is typically seen when new TLS versions are in draft status, recently released, or an attacker in-the-middle is present and altering the TLS negotiation.</p>
+    <p>This error is widely misunderstood to be an issue with the web browser, but it is merely a symptom that appears in the web browser when the root cause of this problem exists with the web server (or introduced by an attacker).</p>
+    <p>An outdated version (or miss-configured e.g. CORS header) of web server introduces TLS Version Interference errors for which it may be possible to change web browsers entirely (or upgrade/downgrade) to avoid the issues with the web server.</p>
 "1.27":
-  issue:
-    '<p>Many web servers are not fully compliant with TLS and may not properly
-    negotiate a TLS version that both the client (web browser) and server support.
-
-    E.g. when a client advertises support for "TLS 1.3" the web server may drop the
-    connection (not respond correctly with the TLS version it supports).</p>
-
-    <p>This is a common web server coding error/bug; The symptom is presented to the
-    user in a web browser by an error message related to "we can not reach this website"
-    (or similar).</p>'
+  issue: |-
+    <p>Many web servers are not fully compliant with TLS and may not properly negotiate a TLS version that both the client (web browser) and server support.
+    E.g. when a client advertises support for "TLS 1.3" the web server may drop the connection (not respond correctly with the TLS version it supports).</p>
+    <p>This is a common web server coding error/bug; The symptom is presented to the user in a web browser by an error message related to "we can not reach this website" (or similar).</p>
 "1.3":
-  issue:
-    <p>The server indicated client certificate subject's it will accept, or the
-    client presented a Certificate to initiate an M/TLS connection with this server.</p>
+  issue: |-
+    <p>The server indicated client certificate subject's it will accept, or the client presented a Certificate to initiate an M/TLS connection with this server.</p>
 "1.4":
-  issue:
-    "<p>If the Certificate being used for client Authentication (M/TLS) was not
-    issued for that purpose then most properly configured servers will drop the connection.</p>
-
-    <p>If either the client Certificate or TLS server is miss-configured the TLS connection
-    should be distrusted as it may be compromised, ineffective at providing the intended
-    security characteristics, or simply not meet the requirements for TLS which is
-    designed to have a chain of trust that relies on Certificate issuers to follow
-    the specification when issuing Certificates and also TLS servers configured per
-    the specification.</p>"
+  issue: |-
+    <p>If the Certificate being used for client Authentication (M/TLS) was not issued for that purpose then most properly configured servers will drop the connection.</p>
+    <p>If either the client Certificate or TLS server is miss-configured the TLS connection should be distrusted as it may be compromised, ineffective at providing the intended security characteristics, or simply not meet the requirements for TLS which is designed to have a chain of trust that relies on Certificate issuers to follow the specification when issuing Certificates and also TLS servers configured per the specification.</p>
 "1.5":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "1.6":
-  issue:
-    "<p>If the Certificate being used for client Authentication (M/TLS) was not
-    matched to a subject sent by the server to indicate accepted client Certificates
-    then most properly configured servers will drop the connection.</p>
-
-    <p>If a connection is established and the TLS server was miss-configured the TLS
-    connection should be distrusted as it may be compromised, ineffective at providing
-    the intended security characteristics, or simply not meet the requirements for
-    TLS which is designed to have a chain of trust that relies on Certificate issuers
-    to follow the specification when issuing Certificates and also TLS servers configured
-    per the specification.</p>"
+  issue: |-
+    <p>If the Certificate being used for client Authentication (M/TLS) was not matched to a subject sent by the server to indicate accepted client Certificates then most properly configured servers will drop the connection.</p>
+    <p>If a connection is established and the TLS server was miss-configured the TLS connection should be distrusted as it may be compromised, ineffective at providing the intended security characteristics, or simply not meet the requirements for TLS which is designed to have a chain of trust that relies on Certificate issuers to follow the specification when issuing Certificates and also TLS servers configured per the specification.</p>
 "1.7":
-  issue:
-    "<p>A client Certificate was presented and Mutual Authentication (M/TLS)
-    expected, if the presented client Certificate did not match the server sent subjects
-    or the</p>
-
-    <p>Certificate was not issued by a trusted Root Certificate Authority this connection
-    attempt should not be considered secure.</p>
-
-    <p>If a connection is established and the TLS server was miss-configured the TLS
-    connection should be distrusted as it may be compromised, ineffetive at providing
-    the intended security characteristics, or simply not meet the requirements for
-    TLS which is designed to have a chain of trust that relies on Certificate issuers
-    to follow the specification when issuing Certificates and also TLS servers configured
-    per the specification.</p>"
+  issue: |-
+    <p>A client Certificate was presented and Mutual Authentication (M/TLS) expected, if the presented client Certificate did not match the server sent subjects or the</p>
+    <p>Certificate was not issued by a trusted Root Certificate Authority this connection attempt should not be considered secure.</p>
+    <p>If a connection is established and the TLS server was miss-configured the TLS connection should be distrusted as it may be compromised, ineffetive at providing the intended security characteristics, or simply not meet the requirements for TLS which is designed to have a chain of trust that relies on Certificate issuers to follow the specification when issuing Certificates and also TLS servers configured per the specification.</p>
 "1.8":
-  issue:
-    <p>Server accepts client-initiated insecure renegotiation, numerous exploits
-    exists and many have been assigned CVE</p>
+  issue: |-
+    <p>Server accepts client-initiated insecure renegotiation, numerous exploits exists and many have been assigned CVE</p>
 "1.9":
-  issue:
-    "<p>When information is sent between the client and the server, it must be
-    encrypted and protected in order to prevent an attacker from being able to read
-    or modify it</p>
-
-    <p>This is most commonly done using HTTPS, which uses the Transport Layer Security
-    (TLS) protocol, a replacement for the deprecated Secure Socket Layer (SSL) protocol</p>
-
-    <p>By default, most servers still support outdated and known vulnerable protocols,
-    typically for backwards compatibility with equally outdated web browser software</p>
-
-    <p>This is known as an insecure default and could lead to trivial attacks against
-    default or miss-configured servers</p>"
+  issue: |-
+    <p>When information is sent between the client and the server, it must be encrypted and protected in order to prevent an attacker from being able to read or modify it</p>
+    <p>This is most commonly done using HTTPS, which uses the Transport Layer Security (TLS) protocol, a replacement for the deprecated Secure Socket Layer (SSL) protocol</p>
+    <p>By default, most servers still support outdated and known vulnerable protocols, typically for backwards compatibility with equally outdated web browser software</p>
+    <p>This is known as an insecure default and could lead to trivial attacks against default or miss-configured servers</p>
 "2.1":
-  issue:
-    "<p>The lack of any CAA records authorises normal unrestricted issuance.</p>
-
-    <p>It is recommended that you create CAA records for your approved CAs to minimise
-    business impact. With CAA, you can minimise the risk of certificate issuance by
-    unauthorised CAs and help create a more secure and transparent online ecosystem.</p>"
+  issue: |-
+    <p>The lack of any CAA records authorises normal unrestricted issuance.</p>
+    <p>It is recommended that you create CAA records for your approved CAs to minimise business impact. With CAA, you can minimise the risk of certificate issuance by unauthorised CAs and help create a more secure and transparent online ecosystem.</p>
 "2.10":
-  issue:
-    <p>Server (leaf) certificates should not be a CA, it could enable impersonation
-    attacks</p>
+  issue: |-
+    <p>Server (leaf) certificates should not be a CA, it could enable impersonation attacks</p>
 "2.11":
-  issue:
-    "<p>Malicious certificates are most commonly signed by trusted certificate
-    authority roots, to evade detection by blending in with legitimate traffic and
-    making use of encryption to help hide their payloads.</p>
-
-    <p>Both commodity and targeted attack malware make heavy use of encrypted command-and-control
-    (C&amp;C) that is indistinguishable from regular traffic, and ethical actors (with
-    permission granted) will leverage tools called intrusion frameworks like; Cobalt
-    Strike, Metasploit, and Core Impact that should be identified as though these
-    were unauthorised because bad actors will attempt to emulate a penetration tester
-    in order to take advantage of a trust relationship and infect you regardless.</p>
-
-    <p>Phishing websites will use these malicious certificates that are identical
-    to legitimate certificates which gives a false sense of security to victims who
-    observe the strong encryption being used in their browser</p>"
+  issue: |-
+    <p>Malicious certificates are most commonly signed by trusted certificate authority roots, to evade detection by blending in with legitimate traffic and making use of encryption to help hide their payloads.</p>
+    <p>Both commodity and targeted attack malware make heavy use of encrypted command-and-control (C&amp;C) that is indistinguishable from regular traffic, and ethical actors (with permission granted) will leverage tools called intrusion frameworks like; Cobalt Strike, Metasploit, and Core Impact that should be identified as though these were unauthorised because bad actors will attempt to emulate a penetration tester in order to take advantage of a trust relationship and infect you regardless.</p>
+    <p>Phishing websites will use these malicious certificates that are identical to legitimate certificates which gives a false sense of security to victims who observe the strong encryption being used in their browser</p>
 "2.12":
-  issue:
-    "<p>DSA keys, and RSA keys smaller than 1024 bits offer no security and should
-    not be used at all, whether they are known to be compromised or not.</p>
-
-    <p>The pwnedkeys database keeps records of compromised 1024 bit and larger RSA/DSA
-    keys, as well as elliptic-curve keys on the P-256, P-384, and P-521 curves.</p>
-
-    <p>If your private key is ever compromised, it should be considered an emergency,
-    and your priority should be resolving the issue immediately. If an unauthorised
-    person gains access to your private key, they can assume the identity that your
-    certificate is intended to protect (e.g. you, your company, and/or your website)</p>"
+  issue: |-
+    <p>DSA keys, and RSA keys smaller than 1024 bits offer no security and should not be used at all, whether they are known to be compromised or not.</p>
+    <p>The pwnedkeys database keeps records of compromised 1024 bit and larger RSA/DSA keys, as well as elliptic-curve keys on the P-256, P-384, and P-521 curves.</p>
+    <p>If your private key is ever compromised, it should be considered an emergency, and your priority should be resolving the issue immediately. If an unauthorised person gains access to your private key, they can assume the identity that your certificate is intended to protect (e.g. you, your company, and/or your website)</p>
 "2.13":
-  issue:
-    <p>Certificate Revocation only occurs if the Certificate is no longer intended
-    to be used for it's designed purpose, and offers no security at best, or represents
-    a known compromise</p>
+  issue: |-
+    <p>Certificate Revocation only occurs if the Certificate is no longer intended to be used for it's designed purpose, and offers no security at best, or represents a known compromise</p>
 "2.14":
-  issue: <p>Using the SHA-1 chosen-prefix collision the OCSP Assertion can be forged</p>
+  issue: |-
+    <p>Using the SHA-1 chosen-prefix collision the OCSP Assertion can be forged</p>
 "2.15":
-  issue: <p>Using the SHA-1 chosen-prefix collision the OCSP Assertion can be forged</p>
+  issue: |-
+    <p>Using the SHA-1 chosen-prefix collision the OCSP Assertion can be forged</p>
 "2.16":
-  issue:
-    "<p>The security benefit characteristics of OCSP can only be enforced when
-    the 'Must Staple' flag is present.</p>
-
-    <p>Failing to include the must staple extension in a Domain Validated (DV) or
-    Organisation Validated (OV) Certificate will allow most web browsers and HTTP
-    clients to 'soft-fail' the OCSP check and continue with TLS without an OCSP
-    assertion or knowledge of revocation status.</p>
-
-    <p>In some web browsers and HTTP clients an Extended Validation (EV) certificate
-    will hard-fail when an OCSP assertion is not obtained, but this functionality
-    should not be relied upon as there have been many changes made by web browsers
-    that are divergent from standards and break assumed security guarantees suddenly
-    become a vulnerability.</p>
-
-    <p>Everywhere the OCSP Must Staple Extension is accepted, it will be enforced
-    for all certificates regardless of validation semantics.</p>"
+  issue: |-
+    <p>The security benefit characteristics of OCSP can only be enforced when the 'Must Staple' flag is present.</p>
+    <p>Failing to include the must staple extension in a Domain Validated (DV) or Organisation Validated (OV) Certificate will allow most web browsers and HTTP clients to 'soft-fail' the OCSP check and continue with TLS without an OCSP assertion or knowledge of revocation status.</p>
+    <p>In some web browsers and HTTP clients an Extended Validation (EV) certificate will hard-fail when an OCSP assertion is not obtained, but this functionality should not be relied upon as there have been many changes made by web browsers that are divergent from standards and break assumed security guarantees suddenly become a vulnerability.</p>
+    <p>Everywhere the OCSP Must Staple Extension is accepted, it will be enforced for all certificates regardless of validation semantics.</p>
 "2.17":
-  issue:
-    <p>When an OCSP assertion is not included 'stapled' with the certificate,
-    an weakness in the clients ability to obtain a remote assertion, when the client
-    attempts to establish a connection with the OCSP responder an additional MITM
-    attack vector is available and forged OCSP assertions may be provided allowing
-    an attacker to spoof the revocation status of a certificate to cause a denial
-    of service or establish trust where otherwise a compromise would have been detected.</p>
+  issue: |-
+    <p>When an OCSP assertion is not included 'stapled' with the certificate, an weakness in the clients ability to obtain a remote assertion, when the client attempts to establish a connection with the OCSP responder an additional MITM attack vector is available and forged OCSP assertions may be provided allowing an attacker to spoof the revocation status of a certificate to cause a denial of service or establish trust where otherwise a compromise would have been detected.</p>
 "2.18":
-  issue:
-    <p>A revoked certificate that remains in use is an indication of miss-configuration,
-    misuse, or abuse.</p>
+  issue: |-
+    <p>A revoked certificate that remains in use is an indication of miss-configuration, misuse, or abuse.</p>
 "2.19":
-  issue:
-    "<p>Using anything other than 65537 as the public exponent would effect compatibility
-    with most hardware and software.</p>
-
-    <p>Any higher exponent would make the public RSA operation, used for encryption
-    or signature verification, unusable, and slower.</p>
-
-    <p>Using a larger exponent will not decrease security, but will be more time /
-    power consuming.</p>"
+  issue: |-
+    <p>Using anything other than 65537 as the public exponent would effect compatibility with most hardware and software.</p>
+    <p>Any higher exponent would make the public RSA operation, used for encryption or signature verification, unusable, and slower.</p>
+    <p>Using a larger exponent will not decrease security, but will be more time / power consuming.</p>
 "2.2":
-  issue:
-    "<p>Certificate authorities implementing CAA perform a DNS lookup for CAA
-    resource records, and if any are found, ensure that they are listed as an authorised
-    party before issuing a digital certificate.</p>
-
-    <p>Third parties monitoring certificate authority behaviour might check newly
-    issued certificates against the domain's CAA records. RFC 8659 states; CAA records
-    MAY be used by Certificate Evaluators as a possible indicator of a security policy
-    violation. Such use SHOULD take into account the possibility that published CAA
-    records changed between the time a certificate was issued and the time at which
-    the certificate was observed by the Certificate Evaluation.</p>
-
-    <p>The CAA records can help with the enforcement of your corporate policies on
-    approved CAs. By aligning the CAA records with the list of corporate approved
-    CAs, the risk of non-compliance to the policy is minimised.</p>
-
-    <p>If CAA records exist but do not include an approved or preferred CA for a specific
-    domain, the issuance of certificates by that CA to the domain cannot proceed until
-    the creation of the appropriate CAA record is completed.</p>"
+  issue: |-
+    <p>Certificate authorities implementing CAA perform a DNS lookup for CAA resource records, and if any are found, ensure that they are listed as an authorised party before issuing a digital certificate.</p>
+    <p>Third parties monitoring certificate authority behaviour might check newly issued certificates against the domain's CAA records. RFC 8659 states; CAA records MAY be used by Certificate Evaluators as a possible indicator of a security policy violation. Such use SHOULD take into account the possibility that published CAA records changed between the time a certificate was issued and the time at which the certificate was observed by the Certificate Evaluation.</p>
+    <p>The CAA records can help with the enforcement of your corporate policies on approved CAs. By aligning the CAA records with the list of corporate approved CAs, the risk of non-compliance to the policy is minimised.</p>
+    <p>If CAA records exist but do not include an approved or preferred CA for a specific domain, the issuance of certificates by that CA to the domain cannot proceed until the creation of the appropriate CAA record is completed.</p>
 "2.20":
-  issue:
-    '<p>Domain Validated (DV) Certificates may be growing in popularity since
-    the browsers ceased showing the organisation name along with a green padlock,
-    but the visual change is not material to the security characteristic associated
-    with Extended Validation (EV) Certificates. When the visual changes occurred the
-    mainstream non-technical or the uneducated in cybersecurity masses all declared
-    that EV Certificates are dead, but the reality and truth of the matter is EV Certificates
-    have never been more important.</p>
-
-    <p>Let''s consider some facts:</p>
-
+  issue: |-
+    <p>Domain Validated (DV) Certificates may be growing in popularity since the browsers ceased showing the organisation name along with a green padlock, but the visual change is not material to the security characteristic associated with Extended Validation (EV) Certificates. When the visual changes occurred the mainstream non-technical or the uneducated in cybersecurity masses all declared that EV Certificates are dead, but the reality and truth of the matter is EV Certificates have never been more important.</p>
+    <p>Let's consider some facts:</p>
     <ol>
-
-    <li>DV Certificates are extensively (almost solely) used by malicious actors of
-    all types; targeted, watering hole, spray-and-pray, any type leverage DV Certificates
-    because they are free, trusted, and easily to obtain anonymously</li>
-
-    <li>A malicious EV Certificates is inherently forged for a target, displaying
-    the forged organisation name to a layman in the browser was an attack on the user
-    trust; Only "IF" the layman was savvy enough they might not trust the forged cert.
-    Today we hide the forgery and as a result there is automatic blind trust and no
-    mechanism for a layman to see the forgery and potentially avoid the threat. To
-    be concise, we used to offer a possible chance to thwart an attacker, now we simply
-    force trust upon users and offer them no means to easily verify anymore. So the
-    changes to EV Certificates in practice made things worse, not better.</li>
-
-    <li>Extended Validation certificates offer warranties up to $2M from my personal
-    experience in Australia, When we are talking about a data breach like the one
-    that happened to Equifax due to an expired EV Certificate, it matters.</li>
-
-    <li>Legislative, Regulatory, International or Local Privacy Laws, Accreditation
-    held for certain practices, Contractual Obligation (like PCI DSS) - all or any
-    of these may obligate you to utilise at the least an EV Certificate, the DV Certificate
-    has little (if any) security assurances.</li>
-
-    <li>The DV Certificate Issuers generally don''t offer any additional features,
-    therefore even if you attempt to use certain features like <code>ssl_stapling</code>
-    it will simply be ignored. These Issuers, (pick on Let''s Encrypt for this one)
-    simply prefer low-barrier and ease-of-use over any and all security characteristics
-    - so if they don''t care, why would you put any trust in their DV Certificates
-    to secure your TLS connections?</li>
-
-    <li>An EV Certificate inherently required an out-of-band validation, that is not
-    automated like a DV Certificate. Therefore if an ATO (Account Take-over) or DNS
-    hijacking attack were to be successful the attacker must be persistent and sometimes
-    be physically attacking you. Which all takes significantly more time than the
-    near-instant time it takes for the DV Certificates to be issued. When you operate
-    public hosted (cloud) servers, they are typically ephemeral IP Addresses. The
-    hazard with an IP Address that changes between distinct users is there is a possibility
-    a patient malicious actor may get assigned an IP Address previously held by a
-    valuable customer of the service provider. The way DNS works with TTL and caches
-    means that some requests will still attempt to connect to IP Address you now have
-    that were intended for the previous IP Address owner. If the IP Address the malicious
-    attacker is assigned is rDNS checked and the malicious actor doesn''t find anything
-    of value, they can easily discard the IP Address and simply request a new one
-    over and over until they get an IP that is of value to them. This is called IP
-    Churn, and a paper describes how this technique that is an accepted "how things
-    work" can be combined with DV Certificates that are also accepted as "how things
-    work", combined allow for DNS hijacking. This is a proven attack, and the attack
-    vectors with continue to work as long as service providers assign IP Addresses
-    that are still fresh and DV certificates are automatically issued in nanoseconds.</li>
-
+    <li>DV Certificates are extensively (almost solely) used by malicious actors of all types; targeted, watering hole, spray-and-pray, any type leverage DV Certificates because they are free, trusted, and easily to obtain anonymously</li>
+    <li>A malicious EV Certificates is inherently forged for a target, displaying the forged organisation name to a layman in the browser was an attack on the user trust; Only "IF" the layman was savvy enough they might not trust the forged cert. Today we hide the forgery and as a result there is automatic blind trust and no mechanism for a layman to see the forgery and potentially avoid the threat. To be concise, we used to offer a possible chance to thwart an attacker, now we simply force trust upon users and offer them no means to easily verify anymore. So the changes to EV Certificates in practice made things worse, not better.</li>
+    <li>Extended Validation certificates offer warranties up to $2M from my personal experience in Australia, When we are talking about a data breach like the one that happened to Equifax due to an expired EV Certificate, it matters.</li>
+    <li>Legislative, Regulatory, International or Local Privacy Laws, Accreditation held for certain practices, Contractual Obligation (like PCI DSS) - all or any of these may obligate you to utilise at the least an EV Certificate, the DV Certificate has little (if any) security assurances.</li>
+    <li>The DV Certificate Issuers generally don't offer any additional features, therefore even if you attempt to use certain features like <code>ssl_stapling</code> it will simply be ignored. These Issuers, (pick on Let's Encrypt for this one) simply prefer low-barrier and ease-of-use over any and all security characteristics - so if they don't care, why would you put any trust in their DV Certificates to secure your TLS connections?</li>
+    <li>An EV Certificate inherently required an out-of-band validation, that is not automated like a DV Certificate. Therefore if an ATO (Account Take-over) or DNS hijacking attack were to be successful the attacker must be persistent and sometimes be physically attacking you. Which all takes significantly more time than the near-instant time it takes for the DV Certificates to be issued. When you operate public hosted (cloud) servers, they are typically ephemeral IP Addresses. The hazard with an IP Address that changes between distinct users is there is a possibility a patient malicious actor may get assigned an IP Address previously held by a valuable customer of the service provider. The way DNS works with TTL and caches means that some requests will still attempt to connect to IP Address you now have that were intended for the previous IP Address owner. If the IP Address the malicious attacker is assigned is rDNS checked and the malicious actor doesn't find anything of value, they can easily discard the IP Address and simply request a new one over and over until they get an IP that is of value to them. This is called IP Churn, and a paper describes how this technique that is an accepted "how things work" can be combined with DV Certificates that are also accepted as "how things work", combined allow for DNS hijacking. This is a proven attack, and the attack vectors with continue to work as long as service providers assign IP Addresses that are still fresh and DV certificates are automatically issued in nanoseconds.</li>
     </ol>
-
-    <p>Put simply, DV Certificates are favoured by attackers and seeing one should
-    make you sceptical, they''re issued for ease-of-use and not for security purposes,
-    and there is a trivial DNS take-over attack that can be used for targeted attacks
-    when attackers are sufficiently motivated. An EV Certificate is the distinct opposite,
-    attackers avoid using them unless they are desperate and motivated to ignore the
-    risks to them, they are issued with security focus in spite of the time do validation
-    which is an effective mitigation to the trivial DNS take-over attack.</p>'
+    <p>Put simply, DV Certificates are favoured by attackers and seeing one should make you sceptical, they're issued for ease-of-use and not for security purposes, and there is a trivial DNS take-over attack that can be used for targeted attacks when attackers are sufficiently motivated. An EV Certificate is the distinct opposite, attackers avoid using them unless they are desperate and motivated to ignore the risks to them, they are issued with security focus in spite of the time do validation which is an effective mitigation to the trivial DNS take-over attack.</p>
 "2.21":
-  issue:
-    <p>DNS by itself is not secure, without TLS/a or DNSSEC ICANN states any
-    attacker can easily redirect a user to any malicious actor controlled server without
-    the user or authentic server realising it</p>
+  issue: |-
+    <p>DNS by itself is not secure, without TLS/a or DNSSEC ICANN states any attacker can easily redirect a user to any malicious actor controlled server without the user or authentic server realising it</p>
 "2.22":
-  issue:
-    "<p>CT brings transparency to the SSL/TLS certificate system that supports
-    the web. SSL/TLS protocols underpin HTTPS and Web PKI. A lack of transparency
-    weakens the reliability and effectiveness of encrypted connections, which can
-    compromise critical TLS/SSL mechanisms. As a result, they can enable a wide range
-    of security attacks, such as website spoofing, server impersonation, and man-in-the-middle
-    attacks.</p>
-
-    <p>Web PKI depends on CAs acting as trustworthy gatekeepers by issuing certificates
-    only to the right parties and by avoiding giving additional permissions accidentally
-    to those parties. An important part of how CAs meet these obligations is to design
-    their systems so they are resilient to failure.</p>"
+  issue: |-
+    <p>CT brings transparency to the SSL/TLS certificate system that supports the web. SSL/TLS protocols underpin HTTPS and Web PKI. A lack of transparency weakens the reliability and effectiveness of encrypted connections, which can compromise critical TLS/SSL mechanisms. As a result, they can enable a wide range of security attacks, such as website spoofing, server impersonation, and man-in-the-middle attacks.</p>
+    <p>Web PKI depends on CAs acting as trustworthy gatekeepers by issuing certificates only to the right parties and by avoiding giving additional permissions accidentally to those parties. An important part of how CAs meet these obligations is to design their systems so they are resilient to failure.</p>
 "2.23":
-  issue:
-    "<p>Certificate Transparency (CT) is a mechanism which helps domain owners
-    and industry watch dogs detect miss-issuance.</p>
-
-    <p>Miss-issuance occurs when a Certificate Authority (CA) issues an SSL certificate
-    improperly.
-
-    This may mean that the CA included incorrect information in the certificate, issued
-    the certificate to someone who did not represent the organisation or domain, or
-    was even compromised.</p>
-
-    <p>Some browsers require certificates to have proof of being logged with certificate
-    transparency, Safari requires up to 3 SCTs and Chrome requires between 3 and 5.
-    The policies are far more complex than this so the generalised best practice is
-    using at least 3 distinct SCTs per certificate.</p>"
+  issue: |-
+    <p>Certificate Transparency (CT) is a mechanism which helps domain owners and industry watch dogs detect miss-issuance.</p>
+    <p>Miss-issuance occurs when a Certificate Authority (CA) issues an SSL certificate improperly.
+    This may mean that the CA included incorrect information in the certificate, issued the certificate to someone who did not represent the organisation or domain, or was even compromised.</p>
+    <p>Some browsers require certificates to have proof of being logged with certificate transparency, Safari requires up to 3 SCTs and Chrome requires between 3 and 5. The policies are far more complex than this so the generalised best practice is using at least 3 distinct SCTs per certificate.</p>
 "2.24":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.25":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.26":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.27":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.28":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.29":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.3":
-  issue:
-    <p>When visiting a website that uses an expired Certificate it is likely
-    the TLS connection is not secure.</p>
+  issue: |-
+    <p>When visiting a website that uses an expired Certificate it is likely the TLS connection is not secure.</p>
 "2.30":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.31":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.32":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.33":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.34":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.35":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.36":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.37":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.38":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.39":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
 "2.4":
-  issue:
-    <p>Whenever a DNS zone is signed with a SHA-1 DNSKEY algorithm it is vulnerable
-    to chosen prefix collision attacks. This is a problem when a zone accepts updates
-    from multiple parties, such as; TLDs, enterprises, hosting providers. It is also
-    a problem when a key is re-used by multiple zones</p>
+  issue: |-
+    <p>Whenever a DNS zone is signed with a SHA-1 DNSKEY algorithm it is vulnerable to chosen prefix collision attacks. This is a problem when a zone accepts updates from multiple parties, such as; TLDs, enterprises, hosting providers. It is also a problem when a key is re-used by multiple zones</p>
 "2.40":
-  issue:
-    "<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>
-
-    <p>Various servers will use different versions, i.e. an updated Debian-based server
-    should include the latest Java JDK distributed by Debian which may not be either
-    the same version considered to be the latest Java JDK distributed, nor the same
-    on other operating systems.</p>"
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
+    <p>Various servers will use different versions, i.e. an updated Debian-based server should include the latest Java JDK distributed by Debian which may not be either the same version considered to be the latest Java JDK distributed, nor the same on other operating systems.</p>
 "2.41":
-  issue:
-    '<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>
-
-    <p>The original source of these root certificates is the <a href="https://www.ccadb.org/">Common
-    CA Database (CCADB)</a> (also the source for Google, Microsoft, Apple, and many
-    more).</p>
-
-    <p>Then they are curated and prepared for bundling into Mozilla''s Network Security
-    Services (NSS), which is consumed by most Mozilla products and published publicly
-    to also be consumed by countless 3rd party products.</p>
-
-    <p>The open source tool <a href="https://curl.se/docs/mk-ca-bundle.html">mk-ca-bundle</a>
-    creates the bundle and <a href="https://github.com/curl/curl/blob/master/scripts/mk-ca-bundle.pl#L626">further
-    curates</a> the certificates.</p>
-
-    <p>It doesn''t appear <code>curl</code> apply bespoke filtering, and the resultant
-    Root CA Trust Store is verifiable.</p>'
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
+    <p>The original source of these root certificates is the <a href="https://www.ccadb.org/">Common CA Database (CCADB)</a> (also the source for Google, Microsoft, Apple, and many more).</p>
+    <p>Then they are curated and prepared for bundling into Mozilla's Network Security Services (NSS), which is consumed by most Mozilla products and published publicly to also be consumed by countless 3rd party products.</p>
+    <p>The open source tool <a href="https://curl.se/docs/mk-ca-bundle.html">mk-ca-bundle</a> creates the bundle and <a href="https://github.com/curl/curl/blob/master/scripts/mk-ca-bundle.pl#L626">further curates</a> the certificates.</p>
+    <p>It doesn't appear <code>curl</code> apply bespoke filtering, and the resultant Root CA Trust Store is verifiable.</p>
 "2.42":
-  issue:
-    '<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>
-
-    <p>We rely on a list generated from <a href="https://github.com/schors/gost-russian-ca/tree/master/certs">open
-    source</a> collection of Russian CA MinTsifry Rossii (Минцифры России), Ministry
-    of Telecom and Mass Communications of Russia (Минкомсвязь России)</p>'
+  issue: "<p>Certificates should be treated as suspicious when they do not have\
+    \ a trusted Root Certificate Authority, as it offers no security characteristics\
+    \ of TLS built on Trust Anchor system.</p>\n<p>When visiting a website that\
+    \ uses an suspicious Certificate it is likely the TLS connection is not secure.</p>\n\
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted\
+    \ stores then all website that have a leaf certificated issued by this CA\
+    \ will gain the ability to eaves-drop on all unencrypted information, inherently\
+    \ due to the nature they are providing the means for the encryption inherently\
+    \ and are present in the trusted CA Root store.</p>\n<p>We rely on a list\
+    \ generated from <a href=\"https://github.com/schors/gost-russian-ca/tree/master/certs\"\
+    >open source</a> collection of Russian CA MinTsifry Rossii (\u041C\u0438\u043D\
+    \u0446\u0438\u0444\u0440\u044B \u0420\u043E\u0441\u0441\u0438\u0438), Ministry\
+    \ of Telecom and Mass Communications of Russia (\u041C\u0438\u043D\u043A\u043E\
+    \u043C\u0441\u0432\u044F\u0437\u044C \u0420\u043E\u0441\u0441\u0438\u0438\
+    )</p>"
 "2.43":
-  issue:
-    '<p>Certificates should be treated as suspicious when they do not have a
-    trusted Root Certificate Authority, as it offers no security characteristics of
-    TLS built on Trust Anchor system.</p>
-
-    <p>When visiting a website that uses an suspicious Certificate it is likely the
-    TLS connection is not secure.</p>
-
-    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores
-    then all website that have a leaf certificated issued by this CA will gain the
-    ability to eaves-drop on all unencrypted information, inherently due to the nature
-    they are providing the means for the encryption inherently and are present in
-    the trusted CA Root store.</p>
-
-    <p>The <code>rustls</code> crate contains <em>curated</em> root certificates for
-    use with the <code>webpki</code> crate and anywhere <code>rustls</code> itself
-    is used.</p>
-
-    <p>The original source of these root certificates is the <a href="https://www.ccadb.org/">Common
-    CA Database (CCADB)</a> (also the source for Google, Microsoft, Apple, and many
-    more).</p>
-
-    <p>Then they are curated and prepared for bundling into Mozilla''s Network Security
-    Services (NSS), which is consumed by most Mozilla products and published publicly
-    to also be consumed by countless 3rd party products.</p>
-
-    <p>Before <code>rustls</code> get''s the bundle the <a href="mkcert.org">mkcert.org</a>
-    (commonly mistakenly referred to as the "Mozilla tooling", which it is not) further
-    curates the certificates and serves them over a HTTP API which is insecure, as
-    it is unverifiable what the code is doing (an open source repo is not the same
-    as the running environment, merely a small portion is the code), but that is the
-    method <code>rustls</code> implemented to initially get the root certificates.</p>
-
-    <p>Finally, <code>rustls</code> apply filtering on the subject and produce the
-    resultant Root CA Trust Store.</p>
-
+  issue: |-
+    <p>Certificates should be treated as suspicious when they do not have a trusted Root Certificate Authority, as it offers no security characteristics of TLS built on Trust Anchor system.</p>
+    <p>When visiting a website that uses an suspicious Certificate it is likely the TLS connection is not secure.</p>
+    <p>Conversely, if a malicious CA Root Certificate is present in the trusted stores then all website that have a leaf certificated issued by this CA will gain the ability to eaves-drop on all unencrypted information, inherently due to the nature they are providing the means for the encryption inherently and are present in the trusted CA Root store.</p>
+    <p>The <code>rustls</code> crate contains <em>curated</em> root certificates for use with the <code>webpki</code> crate and anywhere <code>rustls</code> itself is used.</p>
+    <p>The original source of these root certificates is the <a href="https://www.ccadb.org/">Common CA Database (CCADB)</a> (also the source for Google, Microsoft, Apple, and many more).</p>
+    <p>Then they are curated and prepared for bundling into Mozilla's Network Security Services (NSS), which is consumed by most Mozilla products and published publicly to also be consumed by countless 3rd party products.</p>
+    <p>Before <code>rustls</code> get's the bundle the <a href="mkcert.org">mkcert.org</a> (commonly mistakenly referred to as the "Mozilla tooling", which it is not) further curates the certificates and serves them over a HTTP API which is insecure, as it is unverifiable what the code is doing (an open source repo is not the same as the running environment, merely a small portion is the code), but that is the method <code>rustls</code> implemented to initially get the root certificates.</p>
+    <p>Finally, <code>rustls</code> apply filtering on the subject and produce the resultant Root CA Trust Store.</p>
     <p><strong>Critical Review</strong>;
-
-    A GitHub.com issue <a href="https://github.com/rustls/webpki-roots/issues/25">#25</a>
-    outlines a lack of trust and we hope to have this addressed.</p>'
+    A GitHub.com issue <a href="https://github.com/rustls/webpki-roots/issues/25">#25</a> outlines a lack of trust and we hope to have this addressed.</p>
 "2.44":
-  issue:
-    "<p>This is frequently a miss-configuration, i.e. the website domain name
-    was not included in your common name by mistake.</p>
-
-    <p>However it is a very uncommon issue and is most likely indication of compromise,
-    where a malicious attacker is targeting website owners or visitors using phishing
-    or impersonation and have made the error unintentionally or was unable to effectively
-    impersonate the website correctly and are relying on visitors ignoring browser
-    warnings.</p>"
+  issue: |-
+    <p>This is frequently a miss-configuration, i.e. the website domain name was not included in your common name by mistake.</p>
+    <p>However it is a very uncommon issue and is most likely indication of compromise, where a malicious attacker is targeting website owners or visitors using phishing or impersonation and have made the error unintentionally or was unable to effectively impersonate the website correctly and are relying on visitors ignoring browser warnings.</p>
 "2.45":
-  issue:
-    "<p>This is frequently a miss-configuration, i.e. the website domain name
-    was not included in your common name by mistake.</p>
-
-    <p>However it is a very uncommon issue and is most likely indication of compromise,
-    where a malicious attacker is targeting website owners or visitors using phishing
-    or impersonation and have made the error unintentionally or was unable to effectively
-    impersonate the website correctly and are relying on visitors ignoring browser
-    warnings.</p>"
+  issue: |-
+    <p>This is frequently a miss-configuration, i.e. the website domain name was not included in your common name by mistake.</p>
+    <p>However it is a very uncommon issue and is most likely indication of compromise, where a malicious attacker is targeting website owners or visitors using phishing or impersonation and have made the error unintentionally or was unable to effectively impersonate the website correctly and are relying on visitors ignoring browser warnings.</p>
 "2.46":
-  issue:
-    <p>When visiting a website that uses a Certificate with an invalid <code>NotBefore</code>
-    date, it is likely the TLS connection is not secure.</p>
+  issue: |-
+    <p>When visiting a website that uses a Certificate with an invalid <code>NotBefore</code> date, it is likely the TLS connection is not secure.</p>
 "2.47":
-  issue:
-    "<p>If the server (leaf) certificate was issued to serve the purpose of providing
-    a TLS connection from the server-side.</p>
-
-    <p>Any failure to include the correct signed (by the issuer) values would indicate
-    a forged certificate and compromised connection.</p>"
+  issue: |-
+    <p>If the server (leaf) certificate was issued to serve the purpose of providing a TLS connection from the server-side.</p>
+    <p>Any failure to include the correct signed (by the issuer) values would indicate a forged certificate and compromised connection.</p>
 "2.48":
-  issue:
-    "<p>You can get issued a DV Certificate without actually validating the domain,
-    Until 2018 the ACME protocol of Let's Encrypt did just this, relying on only
-    SNI for the so-called DV Certificate issuance - not their fault, ACME was designed
-    that way.</p>
-
-    <p>June 2022 there are hundreds of ACME protocol Certificate Authorities issuing
-    DV certificates and few would have learned from the 2018 disclosure and turned
-    off the vulnerable design feature of SNI.</p>
-
-    <p>There are a total of 10 methods of verification defined by ACME, few actually
-    offer any security characteristics that can be said to 'Verify' Domain Ownership,
-    in fact some are designed on purpose to offer DV certificates to customers of
-    website hosting providors that can only modify the HTTP header responses, or less
-    control and can only add a HTML tag! Neither of these are verifying control of
-    a domain, let alone Validate domain control! What is a DV certificate if domain
-    validation never occurred?</p>
-
-    <p>Beyond validation itself; The ACME protocol DV Certificate Issuers generally
-    don't offer any additional features, therefore even if you attempt to use certain
-    features like ssl_stapling it will simply be ignored. These Issuers, (pick on
-    Let's Encrypt for this one) simply prefer low-barrier and ease-of-use over any
-    and all security characteristics - so if they don't care, why would you put any
-    trust in their DV Certificates to secure your TLS connections?</p>"
+  issue: |-
+    <p>You can get issued a DV Certificate without actually validating the domain, Until 2018 the ACME protocol of Let's Encrypt did just this, relying on only SNI for the so-called DV Certificate issuance - not their fault, ACME was designed that way.</p>
+    <p>June 2022 there are hundreds of ACME protocol Certificate Authorities issuing DV certificates and few would have learned from the 2018 disclosure and turned off the vulnerable design feature of SNI.</p>
+    <p>There are a total of 10 methods of verification defined by ACME, few actually offer any security characteristics that can be said to 'Verify' Domain Ownership, in fact some are designed on purpose to offer DV certificates to customers of website hosting providors that can only modify the HTTP header responses, or less control and can only add a HTML tag! Neither of these are verifying control of a domain, let alone Validate domain control! What is a DV certificate if domain validation never occurred?</p>
+    <p>Beyond validation itself; The ACME protocol DV Certificate Issuers generally don't offer any additional features, therefore even if you attempt to use certain features like ssl_stapling it will simply be ignored. These Issuers, (pick on Let's Encrypt for this one) simply prefer low-barrier and ease-of-use over any and all security characteristics - so if they don't care, why would you put any trust in their DV Certificates to secure your TLS connections?</p>
 "2.49":
-  issue:
-    "<p>Using anything other than 65537 as the public exponent would effect compatibility
-    with most hardware and software.</p>
-
-    <p>Lower isn't vulnerable with proper padding however RSA implementations are
-    widely flawed and did not consider this security characteristic therefore in practice
-    any low exponent could indicate weakness known to be exploited by many heavily
-    scrutinised researchers publications.</p>
-
-    <p>Using exactly 65537 is an industry standard prescribed by certification authorities
-    and compliance such as PCI DSS, Annex B.3 of FIP186-4, NIST Special Publication
-    on Computer Security (SP 800-78 Rev. 1 of August 2007) does not allow public exponents
-    e smaller than 65537.</p>"
+  issue: |-
+    <p>Using anything other than 65537 as the public exponent would effect compatibility with most hardware and software.</p>
+    <p>Lower isn't vulnerable with proper padding however RSA implementations are widely flawed and did not consider this security characteristic therefore in practice any low exponent could indicate weakness known to be exploited by many heavily scrutinised researchers publications.</p>
+    <p>Using exactly 65537 is an industry standard prescribed by certification authorities and compliance such as PCI DSS, Annex B.3 of FIP186-4, NIST Special Publication on Computer Security (SP 800-78 Rev. 1 of August 2007) does not allow public exponents e smaller than 65537.</p>
 "2.5":
-  issue:
-    <p>DNS by itself is not secure, without DNSSEC ICANN states any attacker
-    can easily redirect a user to any malicious actor controlled server without the
-    user or authentic server realising it</p>
+  issue: |-
+    <p>DNS by itself is not secure, without DNSSEC ICANN states any attacker can easily redirect a user to any malicious actor controlled server without the user or authentic server realising it</p>
 "2.50":
-  issue:
-    "<p>Require all the X509 certificates provided by the server are in version
-    3.</p>
-
-    <p>HIPAA, Security Rule (Ref. NIST SP 800-52: Guidelines for the Selection and
-    Use of TLS Implementations)</p>"
+  issue: |-
+    <p>Require all the X509 certificates provided by the server are in version 3.</p>
+    <p>HIPAA, Security Rule (Ref. NIST SP 800-52: Guidelines for the Selection and Use of TLS Implementations)</p>
 "2.51":
-  issue:
-    "<p>When visiting a website that uses an expired Certificate it is likely
-    the TLS connection is not secure.</p>
-
-    <p>Certificate rotation should occur before the expiry date. Some issuers can
-    take many business days to supply a replacement, and deploying the replacement
-    to live systems often requires planning and care.</p>
-
-    <p>If a Certificate will expire in the next 72 hours it is considered a critical
-    risk, particularly if near weekends or holidays.</p>"
+  issue: |-
+    <p>When visiting a website that uses an expired Certificate it is likely the TLS connection is not secure.</p>
+    <p>Certificate rotation should occur before the expiry date. Some issuers can take many business days to supply a replacement, and deploying the replacement to live systems often requires planning and care.</p>
+    <p>If a Certificate will expire in the next 72 hours it is considered a critical risk, particularly if near weekends or holidays.</p>
 "2.6":
-  issue:
-    <p>DNS by itself is not secure, without DNSSEC ICANN states any attacker
-    can easily redirect a user to any malicious actor controlled server without the
-    user or authentic server realising it</p>
+  issue: |-
+    <p>DNS by itself is not secure, without DNSSEC ICANN states any attacker can easily redirect a user to any malicious actor controlled server without the user or authentic server realising it</p>
 "2.7":
-  issue:
-    "<p>Any self-signed Certificate should be suspicious as it offers no security
-    characteristics of TLS that is based on a system that all Certificates have a
-    Root Certificate Authority Trust Anchor.</p>
-
-    <p>When visiting a website that uses a self-signed Certificate it is likely the
-    TLS connection is not secure.</p>"
+  issue: |-
+    <p>Any self-signed Certificate should be suspicious as it offers no security characteristics of TLS that is based on a system that all Certificates have a Root Certificate Authority Trust Anchor.</p>
+    <p>When visiting a website that uses a self-signed Certificate it is likely the TLS connection is not secure.</p>
 "2.8":
-  issue:
-    "<p>Continued use of weak keys in certificates puts your sensitive data at
-    risk. Exhaustive key searches or brute force attacks against certificates with
-    weak keys are dangerous to network security.
-
+  issue: |-
+    <p>Continued use of weak keys in certificates puts your sensitive data at risk. Exhaustive key searches or brute force attacks against certificates with weak keys are dangerous to network security.
     As computational power increases, so does the need for stronger keys.</p>
-
-    <p>If this is not the leaf certificate it is a root or intermediate which signs
-    other digital certificates with its private key, if the private key is weak it
-    may be compromised and all the rest of the issued certificates become useless.</p>
-
-    <p>Diffie-Hellman key exchange depends for its security on the presumed difficulty
-    of solving the discrete logarithm problem.</p>
-
-    <p>By design, many Diffie-Hellman implementations use the same pre-generated prime
-    for their field, because of the reuse of primes generating pre-computation for
-    just one prime would expose millions of implementations. This vulnerability was
-    known as early as 1992.</p>
-
-    <p>Claims on the practical implications of the attack at the time were however
-    disputed by security researchers but over the years it is expected that many primes
-    were and still are being calculated practically making all primes of 2048 bit
-    or less considered weak or vulnerable.</p>"
+    <p>If this is not the leaf certificate it is a root or intermediate which signs other digital certificates with its private key, if the private key is weak it may be compromised and all the rest of the issued certificates become useless.</p>
+    <p>Diffie-Hellman key exchange depends for its security on the presumed difficulty of solving the discrete logarithm problem.</p>
+    <p>By design, many Diffie-Hellman implementations use the same pre-generated prime for their field, because of the reuse of primes generating pre-computation for just one prime would expose millions of implementations. This vulnerability was known as early as 1992.</p>
+    <p>Claims on the practical implications of the attack at the time were however disputed by security researchers but over the years it is expected that many primes were and still are being calculated practically making all primes of 2048 bit or less considered weak or vulnerable.</p>
 "2.9":
-  issue:
-    <p>Using the SHA-1 chosen-prefix collision the X.509 Certificate can be forged,
-    other attacks leverage predictable serial numbers and compromise Certificate Authorities
-    issued Certificates</p>
+  issue: |-
+    <p>Using the SHA-1 chosen-prefix collision the X.509 Certificate can be forged, other attacks leverage predictable serial numbers and compromise Certificate Authorities issued Certificates</p>
 "3.1":
-  issue:
-    '<p>While some requirements specify the correct evaluation in the Report
-    on Compliance (ROC), regarding the proper configuration of TLS more broadly PCI
-    DSS has the following guidance:</p>
-
+  issue: |-
+    <p>While some requirements specify the correct evaluation in the Report on Compliance (ROC), regarding the proper configuration of TLS more broadly PCI DSS has the following guidance:</p>
     <blockquote>
-
-    <p>"Refer to industry standards and best practices for information on strong cryptography
-    and secure protocols (e.g. NIST SP 800-52 and SP 800-57, OWASP, etc.)"</p>
-
+    <p>"Refer to industry standards and best practices for information on strong cryptography and secure protocols (e.g. NIST SP 800-52 and SP 800-57, OWASP, etc.)"</p>
     </blockquote>
-
-    <p>Each evaluation that reports on PCI DSS 3.2.1 compliance includes references
-    to publications and evidence to support the idea of general industry standardisation,
-    for which is a term that is defined by the existence of these publications over
-    time.</p>'
+    <p>Each evaluation that reports on PCI DSS 3.2.1 compliance includes references to publications and evidence to support the idea of general industry standardisation, for which is a term that is defined by the existence of these publications over time.</p>
 "3.2":
-  issue:
-    "<p>In the prior versions the standard indicated that an organisation had
-    to use the latest version of SSL, or at least TLS 1.2. In the new standard that
-    specific language has been removed in favour of general industry standards that
-    change over time.</p>
-
-    <p>Each evaluation that reports on PCI DSS 4.0 compliance includes references
-    to publications and evidence to support the idea of general industry standardisation,
-    for which is a term that is defined by the existence of these publications over
-    time.</p>"
+  issue: |-
+    <p>In the prior versions the standard indicated that an organisation had to use the latest version of SSL, or at least TLS 1.2. In the new standard that specific language has been removed in favour of general industry standards that change over time.</p>
+    <p>Each evaluation that reports on PCI DSS 4.0 compliance includes references to publications and evidence to support the idea of general industry standardisation, for which is a term that is defined by the existence of these publications over time.</p>
 "3.3":
-  issue:
-    "<p><strong>Note</strong> The transition period closed at the end of 2013.</p>
-
-    <p>The transitioning of cryptographic algorithms and key lengths to stronger cryptographic
-    keys and more robust algorithms as recommended in NIST SP800-131A.</p>
-
-    <p>A product or implementation does not meet the FIPS 140-2 applicability requirements
-    by simply implementing an Approved security function and acquiring validations
-    for each of the implemented algorithms (check references for the list)</p>"
+  issue: |-
+    <p><strong>Note</strong> The transition period closed at the end of 2013.</p>
+    <p>The transitioning of cryptographic algorithms and key lengths to stronger cryptographic keys and more robust algorithms as recommended in NIST SP800-131A.</p>
+    <p>A product or implementation does not meet the FIPS 140-2 applicability requirements by simply implementing an Approved security function and acquiring validations for each of the implemented algorithms (check references for the list)</p>
 "3.4":
-  issue:
-    "<p>SP 800-131A provides specific guidance for transitions to the use of
-    stronger cryptographic keys and more robust algorithms.</p>
-
-    <p>This strengthens security by defining stronger cryptographic keys and more
-    robust algorithms. The standard defines a period to allow customers time to make
-    the transition to the new requirements. The transition period closed at the end
-    of 2013.</p>"
+  issue: |-
+    <p>SP 800-131A provides specific guidance for transitions to the use of stronger cryptographic keys and more robust algorithms.</p>
+    <p>This strengthens security by defining stronger cryptographic keys and more robust algorithms. The standard defines a period to allow customers time to make the transition to the new requirements. The transition period closed at the end of 2013.</p>
 "3.5":
-  issue:
-    "<p>This is specifically for evaluating if the TLS connection only offers
-    allowed cipher suites.</p>
-
-    <p>The FIPS 140-2 states that approved security function is either specified in
-    the list of approved functions (which is Annex A), or specified in a Federal Information
-    Processing Standard (FIPS).</p>
-
-    <p>FIPS 140-2 Implementation Guide states that DES (formally DEA) is not approved
-    since May 19, 2007, however note the list of FIPS-140 validated modules I can
-    see that DES is listed only in other algorithms section.</p>
-
-    <p>Triple-DES or 3DES (formally TDEA, not single DES or DEA) was reissued as a
-    special publication (SP800-67) and that SP is referenced by 140-2 IG and 140-2
-    Annex A.</p>"
+  issue: |-
+    <p>This is specifically for evaluating if the TLS connection only offers allowed cipher suites.</p>
+    <p>The FIPS 140-2 states that approved security function is either specified in the list of approved functions (which is Annex A), or specified in a Federal Information Processing Standard (FIPS).</p>
+    <p>FIPS 140-2 Implementation Guide states that DES (formally DEA) is not approved since May 19, 2007, however note the list of FIPS-140 validated modules I can see that DES is listed only in other algorithms section.</p>
+    <p>Triple-DES or 3DES (formally TDEA, not single DES or DEA) was reissued as a special publication (SP800-67) and that SP is referenced by 140-2 IG and 140-2 Annex A.</p>
 "4.1":
-  issue:
-    "<p>Multiple compression vulnerabilities exist across all SS/TLS versions
-    when HTTPS transport naively utilises compression without taking proper care to
-    mitigate all known attacks.</p>
-
-    <p>Due to the nature and trivial complexity of most compression related attacks,
-    and mitigated both known and inknown threats may be a futile effort, it is best
-    practice to avoid compression and instead rely on minimising the data being transmitted
-    to only what is needed.</p>"
+  issue: |-
+    <p>Multiple compression vulnerabilities exist across all SS/TLS versions when HTTPS transport naively utilises compression without taking proper care to mitigate all known attacks.</p>
+    <p>Due to the nature and trivial complexity of most compression related attacks, and mitigated both known and inknown threats may be a futile effort, it is best practice to avoid compression and instead rely on minimising the data being transmitted to only what is needed.</p>
 "4.11":
-  issue:
-    "<p>The server sent a response header to inform supporting browsers that
-    the site should only be accessed using HTTPS, and that any future attempts to
-    access it using HTTP should automatically be converted to HTTPS.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>Here is an example of what the <code>Strict-Transport-Security</code>
-    header looks like: You can include the max age, subdomains, and preload.</p>\n<p><code>Strict-Transport-Security:
-    max-age=31536000; includeSubDomains; preload</code></p>\n<p><strong>Enable in
-    Nginx</strong></p>\n<p><code>add_header Strict-Transport-Security \"max-age=63072000;
-    includeSubdomains; preload\";</code></p>\n<p><strong>Enable in Apache</strong></p>\n<p><code>Header
-    always set Strict-Transport-Security \"max-age=63072000; includeSubdomains; preload\"</code></p>\n<p><strong>Enable
-    on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"Strict-Transport-Security\"
-    value=\"max-age=63072000; includeSubdomains; preload\" /&gt;\n        &lt;/customHeaders&gt;\n
-    \   &lt;/httpProtocol&gt;\n    ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>The server sent a response header to inform supporting browsers that the site should only be accessed using HTTPS, and that any future attempts to access it using HTTP should automatically be converted to HTTPS.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.12":
-  issue:
-    "<p>The <code>X-Content-Type-Options</code> header prevents browsers from
-    sniffing a response away from the declared Content-Type. This helps reduce the
-    danger of drive-by downloads and helps treat the content the right way.</p>
-
-    <p>Essentially the server sends a response header to inform supporting browsers
-    that the MIME types advertised in the Content-Type headers should be followed
-    and not be changed. The header allows you to avoid MIME type sniffing by saying
-    that the MIME types are deliberately configured.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>Here is an example of what the <code>Strict-Transport-Security</code>
-    header looks like: You can include the max age, subdomains, and preload.</p>\n<p><strong>Enable
-    in Nginx</strong></p>\n<p><code>add_header X-Content-Type-Options \"nosniff\"
-    always;</code></p>\n<p><strong>Enable in Apache</strong></p>\n<p><code>Header
-    always set X-Content-Type-Options \"nosniff\"</code></p>\n<p><strong>Enable on
-    IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"X-Content-Type-Options\"
-    value=\"nosniff\" /&gt;\n        &lt;/customHeaders&gt;\n    &lt;/httpProtocol&gt;\n
-    \   ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>The <code>X-Content-Type-Options</code> header prevents browsers from sniffing a response away from the declared Content-Type. This helps reduce the danger of drive-by downloads and helps treat the content the right way.</p>
+    <p>Essentially the server sends a response header to inform supporting browsers that the MIME types advertised in the Content-Type headers should be followed and not be changed. The header allows you to avoid MIME type sniffing by saying that the MIME types are deliberately configured.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.13":
-  issue:
-    "<p>A web server can instruct web browsers to allow list on the features
-    the site owner intends to utilise, blocking all unused features so that any malicious
-    scripts cannot leverage the unused features or API.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>The <code>Feature-Policy</code> header grants the ability to
-    allow or deny browser features, whether in its own frame or content within an
-    inline frame element <code>&lt;iframe&gt;</code></p>\n<p><strong>Enable in Nginx</strong></p>\n<p><code>add_header
-    Feature-Policy \"clipboard-read 'none'\" always;</code></p>\n<p><strong>Enable
-    in Apache</strong></p>\n<p><code>Header always set Feature-Policy \"clipboard-read
-    'none'\"</code></p>\n<p><strong>Enable on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n
-    \   ...\n    &lt;httpProtocol&gt;\n        &lt;customHeaders&gt;\n            &lt;add
-    name=\"Feature-Policy\" value=\"clipboard-read 'none'\" /&gt;\n        &lt;/customHeaders&gt;\n
-    \   &lt;/httpProtocol&gt;\n    ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>A web server can instruct web browsers to allow list on the features the site owner intends to utilise, blocking all unused features so that any malicious scripts cannot leverage the unused features or API.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.14":
-  issue:
-    "<p>The Referrer-Policy HTTP header controls how much referrer information
-    (sent with the Referrer header) should be included with requests.</p>
-
-    <p>This policy will leak potentially-private information from HTTPS resource URLs
-    to insecure origins. Carefully consider the impact of this setting.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>The <code>Referrer-Policy</code> controls how much (if any)
-    referrer information the browser should reveal to the web server.</p>\n<p><strong>Enable
-    in Nginx</strong></p>\n<p><code>add_header Referrer-Policy \"no-referrer\" always;</code></p>\n<p><strong>Enable
-    in Apache</strong></p>\n<p><code>Header always set Referrer-Policy \"no-referrer\"</code></p>\n<p><strong>Enable
-    on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"Referrer-Policy\" value=\"no-referrer\"
-    /&gt;\n        &lt;/customHeaders&gt;\n    &lt;/httpProtocol&gt;\n    ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>The Referrer-Policy HTTP header controls how much referrer information (sent with the Referrer header) should be included with requests.</p>
+    <p>This policy will leak potentially-private information from HTTPS resource URLs to insecure origins. Carefully consider the impact of this setting.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.15":
-  issue:
-    "<p>The server sent a response header <code>Content-Security-Policy</code>
-    to inform 'supporting browsers; to ensure TLS is used even when miss-configured
-    scripts attempt insecure connections.</p>
-
-    <p>A supporting browser must indicate in the client request a header of <code>Upgrade-Insecure-Requests</code>
-    with the value <code>1</code>, e.g.</p>
-
+  issue: |-
+    <p>The server sent a response header <code>Content-Security-Policy</code> to inform 'supporting browsers; to ensure TLS is used even when miss-configured scripts attempt insecure connections.</p>
+    <p>A supporting browser must indicate in the client request a header of <code>Upgrade-Insecure-Requests</code> with the value <code>1</code>, e.g.</p>
     <p><code>GET / HTTP/1.1
-
     Host: trivialsec.com
-
     Upgrade-Insecure-Requests: 1</code></p>
-
-    <p><strong>Note</strong> this feature has no impact to malicious clients that
-    control the client request and avoid producing the request header (indicating
-    it will not support the feature). This is also not going to impact a scenario
-    where malicious actors have full control over client requests to simply ignore
-    server response headers it does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>There are many directives that you can use with <code>Content-Security-Policy</code>.
-    This example below allows scripts from both the current domain (defined by 'self')
-    as well as google-analytics.com.</p>\n<p><code>Content-Security-Policy: block-all-mixed-content</code></p>\n<p>Or
-    web sites with large numbers of insecure legacy URLs that need to be rewritten:</p>\n<p><code>Content-Security-Policy:
-    upgrade-insecure-requests</code></p>\n<p><strong>Note</strong>: The <code>upgrade-insecure-requests</code>
-    directive is evaluated <em>before</em> <code>block-all-mixed-content</code></p>\n<p>Alternatively
-    the following granular examples will disallow only insecure HTTP images:</p>\n<p><strong>Enable
-    in Nginx</strong></p>\n<p><code>add_header Content-Security-Policy: \"img-src
-    https:\";</code></p>\n<p><strong>Enable in Apache</strong></p>\n<p><code>header
-    set Content-Security-Policy \"img-src https:;\"</code></p>\n<p><strong>Enable
-    on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"Content-Security-Policy\"
-    value=\"img-src https:\" /&gt;\n        &lt;/customHeaders&gt;\n    &lt;/httpProtocol&gt;\n
-    \   ...\n&lt;/system.webServer&gt;</code></p>"
+    <p><strong>Note</strong> this feature has no impact to malicious clients that control the client request and avoid producing the request header (indicating it will not support the feature). This is also not going to impact a scenario where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.16":
-  issue:
-    '<p>The server sent a response header to inform supporting browsers whether
-    or not a browser should be allowed to render a page in a <code>&lt;frame&gt;</code>,
-    <code>&lt;iframe&gt;</code>, <code>&lt;embed&gt;</code> or <code>&lt;object&gt;</code>.</p>
-
-    <p>Sites can use this to avoid click-jacking attacks, by ensuring that their content
-    is not embedded into other sites.</p>
-
-    <p>The added security is provided only if the user accessing the document is using
-    a browser that supports X-Frame-Options.</p>
-
+  issue: |-
+    <p>The server sent a response header to inform supporting browsers whether or not a browser should be allowed to render a page in a <code>&lt;frame&gt;</code>, <code>&lt;iframe&gt;</code>, <code>&lt;embed&gt;</code> or <code>&lt;object&gt;</code>.</p>
+    <p>Sites can use this to avoid click-jacking attacks, by ensuring that their content is not embedded into other sites.</p>
+    <p>The added security is provided only if the user accessing the document is using a browser that supports X-Frame-Options.</p>
     <p><code>X-Frame-Options</code> works only by setting through the HTTP header.</p>
-
-    <p><strong>Note:</strong> Setting X-Frame-Options inside the <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta"><code>&lt;meta&gt;</code></a>
-    element is useless, <code>&lt;meta http-equiv="X-Frame-Options" content="deny"&gt;</code>
-    has no effect.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>'
-  recommendation:
-    "<p>There are many directives that you can use with <code>Content-Security-Policy</code>
-    HTTP response header, the following can help prevent clickjacking.\nOne major
-    benefit to this directive is that it allows you to authorize multiple domains.</p>\n<p><strong>Enable
-    in Nginx</strong></p>\n<p><code>add_header Content-Security-Policy: \"frame-ancestors\";</code></p>\n<p><strong>Enable
-    in Apache</strong></p>\n<p><code>header set Content-Security-Policy \"frame-ancestors;\"</code></p>\n<p><strong>Enable
-    on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"Content-Security-Policy\"
-    value=\"frame-ancestors\" /&gt;\n        &lt;/customHeaders&gt;\n    &lt;/httpProtocol&gt;\n
-    \   ...\n&lt;/system.webServer&gt;</code></p>"
+    <p><strong>Note:</strong> Setting X-Frame-Options inside the <a href="https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta"><code>&lt;meta&gt;</code></a> element is useless, <code>&lt;meta http-equiv="X-Frame-Options" content="deny"&gt;</code> has no effect.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.17":
-  issue: "<h3>Deprecated</h3>
-
-    <p><strong>Warning</strong>: Even though this feature can protect users of older
-    web browsers that don't yet support CSP, in some cases, XSS protection can create
-    XSS vulnerabilities in otherwise safe websites. See the MDN reference for more
-    information.</p>
-
-    <p>The server sent a response header to inform supporting browsers to stop pages
-    from loading when they detect reflected cross-site scripting (XSS) attacks.</p>
-
-    <p>These protections are largely unnecessary in modern browsers when sites implement
-    a strong Content-Security-Policy that disables the use of inline JavaScript ('unsafe-inline').</p>"
+  issue: |-
+    <h3>Deprecated</h3>
+    <p><strong>Warning</strong>: Even though this feature can protect users of older web browsers that don't yet support CSP, in some cases, XSS protection can create XSS vulnerabilities in otherwise safe websites. See the MDN reference for more information.</p>
+    <p>The server sent a response header to inform supporting browsers to stop pages from loading when they detect reflected cross-site scripting (XSS) attacks.</p>
+    <p>These protections are largely unnecessary in modern browsers when sites implement a strong Content-Security-Policy that disables the use of inline JavaScript ('unsafe-inline').</p>
 "4.2":
-  issue:
-    "<p>Server supports TLS compression which may allow CRIME/BEAST attacks.</p>
-
-    <p>CRIME attacks break encryption by analyzing the compression algorithm, an attacker
-    could decrypt the source data by understanding the underlying Lossless compression
-    algorithm to exploit known weaknesses.</p>
-
-    <p>Lossless data compression in SPDY and TLS/SSL (DEFLATE algorithm) finds the
-    redundancies in the body of the data and then these redundancies are represented
-    in a smaller fashion, this enables an attacker to derive contents by testing changes
-    in pre-encrypted compressed data and observing where the resultant encrypted data
-    changes therefore exposing a method to learn unknown encrypted data leaked in
-    the same method.</p>
-
-    <p>The BEAST attack is much simpler, with enough observations of alternating ciphers
-    you can derive the initialisation vector and read the encrypted Session ID. With
-    this you can decipher (decrypt) future communications.</p>"
+  issue: |-
+    <p>Server supports TLS compression which may allow CRIME/BEAST attacks.</p>
+    <p>CRIME attacks break encryption by analyzing the compression algorithm, an attacker could decrypt the source data by understanding the underlying Lossless compression algorithm to exploit known weaknesses.</p>
+    <p>Lossless data compression in SPDY and TLS/SSL (DEFLATE algorithm) finds the redundancies in the body of the data and then these redundancies are represented in a smaller fashion, this enables an attacker to derive contents by testing changes in pre-encrypted compressed data and observing where the resultant encrypted data changes therefore exposing a method to learn unknown encrypted data leaked in the same method.</p>
+    <p>The BEAST attack is much simpler, with enough observations of alternating ciphers you can derive the initialisation vector and read the encrypted Session ID. With this you can decipher (decrypt) future communications.</p>
 "4.3":
-  issue:
-    <p>This will lead to a communication channel established over an insecure
-    network connection</p>
+  issue: |-
+    <p>This will lead to a communication channel established over an insecure network connection</p>
 "4.4":
-  issue: "<p>Websites are not expected to read contents of the users' clipboard,
-    which commonly contains private or sensitive information.</p>
-
-    <p>A web server can instruct web browsers to block this feature so that any malicious
-    scripts cannot leverage the API.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>Set the <code>Feature-Policy</code> HTTP response header to
-    value <code>clipboard-read 'none'</code>.\nFor the time being, the soon to be
-    deprecated <code>Permissions-Policy</code> HTTP response header can still help
-    if set to value <code>clipboard-read=()</code></p>\n<p><strong>Enable in Nginx</strong></p>\n<p><code>add_header
-    Feature-Policy \"clipboard-read 'none'\" always;</code></p>\n<p><strong>Enable
-    in Apache</strong></p>\n<p><code>Header always set Feature-Policy \"clipboard-read
-    'none'\"</code></p>\n<p><strong>Enable on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n
-    \   ...\n    &lt;httpProtocol&gt;\n        &lt;customHeaders&gt;\n            &lt;add
-    name=\"Feature-Policy\" value=\"clipboard-read 'none'\" /&gt;\n        &lt;/customHeaders&gt;\n
-    \   &lt;/httpProtocol&gt;\n    ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>Websites are not expected to read contents of the users' clipboard, which commonly contains private or sensitive information.</p>
+    <p>A web server can instruct web browsers to block this feature so that any malicious scripts cannot leverage the API.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.5":
-  issue:
-    "<p>Websites that are maintained should not be utilising deprecated features,
-    that commonly exhibit insecure functionality or vulnerable to abuse.</p>
-
-    <p>A web server can instruct web browsers to block these features so that any
-    malicious scripts cannot leverage the API.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>Set the <code>Feature-Policy</code> HTTP response header to
-    value <code>sync-script 'none'</code>, <code>sync-xhr 'none'</code>, and <code>document-domain
-    'none'</code>.\nFor the time being, the soon to be deprecated <code>Permissions-Policy</code>
-    HTTP response header can still help if set to value <code>sync-script=()</code>,
-    <code>sync-xhr=()</code>, and <code>document-domain=()</code>.</p>\n<p><strong>Enable
-    in Nginx</strong></p>\n<p><code>add_header Feature-Policy \"sync-script 'none';
-    sync-xhr 'none'; document-domain 'none'\" always;</code></p>\n<p><strong>Enable
-    in Apache</strong></p>\n<p><code>Header always set Feature-Policy \"sync-script
-    'none'; sync-xhr 'none'; document-domain 'none'\"</code></p>\n<p><strong>Enable
-    on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"Feature-Policy\" value=\"sync-script
-    'none'; sync-xhr 'none'; document-domain 'none'\" /&gt;\n        &lt;/customHeaders&gt;\n
-    \   &lt;/httpProtocol&gt;\n    ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>Websites that are maintained should not be utilising deprecated features, that commonly exhibit insecure functionality or vulnerable to abuse.</p>
+    <p>A web server can instruct web browsers to block these features so that any malicious scripts cannot leverage the API.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.6":
-  issue:
-    "<p>The server sent a response header that prevents a document from loading
-    any cross-origin resources that don't explicitly grant the document permission
-    (using CORP or CORS).</p>
-
-    <p>The default configuration when this is not sent allows the document to fetch
-    cross-origin resources which leaves users' vulnerable to cross-site scripting
-    (XSS) attacks.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>Set the <code>Cross-Origin-Embedder-Policy</code> HTTP response
-    header to value <code>require-corp</code>.</p>\n<p><strong>Enable in Nginx</strong></p>\n<p><code>add_header
-    Cross-Origin-Embedder-Policy: \"require-corp\";</code></p>\n<p><strong>Enable
-    in Apache</strong></p>\n<p><code>header set Cross-Origin-Embedder-Policy \"require-corp;\"</code></p>\n<p><strong>Enable
-    on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"Cross-Origin-Embedder-Policy\"
-    value=\"require-corp\" /&gt;\n        &lt;/customHeaders&gt;\n    &lt;/httpProtocol&gt;\n
-    \   ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>The server sent a response header that prevents a document from loading any cross-origin resources that don't explicitly grant the document permission (using CORP or CORS).</p>
+    <p>The default configuration when this is not sent allows the document to fetch cross-origin resources which leaves users' vulnerable to cross-site scripting (XSS) attacks.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.7":
-  issue:
-    "<p>The server sent a response header allows you to ensure a top-level document
-    does not share a browsing context group with cross-origin documents.</p>
-
-    <p>COOP will process-isolate your document and potential attackers can't access
-    your global object if they were to open it in a popup, preventing a set of cross-origin
-    attacks dubbed XS-Leaks.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>Set the <code>Cross-Origin-Opener-Policy</code> HTTP response
-    header to value <code>same-origin</code>.</p>\n<p><strong>Enable in Nginx</strong></p>\n<p><code>add_header
-    Cross-Origin-Opener-Policy: \"same-origin\";</code></p>\n<p><strong>Enable in
-    Apache</strong></p>\n<p><code>header set Cross-Origin-Opener-Policy \"same-origin;\"</code></p>\n<p><strong>Enable
-    on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"Cross-Origin-Opener-Policy\"
-    value=\"same-origin\" /&gt;\n        &lt;/customHeaders&gt;\n    &lt;/httpProtocol&gt;\n
-    \   ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>The server sent a response header allows you to ensure a top-level document does not share a browsing context group with cross-origin documents.</p>
+    <p>COOP will process-isolate your document and potential attackers can't access your global object if they were to open it in a popup, preventing a set of cross-origin attacks dubbed XS-Leaks.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.8":
-  issue:
-    "<p>The server sent a response header that prevents a document from loading
-    any cross-origin resources that don't explicitly grant the document permission
-    (CORS).</p>
-
-    <p>The default configuration when this is not sent allows the document to fetch
-    cross-origin resources which leaves users' vulnerable to cross-site scripting
-    (XSS) attacks.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>Set the <code>Cross-Origin-Resource-Policy</code> HTTP response
-    header to value <code>same-origin</code>.</p>\n<p><strong>Enable in Nginx</strong></p>\n<p><code>add_header
-    Cross-Origin-Resource-Policy: \"same-origin\";</code></p>\n<p><strong>Enable in
-    Apache</strong></p>\n<p><code>header set Cross-Origin-Resource-Policy \"same-origin;\"</code></p>\n<p><strong>Enable
-    on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"Cross-Origin-Resource-Policy\"
-    value=\"same-origin\" /&gt;\n        &lt;/customHeaders&gt;\n    &lt;/httpProtocol&gt;\n
-    \   ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>The server sent a response header that prevents a document from loading any cross-origin resources that don't explicitly grant the document permission (CORS).</p>
+    <p>The default configuration when this is not sent allows the document to fetch cross-origin resources which leaves users' vulnerable to cross-site scripting (XSS) attacks.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>
 "4.9":
-  issue:
-    "<p>The server sent a response header allows web site administrators to control
-    resources the user agent is allowed to load for a given page. With a few exceptions,
-    policies mostly involve specifying server origins and script endpoints.</p>
-
-    <p>This helps guard against cross-site scripting attacks cross-site scripting
-    (XSS), among many common browser attack vectors.</p>
-
-    <p><strong>Note</strong> this feature has no impact where malicious actors have
-    full control over client requests to simply ignore server response headers it
-    does not want to process or adhere to.</p>"
-  recommendation:
-    "<p>There are many directives that you can use with <code>Content-Security-Policy</code>.
-    This example below allows scripts from both the current domain (defined by 'self')
-    as well as google-analytics.com.</p>\n<p><code>Content-Security-Policy: script-src
-    'self' https://www.google-analytics.com</code></p>\n<p><strong>Enable in Nginx</strong></p>\n<p><code>add_header
-    Content-Security-Policy: \"default-src 'none'; script-src 'self' https://www.google-analytics.com\";</code></p>\n<p><strong>Enable
-    in Apache</strong></p>\n<p><code>header set Content-Security-Policy \"default-src
-    'none'; script-src 'self' https://www.google-analytics.com;\"</code></p>\n<p><strong>Enable
-    on IIS</strong></p>\n<p><code>&lt;system.webServer&gt;\n    ...\n    &lt;httpProtocol&gt;\n
-    \       &lt;customHeaders&gt;\n            &lt;add name=\"Content-Security-Policy\"
-    value=\"default-src 'none'; script-src 'self' https://www.google-analytics.com\"
-    /&gt;\n        &lt;/customHeaders&gt;\n    &lt;/httpProtocol&gt;\n    ...\n&lt;/system.webServer&gt;</code></p>"
+  issue: |-
+    <p>The server sent a response header allows web site administrators to control resources the user agent is allowed to load for a given page. With a few exceptions, policies mostly involve specifying server origins and script endpoints.</p>
+    <p>This helps guard against cross-site scripting attacks cross-site scripting (XSS), among many common browser attack vectors.</p>
+    <p><strong>Note</strong> this feature has no impact where malicious actors have full control over client requests to simply ignore server response headers it does not want to process or adhere to.</p>

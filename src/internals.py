@@ -125,16 +125,6 @@ class DelayRetryHandler(Exception):
         Exception.__init__(self, kwargs.get("msg", "Max retries exceeded"))
 
 
-class UnspecifiedError(Exception):
-    """
-    The exception class for exceptions that weren't previously known.
-    """
-
-    def __init__(self, **kwargs):
-        always_log(kwargs.get("msg", "An unspecified error occurred"))
-        Exception.__init__(self, kwargs.get("msg", "An unspecified error occurred"))
-
-
 class HMAC:
     default_algorithm = "sha512"
     supported_algorithms = {
