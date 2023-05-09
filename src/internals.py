@@ -44,7 +44,12 @@ from webauthn.helpers.structs import (
     ResidentKeyRequirement,
     PublicKeyCredentialRequestOptions,
 )
-from lumigo_tracer import add_execution_tag, error as lumigo_error
+from lumigo_tracer import (
+    add_execution_tag,
+    error as lumigo_error,
+    info as lumigo_info,
+    warn as lumigo_warn,
+)
 from user_agents.parsers import UserAgent, parse as ua_parser
 from starlette.requests import Request
 from fastapi import Header, HTTPException, status
@@ -81,32 +86,43 @@ ALLOWED_ORIGINS = (
 AUTHZ_REALM = 'JWT realm="trivialscan"'
 ERR_INVALID_AUTHORIZATION = "Invalid Bearer Token"
 ERR_MISSING_AUTHORIZATION = "Missing Bearer Token"
+UNHANDLED_ERROR = "UnhandledError"
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 boto3.set_stream_logger("boto3", getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))  # type: ignore
 logger.setLevel(getattr(logging, LOG_LEVEL, DEFAULT_LOG_LEVEL))
 
 
-def always_log(message: Union[str, Exception]):
+def always_log(message: Union[str, Exception], is_issue: bool = True):
     caller = getframeinfo(stack()[1][0])
     alert_type = (
         message.__class__.__name__
         if hasattr(message, "__class__") and message is not str
-        else "UnhandledError"
+        else UNHANDLED_ERROR
     )
     filename = (
         caller.filename.replace(getenv("LAMBDA_TASK_ROOT", ""), "")
         if getenv("AWS_EXECUTION_ENV") is not None and getenv("LAMBDA_TASK_ROOT")
         else caller.filename.split("/src/")[1]
     )
-    lumigo_error(
-        f"{filename}:{caller.function}:{caller.lineno} - {message}",
-        alert_type,
-        extra={
-            "LOG_LEVEL": LOG_LEVEL,
-            "NAMESPACE": NAMESPACE.hex,
-        },
-    )
+    if not is_issue:
+        lumigo_info(
+            f"{filename}:{caller.function}:{caller.lineno} - {message}",
+            "Info",
+        )
+    if alert_type == UNHANDLED_ERROR:
+        lumigo_warn(
+            f"{filename}:{caller.function}:{caller.lineno} - {message}",
+            alert_type,
+            extra={
+                "LOG_LEVEL": LOG_LEVEL,
+                "NAMESPACE": NAMESPACE.hex,
+            },
+        )
+    else:
+        lumigo_error(
+            f"{filename}:{caller.function}:{caller.lineno} - {message}", alert_type
+        )
 
 
 class DenyAuthorisation(Exception):
@@ -765,7 +781,7 @@ async def auth_required(
             raw_body=raw_body,
         )
     except DenyAuthorisation as err:
-        always_log(err)
+        always_log(err, is_issue=not isinstance(err, jwt.ExpiredSignatureError))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=ERR_INVALID_AUTHORIZATION,

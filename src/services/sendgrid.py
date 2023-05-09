@@ -10,7 +10,8 @@ from sendgrid.helpers.eventwebhook import EventWebhook
 import services.aws
 import internals
 
-logger = logging.getLogger()
+
+logger = logging.getLogger(__name__)
 
 SENDGRID_TEMPLATES = {
     "early_warning_service": "d-4d6ad6a796bb4021a326fb8ca7fb47d2",
