@@ -55,11 +55,15 @@ def retrieve_hosts(
     seen = set()
     data = []
     for report in scanner_record.history:
-        for host in report.targets or []:
+        for host in report.targets:  # pylint: disable=not-an-iterable
             target = f"{host.transport.hostname}:{host.transport.port}"
-            if target not in seen:
-                seen.add(target)
-                data.append(host)
+            if target in seen:
+                continue
+            for monitored in scanner_record.monitored_targets:  # type: ignore
+                if monitored.hostname == host.transport.hostname:
+                    host.monitoring_enabled = monitored.enabled
+            seen.add(target)
+            data.append(host)
     return data or Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
