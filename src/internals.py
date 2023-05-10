@@ -612,6 +612,9 @@ class Authorization:
                     f"Missing MemberProfile {self.session.member_email}"
                 )
 
+            logger.info(
+                f"Session inputs; {self.member.email} | {self.user_agent.get_browser()} | {self.user_agent.get_os()} | {self.user_agent.get_device()}"
+            )
             expected_session_token = hashlib.sha224(
                 bytes(
                     f"{self.member.email}{self.user_agent.get_browser()}{self.user_agent.get_os()}{self.user_agent.get_device()}",

@@ -509,6 +509,9 @@ async def login(
     confirmed_registration = False
     try:
         parsed_ua = ua_parser(user_agent)
+        internals.logger.info(
+            f"Session inputs; {member.email} | {parsed_ua.get_browser()} | {parsed_ua.get_os()} | {parsed_ua.get_device()}"
+        )
         session_token = hashlib.sha224(
             bytes(
                 f"{member.email}{parsed_ua.get_browser()}{parsed_ua.get_os()}{parsed_ua.get_device()}",
@@ -533,6 +536,24 @@ async def login(
             geo_ip: Location = geocoder.ip(str(ip_addr))
             session.lat = geo_ip.lat
             session.lon = geo_ip.lng
+
+        past_sessions = filter(
+            lambda past_session: past_session.ip_addr == session.ip_addr,
+            [
+                models.MemberSessionForList(
+                    **services.aws.get_dynamodb(  # type: ignore
+                        table_name=services.aws.Tables.LOGIN_SESSIONS,
+                        item_key={"session_token": item["session_token"]},
+                    )
+                )
+                for item in services.aws.query_dynamodb(
+                    table_name=services.aws.Tables.LOGIN_SESSIONS,
+                    IndexName="member_email-index",
+                    KeyConditionExpression=Key("member_email").eq(member.email),
+                )
+            ],
+        )
+
         if not session.save():
             return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
         if member.confirmation_token == magic_token:
@@ -540,6 +561,27 @@ async def login(
             confirmed_registration = True
         if not member.save() or not link.delete():
             return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not list(past_sessions):
+            sendgrid = services.sendgrid.send_email(
+                recipient=member.email,
+                subject="Login from a new location",
+                template="login_location",
+                data={
+                    "browser": session.browser,
+                    "platform": session.platform,
+                    "ip_addr": ip_addr,
+                    "lon": session.lon,
+                    "lat": session.lat,
+                },
+            )
+            if sendgrid._content:  # pylint: disable=protected-access
+                res = json.loads(
+                    sendgrid._content.decode()  # pylint: disable=protected-access
+                )
+                if isinstance(res, dict) and res.get("errors"):
+                    internals.logger.error(res.get("errors"))
+                    return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
 
     except RuntimeError as err:
         internals.logger.exception(err)
@@ -1226,6 +1268,9 @@ async def webauthn_verify(
                     internals.logger.warning(ex, exc_info=True)
 
     parsed_ua = ua_parser(user_agent)
+    internals.logger.info(
+        f"Session inputs; {member.email} | {parsed_ua.get_browser()} | {parsed_ua.get_os()} | {parsed_ua.get_device()}"
+    )
     session_token = hashlib.sha224(
         bytes(
             f"{member.email}{parsed_ua.get_browser()}{parsed_ua.get_os()}{parsed_ua.get_device()}",
@@ -1250,6 +1295,23 @@ async def webauthn_verify(
         geo_ip: Location = geocoder.ip(str(ip_addr))
         session.lat = geo_ip.lat
         session.lon = geo_ip.lng
+
+    past_sessions = filter(
+        lambda past_session: past_session.ip_addr == session.ip_addr,
+        [
+            models.MemberSessionForList(
+                **services.aws.get_dynamodb(  # type: ignore
+                    table_name=services.aws.Tables.LOGIN_SESSIONS,
+                    item_key={"session_token": item["session_token"]},
+                )
+            )
+            for item in services.aws.query_dynamodb(
+                table_name=services.aws.Tables.LOGIN_SESSIONS,
+                IndexName="member_email-index",
+                KeyConditionExpression=Key("member_email").eq(member.email),
+            )
+        ],
+    )
     if not session.save():
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -1263,6 +1325,27 @@ async def webauthn_verify(
             f'"webauthn_verify","","{member.email}","{ip_addr}","{user_agent}",""'
         )
         return Response(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    if not list(past_sessions):
+        sendgrid = services.sendgrid.send_email(
+            recipient=member.email,
+            subject="Login from a new location",
+            template="login_location",
+            data={
+                "browser": session.browser,
+                "platform": session.platform,
+                "ip_addr": ip_addr,
+                "lon": session.lon,
+                "lat": session.lat,
+            },
+        )
+        if sendgrid._content:  # pylint: disable=protected-access
+            res = json.loads(
+                sendgrid._content.decode()  # pylint: disable=protected-access
+            )
+            if isinstance(res, dict) and res.get("errors"):
+                internals.logger.error(res.get("errors"))
+                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
 
     bearer_token = jwt.encode(
         payload={
