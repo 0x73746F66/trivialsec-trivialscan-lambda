@@ -370,7 +370,7 @@ async def store(
                 if len(full_report.targets) > 1:
                     suffix = f" +{len(full_report.targets)} hosts"
                 email_subject = f"Customer-managed scanner upload {first_hostname}:{first_port}{suffix}"
-                sendgrid = services.sendgrid.send_email(
+                if sendgrid := services.sendgrid.send_email(
                     subject=email_subject,
                     recipient=authz.account.primary_email,  # type: ignore
                     template="scan_completed",
@@ -384,13 +384,16 @@ async def store(
                         "warn_result": full_report.results.get("warn", 0),  # type: ignore
                         "fail_result": full_report.results.get("fail", 0),  # type: ignore
                     },
-                )
-                if sendgrid._content:  # pylint: disable=protected-access
-                    res = json.loads(
-                        sendgrid._content.decode()  # pylint: disable=protected-access
+                ):
+                    internals.logger.info(
+                        f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
                     )
-                    if isinstance(res, dict) and res.get("errors"):
-                        internals.logger.error(res.get("errors"))
+                    if sendgrid._content:  # pylint: disable=protected-access
+                        res = json.loads(
+                            sendgrid._content.decode()  # pylint: disable=protected-access
+                        )
+                        if isinstance(res, dict) and res.get("errors"):
+                            internals.logger.error(res.get("errors"))
 
             for cert in certs.values():
                 cert.save()

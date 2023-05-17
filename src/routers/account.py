@@ -108,28 +108,29 @@ async def account_register(
             recipient_email=member.email, list_name="members"
         )
         activation_url = f"{internals.DASHBOARD_URL}/login/{member.confirmation_token}"
-        sendgrid = services.sendgrid.send_email(
-            subject="Registration Confirmation",
-            recipient=member.email,
-            template="registrations",
-            data={"activation_url": activation_url},
-            bcc="support@trivialsec.com",
-        )
-        if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(
-                sendgrid._content.decode()  # pylint: disable=protected-access
-            )
-            if isinstance(res, dict) and res.get("errors"):
-                internals.logger.error(res.get("errors"))
-                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         link = models.MagicLink(
             email=member.email,
             magic_token=member.confirmation_token,  # type: ignore
             ip_addr=ip_addr,
             user_agent=user_agent,
             timestamp=round(time() * 1000),
-            sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
         )
+        if sendgrid := services.sendgrid.send_email(
+            subject="Registration Confirmation",
+            recipient=member.email,
+            template="registrations",
+            data={"activation_url": activation_url},
+            bcc="support@trivialsec.com",
+        ):
+            link.sendgrid_message_id = sendgrid.headers.get("X-Message-Id")
+            internals.logger.info(f"sendgrid_message_id {link.sendgrid_message_id}")
+            if sendgrid._content:  # pylint: disable=protected-access
+                res = json.loads(
+                    sendgrid._content.decode()  # pylint: disable=protected-access
+                )
+                if isinstance(res, dict) and res.get("errors"):
+                    internals.logger.error(res.get("errors"))
+                    return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
         _, hostname = member.email.split("@")
         if hostname not in EMAIL_PROVIDERS:
             with contextlib.suppress(Exception):
@@ -207,7 +208,7 @@ async def support_request(
     Generates a support request for the logged in member.
     """
     try:
-        sendgrid = services.sendgrid.send_email(
+        if sendgrid := services.sendgrid.send_email(
             subject=f"Support | {data.subject}",
             sender_name=authz.account.name,
             sender=authz.member.email,
@@ -219,26 +220,29 @@ async def support_request(
                     authz.member.dict(), indent=2, default=str, sort_keys=True
                 ),
             },
-        )
-        if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(
-                sendgrid._content.decode()  # pylint: disable=protected-access
+        ):
+            internals.logger.info(
+                f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
             )
-            if isinstance(res, dict) and res.get("errors"):
-                internals.logger.error(res.get("errors"))
-                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
+            if sendgrid._content:  # pylint: disable=protected-access
+                res = json.loads(
+                    sendgrid._content.decode()  # pylint: disable=protected-access
+                )
+                if isinstance(res, dict) and res.get("errors"):
+                    internals.logger.error(res.get("errors"))
+                    return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
 
-        support = models.Support(
-            member=authz.member,  # type: ignore
-            subject=data.subject,
-            message=data.message,
-            ip_addr=authz.ip_addr,
-            user_agent=authz.user_agent.ua_string,
-            timestamp=round(time() * 1000),  # JavaScript support
-            sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
-        )
-        if support.save():
-            return support
+            support = models.Support(
+                member=authz.member,  # type: ignore
+                subject=data.subject,
+                message=data.message,
+                ip_addr=authz.ip_addr,
+                user_agent=authz.user_agent.ua_string,
+                timestamp=round(time() * 1000),  # JavaScript support
+                sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
+            )
+            if support.save():
+                return support
     except RuntimeError as err:
         internals.logger.exception(err)
 
@@ -277,7 +281,7 @@ async def update_billing_email(
     if validators.email(data.email) is not True:  # type: ignore
         return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
-        sendgrid = services.sendgrid.send_email(
+        if sendgrid := services.sendgrid.send_email(
             subject="Change of Billing Email Address notice",
             recipient=authz.account.billing_email,  # type: ignore
             cc=data.email,
@@ -288,17 +292,17 @@ async def update_billing_email(
                 "modifying_email": authz.member.email,
                 "email_type_message": "account billing email address",
             },
-        )
-        if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(
-                sendgrid._content.decode()  # pylint: disable=protected-access
+        ):
+            if sendgrid._content:  # pylint: disable=protected-access
+                res = json.loads(
+                    sendgrid._content.decode()  # pylint: disable=protected-access
+                )
+                if isinstance(res, dict) and res.get("errors"):
+                    internals.logger.error(res.get("errors"))
+                    return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
+            internals.logger.info(
+                f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
             )
-            if isinstance(res, dict) and res.get("errors"):
-                internals.logger.error(res.get("errors"))
-                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
-        internals.logger.info(
-            f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
-        )
         authz.account.billing_email = data.email
         with contextlib.suppress(Exception):
             customer = services.stripe.create_customer(
@@ -349,7 +353,6 @@ async def update_billing_email(
     tags=["Member Account"],
 )
 async def update_primary_email(
-    response: Response,
     data: models.EmailEditRequest,
     authz: internals.Authorization = Depends(internals.auth_required, use_cache=False),
 ):
@@ -359,7 +362,7 @@ async def update_primary_email(
     if validators.email(data.email) is not True:  # type: ignore
         return Response(status_code=status.HTTP_400_BAD_REQUEST)
     try:
-        sendgrid = services.sendgrid.send_email(
+        if sendgrid := services.sendgrid.send_email(
             subject="Change of Billing Email Address notice",
             recipient=authz.account.primary_email,  # type: ignore
             cc=data.email,
@@ -370,17 +373,17 @@ async def update_primary_email(
                 "modifying_email": authz.member.email,
                 "email_type_message": "account primary contact email address",
             },
-        )
-        if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(
-                sendgrid._content.decode()  # pylint: disable=protected-access
+        ):
+            if sendgrid._content:  # pylint: disable=protected-access
+                res = json.loads(
+                    sendgrid._content.decode()  # pylint: disable=protected-access
+                )
+                if isinstance(res, dict) and res.get("errors"):
+                    internals.logger.error(res.get("errors"))
+                    return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
+            internals.logger.info(
+                f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
             )
-            if isinstance(res, dict) and res.get("errors"):
-                internals.logger.error(res.get("errors"))
-                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
-        internals.logger.info(
-            f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
-        )
         authz.account.primary_email = data.email
         if not authz.account.save():
             return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -679,7 +682,7 @@ async def enable_webhook(
         webhook.signing_secret = token_urlsafe(nbytes=23)
         webhooks.append(webhook)
         changed = True
-        sendgrid = services.sendgrid.send_email(
+        if sendgrid := services.sendgrid.send_email(
             subject="Webhook Registered",
             recipient=authz.member.email,
             template="webhook_signing_secret",
@@ -687,14 +690,17 @@ async def enable_webhook(
                 "endpoint": webhook.endpoint,
                 "signing_secret": webhook.signing_secret,
             },
-        )
-        if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(
-                sendgrid._content.decode()  # pylint: disable=protected-access
+        ):
+            if sendgrid._content:  # pylint: disable=protected-access
+                res = json.loads(
+                    sendgrid._content.decode()  # pylint: disable=protected-access
+                )
+                if isinstance(res, dict) and res.get("errors"):
+                    internals.logger.error(res.get("errors"))
+                    response.status_code = status.HTTP_424_FAILED_DEPENDENCY
+            internals.logger.info(
+                f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
             )
-            if isinstance(res, dict) and res.get("errors"):
-                internals.logger.error(res.get("errors"))
-                response.status_code = status.HTTP_424_FAILED_DEPENDENCY
 
     authz.account.webhooks = webhooks
     if changed and authz.account.save():

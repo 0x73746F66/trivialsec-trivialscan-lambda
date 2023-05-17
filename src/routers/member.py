@@ -402,26 +402,27 @@ async def magic_link(
     try:
         sendgrid_message_id = None
         if not request.headers.get("Postman-Token"):
-            sendgrid = services.sendgrid.send_email(
+            if sendgrid := services.sendgrid.send_email(
                 recipient=data.email,
                 subject="Trivial Security Magic Link",
                 template="magic_link",
                 data={"magic_link": login_url},
-            )
-            sendgrid_message_id = sendgrid.headers.get("X-Message-Id")
-        link = models.MagicLink(
-            email=data.email,
-            magic_token=magic_token,
-            ip_addr=ip_addr,
-            user_agent=user_agent,
-            timestamp=round(time() * 1000),
-            sendgrid_message_id=sendgrid_message_id,
-        )
-        if link.save():
-            internals.logger.info(
-                f"Magic Link for {member.account_name}"
-            )  # pylint: disable=no-member
-            return f"/login/{link.magic_token}"
+            ):
+                sendgrid_message_id = sendgrid.headers.get("X-Message-Id")
+                internals.logger.info(f"sendgrid_message_id {sendgrid_message_id}")
+                link = models.MagicLink(
+                    email=data.email,
+                    magic_token=magic_token,
+                    ip_addr=ip_addr,
+                    user_agent=user_agent,
+                    timestamp=round(time() * 1000),
+                    sendgrid_message_id=sendgrid_message_id,
+                )
+                if link.save():
+                    internals.logger.info(
+                        f"Magic Link for {member.account_name}"
+                    )  # pylint: disable=no-member
+                    return f"/login/{link.magic_token}"
 
     except RuntimeError as err:
         internals.logger.exception(err)
@@ -532,27 +533,30 @@ async def login(
             if session.browser.startswith("PostmanRuntime")
             else f"{parsed_ua.get_os()} {parsed_ua.get_device()}"
         )
+        past_sessions = []
         if ip_addr:
             geo_ip: Location = geocoder.ip(str(ip_addr))
             session.lat = geo_ip.lat
             session.lon = geo_ip.lng
-
-        past_sessions = filter(
-            lambda past_session: past_session.ip_addr == session.ip_addr,
-            [
-                models.MemberSessionForList(
-                    **services.aws.get_dynamodb(  # type: ignore
-                        table_name=services.aws.Tables.LOGIN_SESSIONS,
-                        item_key={"session_token": item["session_token"]},
-                    )
+            if past_sessions := list(
+                filter(
+                    lambda past_session: past_session.ip_addr == session.ip_addr,
+                    [
+                        models.MemberSessionForList(
+                            **services.aws.get_dynamodb(  # type: ignore
+                                table_name=services.aws.Tables.LOGIN_SESSIONS,
+                                item_key={"session_token": item["session_token"]},
+                            )
+                        )
+                        for item in services.aws.query_dynamodb(
+                            table_name=services.aws.Tables.LOGIN_SESSIONS,
+                            IndexName="member_email-index",
+                            KeyConditionExpression=Key("member_email").eq(member.email),
+                        )
+                    ],
                 )
-                for item in services.aws.query_dynamodb(
-                    table_name=services.aws.Tables.LOGIN_SESSIONS,
-                    IndexName="member_email-index",
-                    KeyConditionExpression=Key("member_email").eq(member.email),
-                )
-            ],
-        )
+            ):
+                internals.logger.info(f"past_sessions {past_sessions}")
 
         if not session.save():
             return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -562,8 +566,9 @@ async def login(
         if not member.save() or not link.delete():
             return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        if not list(past_sessions):
-            sendgrid = services.sendgrid.send_email(
+        if not past_sessions and ip_addr:
+            internals.logger.info(f"past_sessions {past_sessions}")
+            if sendgrid := services.sendgrid.send_email(
                 recipient=member.email,
                 subject="Login from a new location",
                 template="login_location",
@@ -574,14 +579,17 @@ async def login(
                     "lon": session.lon,
                     "lat": session.lat,
                 },
-            )
-            if sendgrid._content:  # pylint: disable=protected-access
-                res = json.loads(
-                    sendgrid._content.decode()  # pylint: disable=protected-access
+            ):
+                internals.logger.info(
+                    f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
                 )
-                if isinstance(res, dict) and res.get("errors"):
-                    internals.logger.error(res.get("errors"))
-                    return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
+                if sendgrid._content:  # pylint: disable=protected-access
+                    res = json.loads(
+                        sendgrid._content.decode()  # pylint: disable=protected-access
+                    )
+                    if isinstance(res, dict) and res.get("errors"):
+                        internals.logger.error(res.get("errors"))
+                        return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
 
     except RuntimeError as err:
         internals.logger.exception(err)
@@ -719,7 +727,7 @@ async def update_email(
         return Response(status_code=status.HTTP_409_CONFLICT)
     try:
         token = hashlib.sha224(bytes(str(random()), "ascii")).hexdigest()
-        sendgrid = services.sendgrid.send_email(
+        if sendgrid := services.sendgrid.send_email(
             subject="Request to Change Email Address",
             recipient=authz.account.primary_email,  # type: ignore
             template="recovery_request",
@@ -728,44 +736,46 @@ async def update_email(
                 "old_email": authz.member.email,
                 "new_email": data.email,
             },
-        )
-        if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(
-                sendgrid._content.decode()  # pylint: disable=protected-access
-            )
-            if isinstance(res, dict) and res.get("errors"):
-                internals.logger.error(res.get("errors"))
-                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
+        ):
+            sendgrid_message_id = sendgrid.headers.get("X-Message-Id")
+            internals.logger.info(f"sendgrid_message_id {sendgrid_message_id}")
+            if sendgrid._content:  # pylint: disable=protected-access
+                res = json.loads(
+                    sendgrid._content.decode()  # pylint: disable=protected-access
+                )
+                if isinstance(res, dict) and res.get("errors"):
+                    internals.logger.error(res.get("errors"))
+                    return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
 
-        link = models.AcceptEdit(
-            account=authz.account,  # type: ignore
-            requester=authz.member,  # type: ignore
-            accept_token=token,
-            old_value=authz.member.email,
-            ip_addr=authz.ip_addr,
-            new_value=data.email,
-            change_model="MemberProfile",
-            change_prop="email",
-            model_key="email",
-            model_value=authz.member.email,
-            user_agent=authz.user_agent.ua_string,
-            timestamp=round(time() * 1000),  # JavaScript support
-            sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
-        )
-        if link.save():
-            services.webhook.send(
-                event_name=models.WebhookEvent.MEMBER_ACTIVITY,
-                account=authz.account,
-                data={
-                    "type": "change_member_email_request",
-                    "timestamp": round(time() * 1000),
-                    "account": authz.account.name,
-                    "member": authz.member.email,
-                    "ip_addr": authz.ip_addr,
-                    "user_agent": authz.user_agent.ua_string,
-                },
+            link = models.AcceptEdit(
+                account=authz.account,  # type: ignore
+                requester=authz.member,  # type: ignore
+                accept_token=token,
+                old_value=authz.member.email,
+                ip_addr=authz.ip_addr,
+                new_value=data.email,
+                change_model="MemberProfile",
+                change_prop="email",
+                model_key="email",
+                model_value=authz.member.email,
+                user_agent=authz.user_agent.ua_string,
+                timestamp=round(time() * 1000),  # JavaScript support
+                sendgrid_message_id=sendgrid_message_id,
             )
-            return link
+            if link.save():
+                services.webhook.send(
+                    event_name=models.WebhookEvent.MEMBER_ACTIVITY,
+                    account=authz.account,
+                    data={
+                        "type": "change_member_email_request",
+                        "timestamp": round(time() * 1000),
+                        "account": authz.account.name,
+                        "member": authz.member.email,
+                        "ip_addr": authz.ip_addr,
+                        "user_agent": authz.user_agent.ua_string,
+                    },
+                )
+                return link
     except RuntimeError as err:
         internals.logger.exception(err)
 
@@ -910,7 +920,7 @@ async def send_member_invitation(
             recipient_email=member.email, list_name="members"
         )
         activation_url = f"{internals.DASHBOARD_URL}/login/{member.confirmation_token}"
-        sendgrid = services.sendgrid.send_email(
+        if sendgrid := services.sendgrid.send_email(
             subject="Trivial Security | Member Invitation",
             recipient=data.email,
             cc=authz.member.email,
@@ -920,35 +930,37 @@ async def send_member_invitation(
                 "invited_by": authz.member.email,
                 "activation_url": activation_url,
             },
-        )
-        if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(
-                sendgrid._content.decode()  # pylint: disable=protected-access
-            )
-            if isinstance(res, dict) and res.get("errors"):
-                internals.logger.error(res.get("errors"))
-                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
-        link = models.MagicLink(
-            email=member.email,
-            magic_token=member.confirmation_token,
-            timestamp=round(time() * 1000),
-            sendgrid_message_id=sendgrid.headers.get("X-Message-Id"),
-        )  # type: ignore
-        if link.save():
-            services.webhook.send(
-                event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
-                account=authz.account,
-                data={
-                    "type": "member_invitation",
-                    "timestamp": round(time() * 1000),
-                    "account": authz.account.name,
-                    "member": authz.member.email,
-                    "invitee": member.email,
-                    "ip_addr": authz.ip_addr,
-                    "user_agent": authz.user_agent.ua_string,
-                },
-            )
-            return member
+        ):
+            sendgrid_message_id = sendgrid.headers.get("X-Message-Id")
+            internals.logger.info(f"sendgrid_message_id {sendgrid_message_id}")
+            if sendgrid._content:  # pylint: disable=protected-access
+                res = json.loads(
+                    sendgrid._content.decode()  # pylint: disable=protected-access
+                )
+                if isinstance(res, dict) and res.get("errors"):
+                    internals.logger.error(res.get("errors"))
+                    return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
+            link = models.MagicLink(
+                email=member.email,
+                magic_token=member.confirmation_token,
+                timestamp=round(time() * 1000),
+                sendgrid_message_id=sendgrid_message_id,
+            )  # type: ignore
+            if link.save():
+                services.webhook.send(
+                    event_name=models.WebhookEvent.ACCOUNT_ACTIVITY,
+                    account=authz.account,
+                    data={
+                        "type": "member_invitation",
+                        "timestamp": round(time() * 1000),
+                        "account": authz.account.name,
+                        "member": authz.member.email,
+                        "invitee": member.email,
+                        "ip_addr": authz.ip_addr,
+                        "user_agent": authz.user_agent.ua_string,
+                    },
+                )
+                return member
     except RuntimeError as err:
         internals.logger.exception(err)
 
@@ -1291,27 +1303,31 @@ async def webauthn_verify(
         if session.browser.startswith("PostmanRuntime")
         else f"{parsed_ua.get_os()} {parsed_ua.get_device()}"
     )
+    past_sessions = []
     if ip_addr:
         geo_ip: Location = geocoder.ip(str(ip_addr))
         session.lat = geo_ip.lat
         session.lon = geo_ip.lng
+        if past_sessions := list(
+            filter(
+                lambda past_session: past_session.ip_addr == session.ip_addr,
+                [
+                    models.MemberSessionForList(
+                        **services.aws.get_dynamodb(  # type: ignore
+                            table_name=services.aws.Tables.LOGIN_SESSIONS,
+                            item_key={"session_token": item["session_token"]},
+                        )
+                    )
+                    for item in services.aws.query_dynamodb(
+                        table_name=services.aws.Tables.LOGIN_SESSIONS,
+                        IndexName="member_email-index",
+                        KeyConditionExpression=Key("member_email").eq(member.email),
+                    )
+                ],
+            )
+        ):
+            internals.logger.info(f"past_sessions {past_sessions}")
 
-    past_sessions = filter(
-        lambda past_session: past_session.ip_addr == session.ip_addr,
-        [
-            models.MemberSessionForList(
-                **services.aws.get_dynamodb(  # type: ignore
-                    table_name=services.aws.Tables.LOGIN_SESSIONS,
-                    item_key={"session_token": item["session_token"]},
-                )
-            )
-            for item in services.aws.query_dynamodb(
-                table_name=services.aws.Tables.LOGIN_SESSIONS,
-                IndexName="member_email-index",
-                KeyConditionExpression=Key("member_email").eq(member.email),
-            )
-        ],
-    )
     if not session.save():
         return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -1326,8 +1342,8 @@ async def webauthn_verify(
         )
         return Response(status_code=status.HTTP_401_UNAUTHORIZED)
 
-    if not list(past_sessions):
-        sendgrid = services.sendgrid.send_email(
+    if not past_sessions and ip_addr:
+        if sendgrid := services.sendgrid.send_email(
             recipient=member.email,
             subject="Login from a new location",
             template="login_location",
@@ -1338,14 +1354,17 @@ async def webauthn_verify(
                 "lon": session.lon,
                 "lat": session.lat,
             },
-        )
-        if sendgrid._content:  # pylint: disable=protected-access
-            res = json.loads(
-                sendgrid._content.decode()  # pylint: disable=protected-access
+        ):
+            internals.logger.info(
+                f"sendgrid_message_id {sendgrid.headers.get('X-Message-Id')}"
             )
-            if isinstance(res, dict) and res.get("errors"):
-                internals.logger.error(res.get("errors"))
-                return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
+            if sendgrid._content:  # pylint: disable=protected-access
+                res = json.loads(
+                    sendgrid._content.decode()  # pylint: disable=protected-access
+                )
+                if isinstance(res, dict) and res.get("errors"):
+                    internals.logger.error(res.get("errors"))
+                    return Response(status_code=status.HTTP_424_FAILED_DEPENDENCY)
 
     bearer_token = jwt.encode(
         payload={
